@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs"
+import { UserButton, SignedIn, SignedOut, SignInButton, SignOutButton } from "@clerk/nextjs"
 import {
     ShoppingCart,
     Package,
@@ -119,9 +119,12 @@ export function AppSidebar({ className }: { className?: string }) {
                     <span>Sync</span>
                 </Button>
                 <SignedIn>
-                    <div className="hidden">
-                        {/* Sign Out handled by UserButton, but keeping this structure if needed later */}
-                    </div>
+                    <SignOutButton>
+                        <Button variant="ghost" className="w-full justify-start gap-3" size="lg">
+                            <LogOut className="h-5 w-5" />
+                            <span>Sign Out</span>
+                        </Button>
+                    </SignOutButton>
                 </SignedIn>
                 <SignedOut>
                     <SignInButton mode="modal">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs"
 import {
     ShoppingCart,
     Package,
@@ -44,10 +45,21 @@ export function AppSidebar({ className }: { className?: string }) {
     return (
         <div className={cn("flex flex-col h-full bg-background", className)}>
             <div className="flex items-center gap-3 pb-6 pt-4 px-2">
-                <User className="h-12 w-12 text-primary" />
-                <div>
-                    <h2 className="text-xl font-semibold">Welcome back!</h2>
-                </div>
+                <SignedIn>
+                    <UserButton showName appearance={{
+                        elements: {
+                            userButtonBox: "flex-row-reverse",
+                            userButtonOuterIdentifier: "text-xl font-semibold",
+                            avatarBox: "h-12 w-12"
+                        }
+                    }} />
+                </SignedIn>
+                <SignedOut>
+                    <User className="h-12 w-12 text-primary" />
+                    <div>
+                        <h2 className="text-xl font-semibold">Guest User</h2>
+                    </div>
+                </SignedOut>
             </div>
 
             <nav className="flex flex-col gap-2 flex-1">
@@ -106,10 +118,19 @@ export function AppSidebar({ className }: { className?: string }) {
                     <RefreshCw className="h-5 w-5" />
                     <span>Sync</span>
                 </Button>
-                <Button variant="ghost" className="w-full justify-start gap-3" size="lg">
-                    <LogOut className="h-5 w-5" />
-                    <span>Sign Out</span>
-                </Button>
+                <SignedIn>
+                    <div className="hidden">
+                        {/* Sign Out handled by UserButton, but keeping this structure if needed later */}
+                    </div>
+                </SignedIn>
+                <SignedOut>
+                    <SignInButton mode="modal">
+                        <Button variant="ghost" className="w-full justify-start gap-3" size="lg">
+                            <LogOut className="h-5 w-5" />
+                            <span>Sign In</span>
+                        </Button>
+                    </SignInButton>
+                </SignedOut>
                 <p className="text-center text-xs text-muted-foreground pt-4 pb-2">ShopFlow v1.0.0</p>
             </div>
         </div>

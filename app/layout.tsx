@@ -31,6 +31,8 @@ export const metadata: Metadata = {
   },
 }
 
+import { QueryProvider } from "@/components/providers/query-provider"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,12 +40,14 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
-        <body className={`font-sans antialiased`}>
-          {children}
-          <Analytics />
-        </body>
-      </html>
+      <QueryProvider>
+        <html lang="en">
+          <body className={`font-sans antialiased`}>
+            {children}
+            <Analytics />
+          </body>
+        </html>
+      </QueryProvider>
     </ClerkProvider>
   )
 }

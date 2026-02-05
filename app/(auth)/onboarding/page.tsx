@@ -1,16 +1,18 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useUser } from "@clerk/nextjs"
+import { useUser, useClerk } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { User, Store, Loader2 } from "lucide-react"
+import { User, Store, Loader2, LogOut } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 
 export default function OnboardingPage() {
     const { user, isLoaded } = useUser()
+    const { signOut } = useClerk()
     const router = useRouter()
+    const [dbUser, setDbUser] = useState<any>(null)
     const [isChecking, setIsChecking] = useState(true)
 
     useEffect(() => {
@@ -19,19 +21,20 @@ export default function OnboardingPage() {
         const checkUser = async () => {
             try {
                 // Check if user exists in the database
-                await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/users/clerk/${user.id}`)
+                const existingUser = await apiClient.get<any>(`${process.env.NEXT_PUBLIC_API_URL}/api/users/clerk/${user.id}`)
+                setDbUser(existingUser)
 
-                // If the request succeeds (200 OK), the user exists
-                // Redirect to dashboard as they don't need onboarding
+                // check if user has a shop assigned 
+                await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/shop-staff/users/${user.id}`)
+
                 router.push("/")
             } catch (error: any) {
-                // If 404, user doesn't exist, proceed with onboarding
+                // If 404 from shop-staff check, user exists but isn't assigned
+                // If 404 from users check, user truly doesn't exist
                 if (error.status === 404) {
                     setIsChecking(false)
                 } else {
                     console.error("Error checking user status:", error)
-                    // If unexpected error, maybe still let them try or show error
-                    // For now, let's allow them to see the page but log the error
                     setIsChecking(false)
                 }
             }
@@ -56,18 +59,30 @@ export default function OnboardingPage() {
             </div>
 
             <div className="w-full space-y-4">
-                <Link href="/onboarding/create-store" className="block">
+                <Link href={`/onboarding/create-shop${dbUser ? `?userId=${dbUser.id}` : ''}`} className="block">
                     <Button className="w-full h-16 text-lg bg-blue-600 hover:bg-blue-700 text-white justify-center gap-3">
                         <User className="h-6 w-6" />
                         Create New Account &rarr;
                     </Button>
                 </Link>
-                <Link href="/onboarding/join" className="block">
+                <Link href={`/onboarding/join${dbUser ? `?userId=${dbUser.id}` : ''}`} className="block">
                     <Button variant="outline" className="w-full h-16 text-lg bg-transparent border-blue-500/30 hover:border-blue-500 hover:bg-blue-500/10 text-blue-500 justify-center gap-3">
                         <Store className="h-6 w-6" />
                         Join Existing Business &rarr;
                     </Button>
                 </Link>
+            </div>
+
+            <div className="pt-4">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => signOut(() => router.push("/sign-in"))}
+                    className="text-muted-foreground hover:text-red-600 transition-colors"
+                >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Back to Sign In
+                </Button>
             </div>
         </div>
     )

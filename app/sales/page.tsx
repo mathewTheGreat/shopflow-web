@@ -35,9 +35,21 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import { AppSidebar } from "@/components/app-sidebar"
+import { useItems } from "@/hooks/use-items"
+import { useCustomersByShop, useCustomerBalance } from "@/hooks/use-customers"
+import { useCreateSale, useSales } from "@/hooks/use-sales"
+import { useAppStore } from "@/store/use-app-store"
+import { v4 as uuidv4 } from "uuid"
+import { toast } from "sonner"
+import { ReceiptDialog } from "@/components/sales/receipt-dialog"
+import { useExpenses, useCreateExpense } from "@/hooks/use-expenses"
+import { CustomerManager } from "@/components/customers/CustomerManager"
+import { Loader2, ChevronLeft } from "lucide-react"
 
-type SaleCategory = "immediate" | "credit" | "prepaid"
-type PaymentMethod = "cash" | "mpesa" | "split"
+type SaleCategory = "IMMEDIATE" | "CREDIT" | "PREPAID"
+type PaymentMethod = "CASH" | "MPESA" | "SPLIT"
+
+// ... ExpenseCategory type remains same ...
 type ExpenseCategory =
   | "rent"
   | "utilities"
@@ -47,19 +59,43 @@ type ExpenseCategory =
   | "supplies"
   | "insurance"
   | "maintenance"
-  | "food"
+  | "food-lunch"
   | "general"
 
 export default function SalesPage() {
   const [activeTab, setActiveTab] = useState("sales")
   const [showPOS, setShowPOS] = useState(false)
   const [showExpenseDialog, setShowExpenseDialog] = useState(false)
+  const [currentView, setCurrentView] = useState<"main" | "customers">("main")
+
+  // Global State
+  const activeShop = useAppStore((state) => state.activeShop)
+  const activeShift = useAppStore((state) => state.activeShift)
+  const userInfo = useAppStore((state) => state.userInfo)
+
+  // Data Fetching Hooks
+  const { items, isLoading: itemsLoading } = useItems()
+  const { data: customers = [], isLoading: customersLoading } = useCustomersByShop(activeShop?.id)
+  const { data: sales, isLoading: salesLoading } = useSales(activeShop?.id)
+  const { data: expenses, isLoading: expensesLoading } = useExpenses(activeShop?.id)
+  const { mutateAsync: completeSale, isPending: isSubmitting } = useCreateSale()
+  const { mutateAsync: createExpense, isPending: isExpenseSubmitting } = useCreateExpense()
 
   // POS State
-  const [saleCategory, setSaleCategory] = useState<SaleCategory>("immediate")
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash")
-  const [cashAmount, setCashAmount] = useState("10.00")
-  const [cartItems, setCartItems] = useState([{ id: 1, name: "0.5L Bottle", price: 10, quantity: 1 }])
+  const [saleCategory, setSaleCategory] = useState<SaleCategory>("IMMEDIATE")
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH")
+  const [cashAmount, setCashAmount] = useState("")
+  const [mpesaAmount, setMpesaAmount] = useState("")
+  const [selectedCustomerId, setSelectedCustomerId] = useState("")
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null)
+  const [itemSearchQuery, setItemSearchQuery] = useState("")
+  const [cartItems, setCartItems] = useState<any[]>([])
+
+  const { balance: customerBalance } = useCustomerBalance(selectedCustomerId)
+
+
+
+
 
   // Expense State
   const [expenseAmount, setExpenseAmount] = useState("0")
@@ -67,473 +103,860 @@ export default function SalesPage() {
   const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>("general")
   const [expensePaymentMethod, setExpensePaymentMethod] = useState<"cash" | "mpesa">("cash")
 
-  const salesData = [
-    { id: "c5bbb2", type: "IMMEDIATE", amount: "630.00", date: "Fri, 31 Oct 2025" },
-    { id: "e85860", type: "IMMEDIATE", amount: "210.00", date: "Fri, 31 Oct 2025" },
-    { id: "28945d", type: "IMMEDIATE", amount: "140.00", date: "Fri, 31 Oct 2025" },
-    { id: "100856", type: "IMMEDIATE", amount: "70.00", date: "Fri, 31 Oct 2025" },
-    { id: "30b3c2", type: "IMMEDIATE", amount: "105.00", date: "Fri, 31 Oct 2025" },
-    { id: "4c151c", type: "IMMEDIATE", amount: "95.00", date: "Fri, 31 Oct 2025" },
-  ]
-
-
-
   const calculateTotal = () => {
     return cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   }
 
-  const updateQuantity = (id: number, delta: number) => {
+  const addToCart = (item: any) => {
+    const existing = cartItems.find((ci) => ci.id === item.id)
+    if (existing) {
+      setCartItems(
+        cartItems.map((ci) => (ci.id === item.id ? { ...ci, quantity: ci.quantity + 1 } : ci))
+      )
+    } else {
+      setCartItems([...cartItems, { id: item.id, name: item.name, price: item.sale_price, quantity: 1 }])
+    }
+    toast.success(`${item.name} added to cart`)
+  }
+
+  const updateQuantity = (id: string, delta: number) => {
     setCartItems(
-      cartItems.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item)),
+      cartItems.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item))
     )
   }
 
-  const removeItem = (id: number) => {
+  const removeItem = (id: string) => {
     setCartItems(cartItems.filter((item) => item.id !== id))
+  }
+
+  const handleCompleteSale = async () => {
+    if (cartItems.length === 0) {
+      toast.error("Cart is empty")
+      return
+    }
+
+    if (saleCategory !== "IMMEDIATE" && !selectedCustomerId) {
+      toast.error("Please select a customer for Credit/Prepaid sales")
+      return
+    }
+
+    if (!activeShop || !activeShift) {
+      toast.error("Shop or Shift not active")
+      return
+    }
+
+    const totalAmount = calculateTotal()
+
+    // Validate payments for IMMEDIATE sales
+    const payments = []
+    if (saleCategory === "IMMEDIATE") {
+      if (paymentMethod === "CASH") {
+        payments.push({ payment_method: "CASH", amount: totalAmount })
+      } else if (paymentMethod === "MPESA") {
+        payments.push({ payment_method: "MPESA", amount: totalAmount })
+      } else if (paymentMethod === "SPLIT") {
+        const cash = parseFloat(cashAmount) || 0
+        const mpesa = parseFloat(mpesaAmount) || 0
+        if (Math.abs(cash + mpesa - totalAmount) > 0.1) {
+          toast.error(`Payment sum (KES ${cash + mpesa}) must match total (KES ${totalAmount})`)
+          return
+        }
+        if (cash > 0) payments.push({ payment_method: "CASH", amount: cash })
+        if (mpesa > 0) payments.push({ payment_method: "MPESA", amount: mpesa })
+      }
+    }
+
+    const payload = {
+      sale: {
+        id: uuidv4(),
+        shop_id: activeShop.id,
+        shift_id: activeShift.id,
+        customer_id: selectedCustomerId || null,
+        total_amount: totalAmount,
+        sale_category: saleCategory,
+        sale_date: new Date().toISOString(),
+        created_by: userInfo?.id || "system",
+      },
+      items: cartItems.map((item) => ({
+        id: uuidv4(),
+        item_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity,
+        created_by: userInfo?.id || "system",
+      })),
+      payments: payments.map((p) => ({
+        ...p,
+        id: uuidv4(),
+        shift_id: activeShift.id,
+        created_by: userInfo?.id || "system",
+      })),
+    }
+
+    try {
+      await completeSale(payload)
+      setCartItems([])
+      setSelectedCustomerId("")
+      setShowPOS(false)
+      setCashAmount("")
+      setMpesaAmount("")
+    } catch (error) {
+      console.error("Sale failed:", error)
+    }
+  }
+
+  if (currentView === "customers") {
+    return (
+      <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
+        <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+          <AppSidebar />
+        </div>
+        <div className="flex-1 flex flex-col min-w-0">
+          <CustomerManager onBack={() => setCurrentView("main")} />
+        </div>
+      </div>
+    )
   }
 
   return (
     <>
-      <div className="flex min-h-screen bg-background text-foreground">
+      <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
         {/* Desktop Sidebar */}
-        <div className="hidden lg:block w-80 border-r border-border bg-card p-6">
+        <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
           <AppSidebar />
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <header className="border-b border-border bg-card sticky top-0 z-40">
-            <div className="w-full flex items-center justify-between p-4">
-              <div className="flex items-center gap-4">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="lg:hidden">
-                      <Menu className="h-6 w-6" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-80 p-6">
-                    <AppSidebar />
-                  </SheetContent>
-                </Sheet>
-                <h1 className="text-2xl font-medium text-muted-foreground">Sales and Expenses</h1>
-              </div>
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Mobile Header */}
+          <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-card border-b border-border/50 lg:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="mr-4">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[300px] p-0 border-r-border bg-card">
+                <AppSidebar />
+              </SheetContent>
+            </Sheet>
+            <h1 className="text-xl font-bold tracking-tight">Sales and Expenses</h1>
+          </header>
+
+          {/* Desktop Header */}
+          <header className="hidden lg:flex items-center h-[64px] px-6 bg-card border-b border-border/50 sticky top-0 z-30">
+            <div className="pl-[44px]">
+              <h1 className="text-xl font-bold tracking-tight">Sales and Expenses</h1>
             </div>
           </header>
 
           {/* Main Content */}
-          <main className="container mx-auto p-4 md:p-6 max-w-7xl">
-
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              {/* Tab Navigation */}
-              <TabsList className="grid w-full grid-cols-4 h-auto mb-6 bg-transparent">
-                <TabsTrigger
-                  value="sales"
-                  className="flex flex-col items-center gap-1 py-3 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent"
-                >
-                  <TrendingUp className="h-6 w-6" />
-                  <span className="text-sm">Sales</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="expenses"
-                  className="flex flex-col items-center gap-1 py-3 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent"
-                >
-                  <Receipt className="h-6 w-6" />
-                  <span className="text-sm">Expenses</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="reports"
-                  className="flex flex-col items-center gap-1 py-3 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent"
-                >
-                  <BarChart3 className="h-6 w-6" />
-                  <span className="text-sm">Reports</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="more"
-                  className="flex flex-col items-center gap-1 py-3 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent"
-                >
-                  <Settings className="h-6 w-6" />
-                  <span className="text-sm">More</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Sales Tab */}
-              <TabsContent value="sales" className="space-y-4">
-                <Button onClick={() => setShowPOS(true)} className="w-full bg-primary hover:bg-primary/90 h-14 text-base">
-                  New Sale
-                </Button>
-
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold">Recent Sales</h2>
-                  <Button variant="ghost" size="icon">
-                    <Filter className="h-5 w-5" />
-                  </Button>
-                </div>
-
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="Search sales..." className="pl-10 h-12 bg-muted border-0" />
-                </div>
-
-                <div className="space-y-3">
-                  {salesData.map((sale) => (
-                    <Card key={sale.id} className="bg-card border-border">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Sale #{sale.id}</span>
-                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <span className="text-sm text-muted-foreground">{sale.date}</span>
+          <main className="flex-1 p-4 md:p-8 lg:p-12 w-full mx-auto overflow-y-auto">
+            <div className="max-w-[1440px] mx-auto h-[calc(100vh-8rem)]">
+              <Card className="h-full border-none shadow-sm flex flex-col bg-card overflow-hidden">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+                  {/* Tab Navigation */}
+                  <div className="border-b px-6 flex-shrink-0">
+                    <TabsList className="flex h-auto w-full justify-start gap-8 bg-transparent p-0">
+                      <TabsTrigger
+                        value="sales"
+                        className="relative h-14 rounded-none border-b-2 border-transparent px-4 pb-3 pt-3 font-medium text-muted-foreground hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary"
+                      >
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4" />
+                          <span>Sales</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">{sale.type}</span>
-                          <span className="text-2xl font-bold">KES {sale.amount}</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="expenses"
+                        className="relative h-14 rounded-none border-b-2 border-transparent px-4 pb-3 pt-3 font-medium text-muted-foreground hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Receipt className="h-4 w-4" />
+                          <span>Expenses</span>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </TabsContent>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="reports"
+                        className="relative h-14 rounded-none border-b-2 border-transparent px-4 pb-3 pt-3 font-medium text-muted-foreground hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary"
+                      >
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4" />
+                          <span>Reports</span>
+                        </div>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="more"
+                        className="relative h-14 rounded-none border-b-2 border-transparent px-4 pb-3 pt-3 font-medium text-muted-foreground hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Settings className="h-4 w-4" />
+                          <span>More</span>
+                        </div>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
 
-              {/* Expenses Tab */}
-              <TabsContent value="expenses" className="space-y-4">
-                <Button
-                  onClick={() => setShowExpenseDialog(true)}
-                  className="w-full h-14 text-base bg-[oklch(0.5_0.15_20)] hover:bg-[oklch(0.45_0.15_20)]"
-                >
-                  Add Expense
-                </Button>
+                  <div className="flex-1 overflow-y-auto min-h-0">
 
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="Search expenses..." className="pl-10 h-12 bg-muted border-0" />
-                </div>
+                    {/* Sales Tab */}
+                    <TabsContent value="sales" className="h-full p-6 space-y-6">
+                      <Button onClick={() => setShowPOS(true)} className="w-full bg-primary hover:bg-primary/90 h-14 text-base">
+                        <Plus className="h-5 w-5 mr-2" />
+                        New Sale
+                      </Button>
 
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold">Expenses (0)</h2>
-                  <Button variant="ghost" size="icon">
-                    <Filter className="h-5 w-5" />
-                  </Button>
-                </div>
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold">Recent Sales</h2>
+                        <Button variant="outline" size="icon">
+                          <Filter className="h-4 w-4" />
+                        </Button>
+                      </div>
 
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Receipt className="h-24 w-24 text-muted-foreground/30 mb-4" />
-                  <p className="text-muted-foreground text-lg">No expenses for this shift yet</p>
-                </div>
-              </TabsContent>
+                      <div className="border rounded-lg">
+                        <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
+                          <div>Sale ID</div>
+                          <div>Date</div>
+                          <div>Type</div>
+                          <div className="text-right">Amount</div>
+                        </div>
+                        <div className="divide-y">
+                          {salesLoading ? (
+                            <div className="p-8 text-center text-muted-foreground">Loading sales...</div>
+                          ) : sales?.length === 0 ? (
+                            <div className="p-8 text-center text-muted-foreground">No recent sales</div>
+                          ) : (
+                            sales?.map((sale: any) => (
+                              <div
+                                key={sale.id}
+                                className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm"
+                                onClick={() => setSelectedSaleId(sale.id)}
+                              >
+                                <div className="font-medium text-primary" title={sale.id}>#{sale.id.slice(0, 8)}</div>
+                                <div className="text-muted-foreground">
+                                  {new Date(sale.sale_date).toLocaleString('en-US', {
+                                    weekday: 'short',
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: 'numeric',
+                                    minute: 'numeric',
+                                    hour12: true
+                                  })}
+                                </div>
+                                <div>
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                    {sale.sale_category}
+                                  </span>
+                                </div>
+                                <div className="text-right font-bold">KES {sale.total_amount.toLocaleString()}</div>
+                              </div>
+                            )))}
+                        </div>
+                      </div>
+                    </TabsContent>
 
-              {/* Reports Tab */}
-              <TabsContent value="reports" className="space-y-4">
-                <Card className="bg-card border-border hover:bg-accent transition-colors cursor-pointer">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <FileText className="h-8 w-8 text-primary" />
-                      <span className="text-lg font-medium">Shift Performance</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                    {/* Expenses Tab */}
+                    <TabsContent value="expenses" className="h-full p-6 space-y-6">
+                      <Button
+                        onClick={() => setShowExpenseDialog(true)}
+                        className="w-full h-14 text-base bg-[oklch(0.5_0.15_20)] hover:bg-[oklch(0.45_0.15_20)]"
+                      >
+                        <Plus className="h-5 w-5 mr-2" />
+                        Add Expense
+                      </Button>
 
-                <Card className="bg-card border-border hover:bg-accent transition-colors cursor-pointer">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <FileText className="h-8 w-8 text-primary" />
-                      <span className="text-lg font-medium">Financial Breakdown</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold">Recent Expenses</h2>
+                        <Button variant="outline" size="icon">
+                          <Filter className="h-4 w-4" />
+                        </Button>
+                      </div>
 
-              {/* More Tab */}
-              <TabsContent value="more" className="space-y-4">
-                <Card className="bg-card border-border hover:bg-accent transition-colors cursor-pointer">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <Users className="h-8 w-8 text-primary" />
-                      <span className="text-lg font-medium">Customers</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
+                          <div>Category</div>
+                          <div>Description</div>
+                          <div>Date</div>
+                          <div className="text-right">Amount</div>
+                        </div>
+                        <div className="divide-y max-h-[500px] overflow-y-auto">
+                          {expensesLoading ? (
+                            <div className="p-8 text-center text-muted-foreground">Loading expenses...</div>
+                          ) : expenses?.length === 0 ? (
+                            <div className="p-12 text-center border-2 border-dashed rounded-lg bg-muted/5 m-4">
+                              <div className="bg-muted/20 p-4 rounded-full mb-4 inline-block">
+                                <Receipt className="h-10 w-10 text-muted-foreground/50" />
+                              </div>
+                              <h3 className="text-lg font-semibold">No expenses recorded</h3>
+                              <p className="text-muted-foreground text-sm max-w-sm mt-2 mb-6 mx-auto">
+                                Expenses recorded for this branch will appear here.
+                              </p>
+                              <Button variant="outline" onClick={() => setShowExpenseDialog(true)}>
+                                Record First Expense
+                              </Button>
+                            </div>
+                          ) : (
+                            expenses?.map((expense: any) => (
+                              <div key={expense.id} className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm">
+                                <div className="font-medium text-primary">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 uppercase">
+                                    {expense.category}
+                                  </span>
+                                </div>
+                                <div className="truncate text-muted-foreground pr-4" title={expense.description || ""}>
+                                  {expense.description || "No description"}
+                                </div>
+                                <div className="text-muted-foreground/80">
+                                  {new Date(expense.expense_date).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: '2-digit'
+                                  })}
+                                </div>
+                                <div className="text-right font-bold text-orange-600">KES {expense.amount.toLocaleString()}</div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </TabsContent>
 
-                <Card className="bg-card border-border hover:bg-accent transition-colors cursor-pointer">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <Receipt className="h-8 w-8 text-primary" />
-                      <span className="text-lg font-medium">Payments</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                    {/* Reports Tab */}
+                    <TabsContent value="reports" className="h-full p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card className="border hover:border-primary/50 transition-colors cursor-pointer group">
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <FileText className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Shift Performance</h3>
+                              <p className="text-sm text-muted-foreground">View detailed analytics about current and past shifts.</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="border hover:border-primary/50 transition-colors cursor-pointer group">
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <BarChart3 className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Financial Breakdown</h3>
+                              <p className="text-sm text-muted-foreground">Analyze sales, expenses and profit margins.</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </TabsContent>
+
+                    {/* More Tab */}
+                    <TabsContent value="more" className="h-full p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setCurrentView("customers")}
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <Users className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Customers</h3>
+                              <p className="text-sm text-muted-foreground">Manage customer profiles and credit history.</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="border hover:border-primary/50 transition-colors cursor-pointer group">
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <CreditCard className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Payments</h3>
+                              <p className="text-sm text-muted-foreground">View payment history and transaction details.</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </TabsContent>
+                  </div>
+                </Tabs>
+              </Card>
+            </div>
           </main>
 
           {/* Point of Sale Dialog */}
-          <Dialog open={showPOS} onOpenChange={setShowPOS}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
-              <div className="sticky top-0 bg-card z-10 border-b border-border p-6 flex items-center justify-between">
-                <DialogTitle className="text-2xl">Point of Sale</DialogTitle>
-                <Button variant="ghost" onClick={() => setShowPOS(false)}>
-                  Cancel
+          <Sheet open={showPOS} onOpenChange={setShowPOS}>
+            <SheetContent
+              side="bottom"
+              className="h-[100vh] w-full p-0 gap-0 overflow-hidden flex flex-col max-w-none"
+            >
+              {/* Header */}
+              <div className="sticky top-0 bg-card z-10 border-b border-border px-6 py-4 flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-4">
+                  <Package className="h-8 w-8 text-primary" />
+                  <div>
+                    <h2 className="text-2xl font-bold">Point of Sale</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Branch: <span className="font-medium">{activeShop?.name || "None"}</span> •
+                      Shift: <span className="font-medium">#{activeShift?.id?.slice(-4) || "None"}</span>
+                    </p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowPOS(false)}>
+                  <X className="h-6 w-6" />
                 </Button>
               </div>
 
-              <div className="p-6 space-y-6">
-                {/* Sale Category */}
-                <div>
-                  <Label className="text-base mb-3 block">Sale Category</Label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <Button
-                      variant={saleCategory === "immediate" ? "default" : "outline"}
-                      className="h-20 flex flex-col gap-2"
-                      onClick={() => setSaleCategory("immediate")}
-                    >
-                      <Banknote className="h-6 w-6" />
-                      <span>Immediate</span>
-                    </Button>
-                    <Button
-                      variant={saleCategory === "credit" ? "default" : "outline"}
-                      className="h-20 flex flex-col gap-2"
-                      onClick={() => setSaleCategory("credit")}
-                    >
-                      <CreditCard className="h-6 w-6" />
-                      <span>Credit</span>
-                    </Button>
-                    <Button
-                      variant={saleCategory === "prepaid" ? "default" : "outline"}
-                      className="h-20 flex flex-col gap-2"
-                      onClick={() => setSaleCategory("prepaid")}
-                    >
-                      <Wallet className="h-6 w-6" />
-                      <span>Prepaid</span>
-                    </Button>
-                  </div>
-                </div>
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto min-h-0 bg-muted/30">
+                <div className="p-4 md:p-8 lg:p-12 space-y-6">
+                  <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-                {/* Payment Method */}
-                <div>
-                  <Label className="text-base mb-3 block">Payment Method</Label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <Button
-                      variant={paymentMethod === "cash" ? "default" : "outline"}
-                      className="h-20 flex flex-col gap-2"
-                      onClick={() => setPaymentMethod("cash")}
-                    >
-                      <Banknote className="h-6 w-6" />
-                      <span>Cash</span>
-                    </Button>
-                    <Button
-                      variant={paymentMethod === "mpesa" ? "default" : "outline"}
-                      className="h-20 flex flex-col gap-2"
-                      onClick={() => setPaymentMethod("mpesa")}
-                    >
-                      <CreditCard className="h-6 w-6" />
-                      <span>M-Pesa</span>
-                    </Button>
-                    <Button
-                      variant={paymentMethod === "split" ? "default" : "outline"}
-                      className="h-20 flex flex-col gap-2"
-                      onClick={() => setPaymentMethod("split")}
-                    >
-                      <Wallet className="h-6 w-6" />
-                      <span>Split</span>
-                    </Button>
-                  </div>
-                </div>
+                    {/* Left Column: Configuration & Search (7 cols) */}
+                    <div className="lg:col-span-8 space-y-6">
 
-                {/* Cash Amount */}
-                <div>
-                  <Label htmlFor="cashAmount" className="text-base mb-3 block">
-                    Cash Amount
-                  </Label>
-                  <Input
-                    id="cashAmount"
-                    type="number"
-                    value={cashAmount}
-                    onChange={(e) => setCashAmount(e.target.value)}
-                    className="h-14 text-lg bg-muted"
-                  />
-                </div>
-
-                {/* Payment Summary */}
-                <Card className="bg-muted border-l-4 border-l-teal-500">
-                  <CardContent className="p-4">
-                    <div className="space-y-1">
-                      <p className="text-lg">
-                        <span className="font-semibold">Total:</span> KSh {calculateTotal().toFixed(2)}
-                      </p>
-                      <p className="text-lg">
-                        <span className="font-semibold">Paid:</span> KSh {cashAmount}
-                      </p>
-                      <p className="text-lg font-semibold text-teal-500">Fully Paid</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Search Products */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="Search products..." className="pl-10 h-12 bg-muted border-0" />
-                </div>
-
-                {/* Cart */}
-                <div>
-                  <h3 className="text-xl font-semibold mb-4">Cart ({cartItems.length})</h3>
-                  <div className="space-y-3">
-                    {cartItems.map((item) => (
-                      <Card key={item.id} className="bg-card border-border">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="font-medium text-lg">{item.name}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-500"
-                              onClick={() => removeItem(item.id)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="secondary"
-                                size="icon"
-                                className="h-10 w-10"
-                                onClick={() => updateQuantity(item.id, -1)}
-                              >
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                              <span className="text-xl font-medium w-12 text-center">{item.quantity}</span>
-                              <Button
-                                variant="secondary"
-                                size="icon"
-                                className="h-10 w-10"
-                                onClick={() => updateQuantity(item.id, 1)}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
+                      {/* Customer & Category Selection */}
+                      <Card className="shadow-sm">
+                        <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Sale Category */}
+                          <div>
+                            <Label className="text-sm font-bold mb-3 block text-primary uppercase tracking-wider">1. Sale Type</Label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {["IMMEDIATE", "CREDIT", "PREPAID"].map((cat) => (
+                                <Button
+                                  key={cat}
+                                  variant={saleCategory === cat ? "default" : "outline"}
+                                  className="h-16 flex flex-col gap-1 transition-all"
+                                  onClick={() => setSaleCategory(cat as SaleCategory)}
+                                >
+                                  {cat === "IMMEDIATE" && <Banknote className="h-5 w-5" />}
+                                  {cat === "CREDIT" && <CreditCard className="h-5 w-5" />}
+                                  {cat === "PREPAID" && <Wallet className="h-5 w-5" />}
+                                  <span className="text-xs font-bold uppercase">{cat}</span>
+                                </Button>
+                              ))}
                             </div>
-                            <span className="text-xl font-bold text-primary">KSh {item.price * item.quantity}</span>
+                          </div>
+
+                          {/* Customer Selection */}
+                          <div>
+                            <Label className="text-sm font-bold mb-3 block text-primary uppercase tracking-wider">
+                              2. Customer {saleCategory !== "IMMEDIATE" && <span className="text-destructive">*</span>}
+                            </Label>
+                            {customersLoading ? (
+                              <div className="h-14 flex items-center justify-center border rounded-md bg-muted/20">
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <select
+                                  value={selectedCustomerId}
+                                  onChange={(e) => setSelectedCustomerId(e.target.value)}
+                                  className="flex h-16 w-full rounded-md border border-input bg-card px-4 py-2 text-lg ring-offset-background focus:ring-2 focus:ring-primary outline-none transition-all"
+                                >
+                                  <option value="">Walk-in Customer</option>
+                                  {customers.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name} {c.phone ? `(${c.phone})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                                {selectedCustomerId && (
+                                  <div className="flex items-center justify-between px-2 text-sm">
+                                    <span className="text-muted-foreground font-medium">Available Balance:</span>
+                                    <span className={`font-bold ${customerBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                      KES {customerBalance.toLocaleString()}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Complete Sale Button */}
-                <div className="flex items-center justify-between gap-4 pt-4 border-t border-border sticky bottom-0 bg-card pb-4">
-                  <div className="text-2xl font-bold">Total: KSh {calculateTotal()}</div>
-                  <Button className="bg-primary hover:bg-primary/90 h-14 px-8 text-lg">Complete Sale</Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+                      {/* Payment Method (Only for IMMEDIATE) */}
+                      {saleCategory === "IMMEDIATE" && (
+                        <Card className="shadow-sm border-l-4 border-l-blue-500">
+                          <CardContent className="p-6 space-y-6">
+                            <div>
+                              <Label className="text-sm font-bold mb-3 block text-blue-600 uppercase tracking-wider">3. Payment Configuration</Label>
+                              <div className="grid grid-cols-3 gap-3">
+                                {["CASH", "MPESA", "SPLIT"].map((method) => (
+                                  <Button
+                                    key={method}
+                                    variant={paymentMethod === method ? "default" : "outline"}
+                                    className={`h-16 flex flex-col gap-1 ${paymentMethod === method ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                                    onClick={() => setPaymentMethod(method as PaymentMethod)}
+                                  >
+                                    <span className="text-xs font-bold opacity-70 uppercase">{method}</span>
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
 
-          {/* Add Expense Dialog */}
-          <Dialog open={showExpenseDialog} onOpenChange={setShowExpenseDialog}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between">
-                <DialogTitle className="text-2xl">Add New Expense</DialogTitle>
-                <Button variant="ghost" size="icon" onClick={() => setShowExpenseDialog(false)}>
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
+                            {paymentMethod === "SPLIT" && (
+                              <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                                <div className="space-y-2">
+                                  <Label className="text-xs font-bold text-muted-foreground uppercase">Cash Portion</Label>
+                                  <div className="relative">
+                                    <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                      type="number"
+                                      placeholder="0.00"
+                                      value={cashAmount}
+                                      onChange={(e) => setCashAmount(e.target.value)}
+                                      className="h-12 pl-10 text-lg font-bold"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-xs font-bold text-muted-foreground uppercase">M-Pesa Portion</Label>
+                                  <div className="relative">
+                                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                      type="number"
+                                      placeholder="0.00"
+                                      value={mpesaAmount}
+                                      onChange={(e) => setMpesaAmount(e.target.value)}
+                                      className="h-12 pl-10 text-lg font-bold"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
 
-              <div className="space-y-6 pt-4">
-                {/* Amount */}
-                <div>
-                  <Label htmlFor="expenseAmount" className="text-base mb-3 block">
-                    Amount (Ksh)
-                  </Label>
-                  <Input
-                    id="expenseAmount"
-                    type="number"
-                    value={expenseAmount}
-                    onChange={(e) => setExpenseAmount(e.target.value)}
-                    className="h-14 text-lg bg-muted"
-                  />
-                </div>
+                      {/* Product Search & Catalog */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-bold flex items-center gap-2">
+                            <Plus className="h-6 w-6 text-primary" />
+                            Select Products
+                          </h3>
+                        </div>
+                        <div className="relative">
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                          <Input
+                            placeholder="Enter product name or SKU..."
+                            className="pl-12 h-16 text-lg bg-card border-border shadow-sm focus:ring-2 focus:ring-primary"
+                            value={itemSearchQuery}
+                            onChange={(e) => setItemSearchQuery(e.target.value)}
+                          />
+                        </div>
 
-                {/* Reference */}
-                <div>
-                  <Label htmlFor="expenseReference" className="text-base mb-3 block">
-                    Reference (Optional)
-                  </Label>
-                  <Input
-                    id="expenseReference"
-                    placeholder="Enter reference or additional notes"
-                    value={expenseReference}
-                    onChange={(e) => setExpenseReference(e.target.value)}
-                    className="h-12 bg-muted"
-                  />
-                </div>
+                        {/* Search Results Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto max-h-[400px] pr-2">
+                          {itemsLoading ? (
+                            Array(6).fill(0).map((_, i) => (
+                              <div key={i} className="h-32 bg-muted/20 animate-pulse rounded-xl" />
+                            ))
+                          ) : items.filter(i =>
+                            i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
+                            i.id.includes(itemSearchQuery)
+                          ).map((item) => (
+                            <Card
+                              key={item.id}
+                              className="group cursor-pointer hover:border-primary hover:shadow-md transition-all active:scale-95 overflow-hidden"
+                              onClick={() => addToCart(item)}
+                            >
+                              <CardContent className="p-4 flex flex-col justify-between h-full space-y-2">
+                                <div>
+                                  <div className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-1">{item.name}</div>
+                                  <div className="text-xs text-muted-foreground bg-muted-foreground/10 inline-block px-1.5 py-0.5 rounded mt-1 uppercase font-bold tracking-tight">
+                                    {item.unit_of_measure}
+                                  </div>
+                                </div>
+                                <div className="flex items-end justify-between pt-2">
+                                  <div className="text-primary font-black text-xl leading-none">
+                                    <span className="text-xs font-bold mr-0.5">KES</span>
+                                    {item.sale_price.toLocaleString()}
+                                  </div>
+                                  <div className="p-1.5 rounded-full bg-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">
+                                    <Plus className="h-4 w-4" />
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
 
-                {/* Category */}
-                <div>
-                  <Label className="text-base mb-3 block">Category</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: "rent", label: "Rent" },
-                      { value: "utilities", label: "Utilities" },
-                      { value: "transport", label: "Transport" },
-                      { value: "salaries", label: "Salaries" },
-                      { value: "marketing", label: "Marketing" },
-                      { value: "supplies", label: "Supplies" },
-                      { value: "insurance", label: "Insurance" },
-                      { value: "maintenance", label: "Maintenance" },
-                      { value: "food", label: "Food/Lunch" },
-                      { value: "general", label: "General" },
-                    ].map((cat) => (
+                    {/* Right Column: Cart & Summary (4 cols) */}
+                    <div className="lg:col-span-4 space-y-6">
+                      <Card className="flex flex-col h-[calc(100vh-16rem)] shadow-lg border-primary/20 bg-card/50 backdrop-blur-sm">
+                        <CardContent className="p-6 flex flex-col h-full">
+                          <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-2xl font-black flex items-center gap-2">
+                              <ShoppingCart className="h-7 w-7 text-primary" />
+                              Cart
+                              <span className="bg-primary text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center ml-1">
+                                {cartItems.length}
+                              </span>
+                            </h3>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-muted-foreground font-bold hover:text-red-500"
+                              onClick={() => setCartItems([])}
+                            >
+                              CLEAR
+                            </Button>
+                          </div>
+
+                          {/* Cart Item List */}
+                          <div className="flex-1 overflow-y-auto min-h-0 -mx-2 px-2 space-y-4">
+                            {cartItems.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
+                                <ShoppingCart className="h-16 w-16 mb-4" />
+                                <p className="font-bold text-lg">Your cart is empty</p>
+                                <p className="text-sm">Add items from the catalog on the left to start a sale</p>
+                              </div>
+                            ) : cartItems.map((item) => (
+                              <div key={item.id} className="p-4 rounded-2xl border border-border bg-card group shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="font-bold text-lg line-clamp-1">{item.name}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                    onClick={() => removeItem(item.id)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <div className="flex items-center gap-1 bg-muted/30 rounded-xl p-1 shadow-inner border">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-10 w-10 text-primary hover:bg-white transition-all shadow-none"
+                                      onClick={() => updateQuantity(item.id, -1)}
+                                    >
+                                      <Minus className="h-4 w-4" />
+                                    </Button>
+                                    <span className="font-black w-10 text-center text-lg">{item.quantity}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-10 w-10 text-primary hover:bg-white transition-all shadow-none"
+                                      onClick={() => updateQuantity(item.id, 1)}
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-xs font-bold text-muted-foreground/60 uppercase">
+                                      {item.quantity} x {item.price.toLocaleString()}
+                                    </div>
+                                    <div className="text-xl font-black text-primary tracking-tighter">
+                                      KES {(item.price * item.quantity).toLocaleString()}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Order Summary Footer */}
+                          <div className="mt-8 pt-8 border-t-2 border-dashed space-y-4">
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-muted-foreground font-bold">
+                                <span>SUBTOTAL</span>
+                                <span>KES {calculateTotal().toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between text-muted-foreground font-bold">
+                                <span>TAX (VAT 0%)</span>
+                                <span>KES 0.00</span>
+                              </div>
+                            </div>
+                            <div className="bg-primary/5 p-4 rounded-2xl flex justify-between items-center">
+                              <span className="text-lg font-bold text-primary">GRAND TOTAL</span>
+                              <span className="text-3xl font-black text-primary tracking-tighter">
+                                KES {calculateTotal().toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
                       <Button
-                        key={cat.value}
-                        variant={expenseCategory === cat.value ? "default" : "outline"}
-                        className="h-12"
-                        onClick={() => setExpenseCategory(cat.value as ExpenseCategory)}
+                        disabled={isSubmitting || cartItems.length === 0}
+                        onClick={handleCompleteSale}
+                        className="w-full h-24 text-2xl font-black rounded-3xl shadow-2xl shadow-primary/30 bg-primary hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 group overflow-hidden relative"
                       >
-                        {cat.label}
+                        {isSubmitting ? (
+                          <div className="flex items-center gap-3">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                            PROCESSING...
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between w-full px-4">
+                            <span>COMPLETE SALE</span>
+                            <div className="bg-white/20 p-3 rounded-full group-hover:translate-x-2 transition-transform">
+                              <TrendingUp className="h-8 w-8" />
+                            </div>
+                          </div>
+                        )}
                       </Button>
-                    ))}
+                    </div>
                   </div>
-                </div>
-
-                {/* Payment Method */}
-                <div>
-                  <Label className="text-base mb-3 block">
-                    Payment Method <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      variant={expensePaymentMethod === "cash" ? "default" : "outline"}
-                      className="h-16 text-lg"
-                      onClick={() => setExpensePaymentMethod("cash")}
-                    >
-                      Cash
-                    </Button>
-                    <Button
-                      variant={expensePaymentMethod === "mpesa" ? "default" : "outline"}
-                      className="h-16 text-lg"
-                      onClick={() => setExpensePaymentMethod("mpesa")}
-                    >
-                      M-Pesa
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-3 pt-4">
-                  <Button variant="secondary" className="h-14 text-base" onClick={() => setShowExpenseDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button className="h-14 text-base bg-primary hover:bg-primary/90">Add Expense</Button>
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            </SheetContent>
+          </Sheet>
+
+          {/* Receipt Dialog */}
+          <ReceiptDialog
+            open={!!selectedSaleId}
+            onOpenChange={(open) => !open && setSelectedSaleId(null)}
+            saleId={selectedSaleId}
+          />
+
+          {/* Add Expense Sheet (Bottom Sheet UI) */}
+          <Sheet open={showExpenseDialog} onOpenChange={setShowExpenseDialog}>
+            <SheetContent side="bottom" className="h-screen w-screen p-0 flex flex-col overflow-hidden border-none">
+              <SheetHeader className="px-6 py-6 border-b flex-shrink-0 flex flex-row items-center justify-between">
+                <div>
+                  <SheetTitle className="text-3xl font-black tracking-tighter">RECORD EXPENSE</SheetTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Branch: <span className="font-bold">{activeShop?.name}</span>
+                  </p>
+                </div>
+              </SheetHeader>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-muted/20">
+                <div className="max-w-2xl mx-auto space-y-8 pb-12">
+                  {/* Amount Section */}
+                  <div className="space-y-4">
+                    <Label className="text-sm font-bold text-primary uppercase tracking-widest">1. Amount (KES) *</Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-muted-foreground">KES</span>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={expenseAmount}
+                        onChange={(e) => setExpenseAmount(e.target.value)}
+                        className="h-20 pl-20 text-4xl font-black bg-card border-2 focus:border-primary transition-all rounded-2xl"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Category Section */}
+                  <div className="space-y-4">
+                    <Label className="text-sm font-bold text-primary uppercase tracking-widest">2. Category *</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {[
+                        'Rent', 'Utilities', 'Transport', 'Salaries',
+                        'Marketing', 'Supplies', 'Insurance', 'Maintenance',
+                        'Food/Lunch', 'General'
+                      ].map((cat) => (
+                        <Button
+                          key={cat}
+                          variant={expenseCategory === cat.toLowerCase().replace('/', '-') ? "default" : "outline"}
+                          className={`h-14 font-bold border-2 transition-all rounded-xl ${expenseCategory === cat.toLowerCase().replace('/', '-') ? "scale-105 shadow-md" : "hover:bg-primary/5"
+                            }`}
+                          onClick={() => setExpenseCategory(cat.toLowerCase().replace('/', '-') as ExpenseCategory)}
+                        >
+                          {cat}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Payment Method */}
+                  <div className="space-y-4">
+                    <Label className="text-sm font-bold text-primary uppercase tracking-widest">3. Payment Method *</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button
+                        variant={expensePaymentMethod === 'cash' ? "default" : "outline"}
+                        className="h-16 text-lg font-black gap-2 rounded-2xl border-2"
+                        onClick={() => setExpensePaymentMethod('cash')}
+                      >
+                        <Banknote className="h-6 w-6" />
+                        CASH
+                      </Button>
+                      <Button
+                        variant={expensePaymentMethod === 'mpesa' ? "default" : "outline"}
+                        className="h-16 text-lg font-black gap-2 rounded-2xl border-2"
+                        onClick={() => setExpensePaymentMethod('mpesa')}
+                      >
+                        <Store className="h-6 w-6" />
+                        M-PESA
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Description & Reference */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <Label className="text-sm font-bold text-primary uppercase tracking-widest">4. Description *</Label>
+                      <Input
+                        placeholder="What was this for?"
+                        value={expenseReference}
+                        onChange={(e) => setExpenseReference(e.target.value)}
+                        className="h-14 bg-card border-2 rounded-xl px-4"
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <Label className="text-sm font-bold text-primary uppercase tracking-widest">5. Notes (Optional)</Label>
+                      <Input
+                        placeholder="Add more details..."
+                        className="h-14 bg-card border-2 rounded-xl px-4"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    disabled={isExpenseSubmitting || !expenseAmount || parseFloat(expenseAmount) <= 0 || !expenseReference}
+                    onClick={async () => {
+                      if (!activeShop || !activeShift || !userInfo) {
+                        toast.error("Required context missing (Shop/Shift/User)")
+                        return
+                      }
+
+                      try {
+                        await createExpense({
+                          shop_id: activeShop.id,
+                          shift_id: activeShift.id,
+                          expense_date: new Date().toISOString(),
+                          amount: parseFloat(expenseAmount),
+                          description: expenseReference,
+                          category: expenseCategory.toUpperCase(),
+                          payment_method: expensePaymentMethod.toUpperCase() as 'CASH' | 'MPESA',
+                          created_by: userInfo.id,
+                        })
+                        setShowExpenseDialog(false)
+                        setExpenseAmount("0")
+                        setExpenseReference("")
+                      } catch (err) {
+                        console.error(err)
+                      }
+                    }}
+                    className="w-full h-20 text-2xl font-black rounded-3xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+                  >
+                    {isExpenseSubmitting ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        RECORDING...
+                      </div>
+                    ) : (
+                      "SAVE EXPENSE"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div >
+      </div >
     </>
   )
 }

@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2 } from "lucide-react"
+import { Loader2, Eye, EyeOff, Lock, Mail } from "lucide-react"
 import { toast } from "sonner"
 
 export function SignUpForm() {
@@ -16,6 +16,7 @@ export function SignUpForm() {
     const router = useRouter()
     const [email, setEmail] = React.useState("")
     const [password, setPassword] = React.useState("")
+    const [showPassword, setShowPassword] = React.useState(false)
     const [verifying, setVerifying] = React.useState(false)
     const [code, setCode] = React.useState("")
     const [isLoading, setIsLoading] = React.useState(false)
@@ -62,7 +63,7 @@ export function SignUpForm() {
 
             if (completeSignUp.status === "complete") {
                 await setActive({ session: completeSignUp.createdSessionId })
-                router.push("/")
+                router.push("/onboarding")
             }
         } catch (err: any) {
             console.error(JSON.stringify(err, null, 2))
@@ -79,13 +80,17 @@ export function SignUpForm() {
             await signUp.authenticateWithRedirect({
                 strategy: "oauth_google",
                 redirectUrl: "/sso-callback",
-                redirectUrlComplete: "/",
+                redirectUrlComplete: "/onboarding",
             })
         } catch (err: any) {
             console.error(JSON.stringify(err, null, 2))
             toast.error("Failed to start Google sign up")
             setIsLoading(false)
         }
+    }
+
+    const togglePasswordVisibility = () => {
+        setShowPassword(!showPassword)
     }
 
     if (verifying) {
@@ -141,31 +146,57 @@ export function SignUpForm() {
             <form onSubmit={handleSubmit} className="w-full space-y-4">
                 <div className="space-y-2">
                     <Label htmlFor="email">Email address</Label>
-                    <Input
-                        id="email"
-                        placeholder="name@example.com"
-                        type="email"
-                        autoCapitalize="none"
-                        autoComplete="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading}
-                        required
-                        className="bg-white"
-                    />
+                    <div className="relative">
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                            <Mail className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <Input
+                            id="email"
+                            placeholder="name@example.com"
+                            type="email"
+                            autoCapitalize="none"
+                            autoComplete="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            disabled={isLoading}
+                            required
+                            className="pl-10 h-12 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400"
+                        />
+                    </div>
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading}
-                        required
-                        className="bg-white"
-                    />
+                    <div className="relative">
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                            <Lock className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            disabled={isLoading}
+                            required
+                            className="pl-10 pr-10 h-12 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400"
+                        />
+                        <button
+                            type="button"
+                            onClick={togglePasswordVisibility}
+                            disabled={isLoading}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                            {showPassword ? (
+                                <EyeOff className="h-5 w-5" />
+                            ) : (
+                                <Eye className="h-5 w-5" />
+                            )}
+                        </button>
+                    </div>
                 </div>
+
+                {/* Clerk's CAPTCHA widget */}
+                <div id="clerk-captcha" />
+
                 <Button className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700 text-white mt-2" disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Continue &rarr;

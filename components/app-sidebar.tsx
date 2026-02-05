@@ -1,140 +1,106 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { UserButton, SignedIn, SignedOut, SignInButton, SignOutButton } from "@clerk/nextjs"
+import { SignOutButton } from "@clerk/nextjs"
+import { useTheme } from "next-themes"
 import {
+    LayoutDashboard,
     ShoppingCart,
     Package,
     Store,
+    Settings,
     Moon,
+    Sun,
     RefreshCw,
     LogOut,
-    User,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
+import { ShopSwitcher } from "@/components/shops/ShopSwitcher"
 
 export function AppSidebar({ className }: { className?: string }) {
     const pathname = usePathname()
-    const [isDarkMode, setIsDarkMode] = useState(true)
-
-    useEffect(() => {
-        // Check initial state from DOM
-        if (document.documentElement.classList.contains("dark")) {
-            setIsDarkMode(true)
-        } else {
-            setIsDarkMode(false)
-        }
-    }, [])
+    const { theme, setTheme } = useTheme()
 
     const toggleDarkMode = () => {
-        const newMode = !isDarkMode
-        setIsDarkMode(newMode)
-        if (newMode) {
-            document.documentElement.classList.add("dark")
-        } else {
-            document.documentElement.classList.remove("dark")
-        }
+        setTheme(theme === "dark" ? "light" : "dark")
     }
 
     const isActive = (path: string) => pathname === path
 
+    const navItems = [
+        { label: "Dashboard", icon: LayoutDashboard, href: "/" },
+        { label: "Sales and Expenses", icon: ShoppingCart, href: "/sales" },
+        { label: "Inventory", icon: Package, href: "/inventory" },
+        { label: "Shop", icon: Store, href: "/shop" },
+        { label: "Settings", icon: Settings, href: "/settings" },
+    ]
+
     return (
-        <div className={cn("flex flex-col h-full bg-background", className)}>
-            <div className="flex items-center gap-3 pb-6 pt-4 px-2">
-                <SignedIn>
-                    <UserButton showName appearance={{
-                        elements: {
-                            userButtonBox: "flex-row-reverse",
-                            userButtonOuterIdentifier: "text-xl font-semibold",
-                            avatarBox: "h-12 w-12"
-                        }
-                    }} />
-                </SignedIn>
-                <SignedOut>
-                    <User className="h-12 w-12 text-primary" />
-                    <div>
-                        <h2 className="text-xl font-semibold">Guest User</h2>
-                    </div>
-                </SignedOut>
+        <div className={cn("flex flex-col h-full bg-card text-card-foreground", className)}>
+            {/* Sidebar Header - Align with Dashboard Header */}
+            <div className="h-[64px] flex items-center px-6">
+                <ShopSwitcher />
             </div>
 
-            <nav className="flex flex-col gap-2 flex-1">
-                <Link href="/">
-                    <Button
-                        variant="ghost"
-                        className={cn(
-                            "w-full justify-start gap-3 h-14",
-                            isActive("/") && "bg-accent"
-                        )}
-                        size="lg"
-                    >
-                        <div className="grid h-8 w-8 place-items-center rounded-md border-2 border-muted-foreground/20">
-                            <div className="grid grid-cols-2 gap-0.5">
-                                <div className={cn("h-1.5 w-1.5 rounded-sm", isActive("/") ? "bg-primary" : "bg-muted-foreground")} />
-                                <div className={cn("h-1.5 w-1.5 rounded-sm", isActive("/") ? "bg-primary" : "bg-muted-foreground")} />
-                                <div className={cn("h-1.5 w-1.5 rounded-sm", isActive("/") ? "bg-primary" : "bg-muted-foreground")} />
-                                <div className={cn("h-1.5 w-1.5 rounded-sm", isActive("/") ? "bg-primary" : "bg-muted-foreground")} />
-                            </div>
-                        </div>
-                        <span className="text-base">Dashboard</span>
-                    </Button>
-                </Link>
-                <Link href="/sales">
-                    <Button
-                        variant="ghost"
-                        className={cn(
-                            "w-full justify-start gap-3 h-14",
-                            isActive("/sales") && "bg-accent"
-                        )}
-                        size="lg"
-                    >
-                        <ShoppingCart className="h-8 w-8" />
-                        <span className="text-base">Sales and Expenses</span>
-                    </Button>
-                </Link>
-                <Button variant="ghost" className="justify-start gap-3 h-14" size="lg">
-                    <Package className="h-8 w-8" />
-                    <span className="text-base">Inventory</span>
-                </Button>
-                <Button variant="ghost" className="justify-start gap-3 h-14" size="lg">
-                    <Store className="h-8 w-8" />
-                    <span className="text-base">Shop</span>
-                </Button>
-            </nav>
+            <div className="flex flex-col h-full p-6">
+                {/* Navigation */}
+                <nav className="flex-1 space-y-1">
+                    {navItems.map((item) => (
+                        <Link key={item.href} href={item.href}>
+                            <Button
+                                variant="ghost"
+                                className={cn(
+                                    "w-full justify-start gap-4 h-14 rounded-xl transition-all duration-200",
+                                    isActive(item.href)
+                                        ? "bg-blue-600/10 text-blue-500 font-semibold"
+                                        : "text-muted-foreground hover:bg-muted"
+                                )}
+                            >
+                                <item.icon className={cn("h-6 w-6", isActive(item.href) ? "text-blue-500" : "text-muted-foreground")} />
+                                <span className="text-base">{item.label}</span>
+                            </Button>
+                        </Link>
+                    ))}
+                </nav>
 
-            <div className="space-y-2 mt-auto pt-4 border-t border-border">
-                <div className="flex items-center justify-between rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                        <Moon className="h-5 w-5" />
-                        <span className="text-sm">Dark Mode</span>
+                {/* Footer Actions */}
+                <div className="space-y-4 pt-6 mt-auto border-t border-border/50">
+                    {/* Theme Switcher */}
+                    <div className="flex items-center justify-between px-4 py-2">
+                        <div className="flex items-center gap-3">
+                            {theme === "dark" ? <Moon className="h-5 w-5 text-blue-500" /> : <Sun className="h-5 w-5 text-orange-500" />}
+                            <span className="text-sm font-medium">Dark Mode</span>
+                        </div>
+                        <Switch checked={theme === "dark"} onCheckedChange={toggleDarkMode} />
                     </div>
-                    <Switch checked={isDarkMode} onCheckedChange={toggleDarkMode} />
-                </div>
-                <Button variant="ghost" className="w-full justify-start gap-3" size="lg">
-                    <RefreshCw className="h-5 w-5" />
-                    <span>Sync</span>
-                </Button>
-                <SignedIn>
+
+                    {/* Sync Button */}
+                    <Button
+                        variant="secondary"
+                        className="w-full justify-start gap-4 h-14 rounded-xl bg-muted/50 hover:bg-muted transition-all"
+                    >
+                        <RefreshCw className="h-6 w-6 text-blue-500" />
+                        <span className="font-semibold">Sync</span>
+                    </Button>
+
+                    {/* Sign Out Button */}
                     <SignOutButton>
-                        <Button variant="ghost" className="w-full justify-start gap-3" size="lg">
-                            <LogOut className="h-5 w-5" />
-                            <span>Sign Out</span>
+                        <Button
+                            variant="secondary"
+                            className="w-full justify-start gap-4 h-14 rounded-xl bg-muted/50 hover:bg-muted transition-all"
+                        >
+                            <LogOut className="h-6 w-6 text-blue-500" />
+                            <span className="font-semibold">Sign Out</span>
                         </Button>
                     </SignOutButton>
-                </SignedIn>
-                <SignedOut>
-                    <SignInButton mode="modal">
-                        <Button variant="ghost" className="w-full justify-start gap-3" size="lg">
-                            <LogOut className="h-5 w-5" />
-                            <span>Sign In</span>
-                        </Button>
-                    </SignInButton>
-                </SignedOut>
-                <p className="text-center text-xs text-muted-foreground pt-4 pb-2">ShopFlow v1.0.0</p>
+
+                    <p className="text-center text-[10px] text-muted-foreground/50 tracking-widest uppercase py-4">
+                        ShopFlow v1.0.0
+                    </p>
+                </div>
             </div>
         </div>
     )

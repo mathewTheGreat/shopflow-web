@@ -1,212 +1,263 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
+import { useState, useEffect } from "react"
+import { useUser } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
+import dynamic from "next/dynamic"
+import { apiClient } from "@/lib/api-client"
 import {
   Menu,
-  Calendar,
-  Lock,
-  LockOpen,
   ShoppingCart,
   Package,
   Store,
-  Moon,
   RefreshCw,
   LogOut,
-  User,
+  User as UserIcon,
+  Loader2,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+
+// Hooks
+import { useShift } from "@/hooks/use-shift"
+import { useAppStore } from "@/store/use-app-store"
+import { useDashboardStats } from "@/hooks/use-dashboard-stats"
+
+// Components
+import { ShiftStatusCard } from "@/components/shifts/ShiftStatusCard"
 import { AppSidebar } from "@/components/app-sidebar"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+
+// Lazy load dialogs for performance
+const OpenShiftDialog = dynamic(() => import("@/components/shifts/OpenShiftDialog").then(mod => mod.OpenShiftDialog), {
+  ssr: false,
+  loading: () => <Loader2 className="h-4 w-4 animate-spin" />
+})
+
+const CloseShiftDialog = dynamic(() => import("@/components/shifts/CloseShiftDialog").then(mod => mod.CloseShiftDialog), {
+  ssr: false,
+  loading: () => <Loader2 className="h-4 w-4 animate-spin" />
+})
+
+const ShiftSuccessDialog = dynamic(() => import("@/components/shifts/ShiftSuccessDialog").then(mod => mod.ShiftSuccessDialog), {
+  ssr: false
+})
 
 export default function DashboardPage() {
-  const [shiftOpen, setShiftOpen] = useState(false)
+  const { user, isLoaded } = useUser()
+  const router = useRouter()
+
+  const { activeShop, userInfo } = useAppStore()
+  const { currentShift, isLoading: isLoadingShift, openShift, closeShift, isOpening, isClosing } = useShift()
+  const { sales, expenses, isLoading: isLoadingStats, isManager, currency } = useDashboardStats()
+  const [showOpenDialog, setShowOpenDialog] = useState(false)
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [cashAmount, setCashAmount] = useState("100")
-  const [mpesaAmount, setMpesaAmount] = useState("100")
 
-  const handleOpenShift = () => {
-    setShiftOpen(true)
+  // Amounts for dialogs
+  const [cashAmount, setCashAmount] = useState("0")
+  const [mpesaAmount, setMpesaAmount] = useState("0")
+
+  const shiftOpen = !!(currentShift && !currentShift.is_closed)
+
+  const handleOpenShiftClick = () => {
+    setCashAmount("0")
+    setMpesaAmount("0")
+    setShowOpenDialog(true)
   }
 
-  const handleCloseShift = () => {
+  const handleOpenShiftSubmit = async () => {
+    try {
+      await openShift({
+        cashAmount: parseFloat(cashAmount),
+        mpesaAmount: parseFloat(mpesaAmount)
+      })
+      setShowOpenDialog(false)
+    } catch (error) {
+      // Handled by mutation toast
+    }
+  }
+
+  const handleCloseShiftClick = () => {
+    setCashAmount("0")
+    setMpesaAmount("0")
     setShowCloseDialog(true)
   }
 
-  const handleSubmitBalances = () => {
-    setShowCloseDialog(false)
-    setShiftOpen(false)
-    setShowSuccessDialog(true)
+  const handleCloseShiftSubmit = async () => {
+    try {
+      await closeShift({
+        cashAmount: parseFloat(cashAmount),
+        mpesaAmount: parseFloat(mpesaAmount)
+      })
+      setShowCloseDialog(false)
+      setShowSuccessDialog(true)
+    } catch (error) {
+      // Handled by mutation toast
+    }
   }
 
+  // Effect for onboarding redirection
+  useEffect(() => {
+    if (isLoaded && !userInfo && !activeShop) {
+      router.push("/onboarding")
+    }
+  }, [isLoaded, userInfo, activeShop, router])
 
+  if (!isLoaded || isLoadingShift) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background text-foreground">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
-    <>
-      <div className="flex min-h-screen bg-background text-foreground">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:block w-80 border-r border-border bg-card p-6">
-          <AppSidebar />
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <header className="border-b border-border bg-card">
-            <div className="w-full flex items-center justify-between p-4">
-              <div className="flex items-center gap-4">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="lg:hidden">
-                      <Menu className="h-6 w-6" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-80 p-6">
-                    <AppSidebar />
-                  </SheetContent>
-                </Sheet>
-                <h1 className="text-2xl font-medium text-muted-foreground">Dashboard</h1>
-              </div>
-            </div>
-          </header>
-
-          {/* Main Content */}
-          <main className="container mx-auto p-4 md:p-6 max-w-7xl">
-            <div className="space-y-6">
-
-              {/* Shift Status Card */}
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-muted-foreground font-normal">
-                    <Calendar className="h-5 w-5 text-primary" />
-                    Shift Status
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {shiftOpen ? (
-                    <>
-                      <div className="flex items-center gap-2 mb-2">
-                        <LockOpen className="h-5 w-5 text-teal-500" />
-                        <span className="text-lg font-medium text-teal-500">OPEN</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-1">ID: 4e047dfe-f56a-402a-b07e-a760dded4e38</p>
-                      <p className="text-sm text-muted-foreground mb-4">Started: 15:41</p>
-                      <Button onClick={handleCloseShift} className="w-full bg-primary hover:bg-primary/90" size="lg">
-                        <Lock className="mr-2 h-5 w-5" />
-                        Close Shift
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Lock className="h-5 w-5 text-red-500" />
-                        <span className="text-lg font-medium text-red-500">CLOSED</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-4">No active shift</p>
-                      <Button onClick={handleOpenShift} className="w-full bg-primary hover:bg-primary/90" size="lg">
-                        <LockOpen className="mr-2 h-5 w-5" />
-                        Open Shift
-                      </Button>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Sales and Expenses Cards */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card className="bg-card border-border">
-                  <CardContent className="p-6">
-                    <p className="text-sm text-muted-foreground mb-2">Today's Sales</p>
-                    <p className="text-4xl font-bold">KES6,340</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card border-border">
-                  <CardContent className="p-6">
-                    <p className="text-sm text-muted-foreground mb-2">Today's Expenses</p>
-                    <p className="text-4xl font-bold">KES19,917.23</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </main>
-
-          {/* Close Shift Dialog */}
-          <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle className="text-xl">Enter Final Balances</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cash" className="flex items-center gap-2">
-                    <span className="text-lg">💵</span>
-                    Cash Amount (KES)
-                  </Label>
-                  <Input
-                    id="cash"
-                    type="number"
-                    value={cashAmount}
-                    onChange={(e) => setCashAmount(e.target.value)}
-                    className="h-12 text-lg bg-muted"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="mpesa" className="flex items-center gap-2">
-                    <span className="text-lg">📱</span>
-                    MPESA Amount (KES)
-                  </Label>
-                  <Input
-                    id="mpesa"
-                    type="number"
-                    value={mpesaAmount}
-                    onChange={(e) => setMpesaAmount(e.target.value)}
-                    className="h-12 text-lg bg-muted"
-                  />
-                </div>
-              </div>
-              <DialogFooter className="flex gap-2 sm:gap-2">
-                <Button onClick={handleSubmitBalances} className="flex-1 bg-primary hover:bg-primary/90 h-12">
-                  <span className="mr-2">💵</span>
-                  Submit Balances & Close Shift
-                </Button>
-                <Button variant="secondary" onClick={() => setShowCloseDialog(false)} className="flex-1 h-12">
-                  Cancel
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Success Dialog */}
-          <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle className="text-xl">Success</DialogTitle>
-              </DialogHeader>
-              <DialogDescription className="text-base leading-relaxed py-4">
-                Shift successfully closed with KES {cashAmount} cash and KES {mpesaAmount} MPESA. Reconciliation
-                initiated.
-              </DialogDescription>
-              <DialogFooter>
-                <Button onClick={() => setShowSuccessDialog(false)} className="w-full bg-primary hover:bg-primary/90">
-                  OK
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+    <div className="flex min-h-screen bg-background text-foreground transition-colors duration-300">
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+        <AppSidebar />
       </div>
-    </>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile Header */}
+        <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-card border-b border-border/50 lg:hidden">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="mr-4">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[300px] p-0 border-r-border bg-card">
+              <AppSidebar />
+            </SheetContent>
+          </Sheet>
+          <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
+        </header>
+
+        {/* Desktop Header */}
+        <header className="hidden lg:flex items-center h-[64px] px-6 bg-card border-b border-border/50 sticky top-0 z-30">
+          <div className="pl-[44px]">
+            <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 md:p-8 lg:p-12 w-full mx-auto">
+          <div className="max-w-[1440px] mx-auto space-y-8">
+            {/* Welcome Section */}
+            {/* Welcome Section */}
+            <Card className="bg-card border-none shadow-sm">
+              <CardContent className="p-6 flex items-center gap-4 md:gap-6">
+                <div className="p-2 md:p-3 bg-blue-600/10 rounded-xl flex-shrink-0">
+                  <UserIcon className="h-8 w-8 md:h-10 md:w-10 text-blue-500" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground whitespace-nowrap">Welcome back,</p>
+                    {activeShop?.role && (
+                      <span className="px-1.5 py-0.5 bg-blue-600/10 text-blue-500 text-[10px] font-black rounded uppercase tracking-tighter">
+                        {activeShop.role}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-xl md:text-3xl font-bold tracking-tight truncate">
+                    {userInfo?.name || 'User'}
+                  </h2>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Dashboard Content Grid */}
+            <div className="flex flex-col gap-8">
+              {/* Shift Status Card - Full Width */}
+              <div className="w-full">
+                <ShiftStatusCard
+                  shiftOpen={shiftOpen}
+                  onOpenShift={handleOpenShiftClick}
+                  onCloseShift={handleCloseShiftClick}
+                />
+              </div>
+
+              {/* Stat Cards - Side by Side */}
+              <div className="grid grid-cols-2 gap-4 md:gap-8 w-full">
+                <Card className="bg-card border-none shadow-sm h-full w-full">
+                  <CardContent className="p-6 md:p-10 lg:p-12">
+                    <p className="text-xs md:text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">
+                      {isManager ? "Today's Shop Sales" : "Sales This Shift"}
+                    </p>
+                    {isLoadingStats ? (
+                      <div className="h-12 w-32 bg-muted animate-pulse rounded-lg" />
+                    ) : (
+                      <h3 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tighter">
+                        {currency}
+                        <span>{" " + Number(sales).toLocaleString()}</span>
+
+                      </h3>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-none shadow-sm h-full w-full">
+                  <CardContent className="p-6 md:p-10 lg:p-12">
+                    <p className="text-xs md:text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">
+                      {isManager ? "Today's Shop Expenses" : "Expenses This Shift"}
+                    </p>
+                    {isLoadingStats ? (
+                      <div className="h-12 w-32 bg-muted animate-pulse rounded-lg" />
+                    ) : (
+                      <h3 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tighter">
+                        {currency}
+                        {" " + Number(expenses).toLocaleString()}
+                      </h3>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Dialogs */}
+        {showOpenDialog && (
+          <OpenShiftDialog
+            open={showOpenDialog}
+            onOpenChange={setShowOpenDialog}
+            cashAmount={cashAmount}
+            setCashAmount={setCashAmount}
+            mpesaAmount={mpesaAmount}
+            setMpesaAmount={setMpesaAmount}
+            onSubmit={handleOpenShiftSubmit}
+            isLoading={isOpening}
+          />
+        )}
+
+        {showCloseDialog && (
+          <CloseShiftDialog
+            open={showCloseDialog}
+            onOpenChange={setShowCloseDialog}
+            cashAmount={cashAmount}
+            setCashAmount={setCashAmount}
+            mpesaAmount={mpesaAmount}
+            setMpesaAmount={setMpesaAmount}
+            onSubmit={handleCloseShiftSubmit}
+            isLoading={isClosing}
+          />
+        )}
+
+        {showSuccessDialog && (
+          <ShiftSuccessDialog
+            open={showSuccessDialog}
+            onOpenChange={setShowSuccessDialog}
+            cashAmount={cashAmount}
+            mpesaAmount={mpesaAmount}
+          />
+        )}
+      </div>
+    </div>
   )
 }

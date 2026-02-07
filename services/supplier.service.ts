@@ -7,4 +7,14 @@ export const supplierService = {
     createSupplier: (data: Partial<Supplier>) => apiClient.post<Supplier>("/api/suppliers", data),
     updateSupplier: (id: string, data: Partial<Supplier>) => apiClient.put<Supplier>(`/api/suppliers/${id}`, data),
     deleteSupplier: (id: string) => apiClient.delete(`/api/suppliers/${id}`),
+
+    // Reports
+    getSupplierDeliveries: (supplierId: string | undefined, startDate: string, endDate: string) => {
+        const queryParams = new URLSearchParams({
+            startDate,
+            endDate,
+            supplierId: supplierId || ""
+        })
+        return apiClient.get<any[]>(`/api/suppliers/deliveries?${queryParams.toString()}`)
+    }
 }

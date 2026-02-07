@@ -44,6 +44,10 @@ import { toast } from "sonner"
 import { ReceiptDialog } from "@/components/sales/receipt-dialog"
 import { useExpenses, useCreateExpense } from "@/hooks/use-expenses"
 import { CustomerManager } from "@/components/customers/CustomerManager"
+import { CustomerPaymentsManager } from "@/components/payments/CustomerPaymentsManager"
+import { ShiftPerformanceDialog } from "@/components/reports/ShiftPerformanceDialog"
+import { SalesReportDialog } from "@/components/reports/SalesReportDialog"
+import { CustomerNetPositionDialog } from "@/components/reports/CustomerNetPositionDialog"
 import { Loader2, ChevronLeft } from "lucide-react"
 
 type SaleCategory = "IMMEDIATE" | "CREDIT" | "PREPAID"
@@ -66,7 +70,10 @@ export default function SalesPage() {
   const [activeTab, setActiveTab] = useState("sales")
   const [showPOS, setShowPOS] = useState(false)
   const [showExpenseDialog, setShowExpenseDialog] = useState(false)
-  const [currentView, setCurrentView] = useState<"main" | "customers">("main")
+  const [showShiftReportDialog, setShowShiftReportDialog] = useState(false)
+  const [showSalesReportDialog, setShowSalesReportDialog] = useState(false)
+  const [showNetPositionDialog, setShowNetPositionDialog] = useState(false)
+  const [currentView, setCurrentView] = useState<"main" | "customers" | "payments">("main")
 
   // Global State
   const activeShop = useAppStore((state) => state.activeShop)
@@ -213,6 +220,19 @@ export default function SalesPage() {
         </div>
         <div className="flex-1 flex flex-col min-w-0">
           <CustomerManager onBack={() => setCurrentView("main")} />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === "payments") {
+    return (
+      <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
+        <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+          <AppSidebar />
+        </div>
+        <div className="flex-1 flex flex-col min-w-0">
+          <CustomerPaymentsManager onBack={() => setCurrentView("main")} />
         </div>
       </div>
     )
@@ -425,7 +445,10 @@ export default function SalesPage() {
                     {/* Reports Tab */}
                     <TabsContent value="reports" className="h-full p-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card className="border hover:border-primary/50 transition-colors cursor-pointer group">
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setShowShiftReportDialog(true)}
+                        >
                           <CardContent className="p-6 flex items-start gap-4">
                             <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                               <FileText className="h-6 w-6 text-primary" />
@@ -437,14 +460,32 @@ export default function SalesPage() {
                           </CardContent>
                         </Card>
 
-                        <Card className="border hover:border-primary/50 transition-colors cursor-pointer group">
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setShowSalesReportDialog(true)}
+                        >
                           <CardContent className="p-6 flex items-start gap-4">
                             <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                               <BarChart3 className="h-6 w-6 text-primary" />
                             </div>
                             <div>
-                              <h3 className="font-semibold text-lg mb-1">Financial Breakdown</h3>
-                              <p className="text-sm text-muted-foreground">Analyze sales, expenses and profit margins.</p>
+                              <h3 className="font-semibold text-lg mb-1">Sales Report</h3>
+                              <p className="text-sm text-muted-foreground">Detailed report of sales transactions.</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setShowNetPositionDialog(true)}
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <User className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Customer Net Position</h3>
+                              <p className="text-sm text-muted-foreground">Detailed history of customer account activity and balances.</p>
                             </div>
                           </CardContent>
                         </Card>
@@ -469,7 +510,10 @@ export default function SalesPage() {
                           </CardContent>
                         </Card>
 
-                        <Card className="border hover:border-primary/50 transition-colors cursor-pointer group">
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setCurrentView("payments")}
+                        >
                           <CardContent className="p-6 flex items-start gap-4">
                             <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                               <CreditCard className="h-6 w-6 text-primary" />
@@ -485,6 +529,21 @@ export default function SalesPage() {
                   </div>
                 </Tabs>
               </Card>
+
+              <ShiftPerformanceDialog
+                open={showShiftReportDialog}
+                onOpenChange={setShowShiftReportDialog}
+              />
+
+              <SalesReportDialog
+                open={showSalesReportDialog}
+                onOpenChange={setShowSalesReportDialog}
+              />
+
+              <CustomerNetPositionDialog
+                open={showNetPositionDialog}
+                onOpenChange={setShowNetPositionDialog}
+              />
             </div>
           </main>
 
@@ -817,8 +876,9 @@ export default function SalesPage() {
           <ReceiptDialog
             open={!!selectedSaleId}
             onOpenChange={(open) => !open && setSelectedSaleId(null)}
-            saleId={selectedSaleId}
+            saleId={selectedSaleId || ""}
           />
+
 
           {/* Add Expense Sheet (Bottom Sheet UI) */}
           <Sheet open={showExpenseDialog} onOpenChange={setShowExpenseDialog}>

@@ -31,6 +31,8 @@ import { StockOutDialog } from "@/components/inventory/StockOutDialog"
 import { StockTakeDialog } from "@/components/inventory/StockTakeDialog"
 import { SupplierManager } from "@/components/inventory/SupplierManager"
 import { StockTransactionsGrid } from "@/components/inventory/StockTransactionsGrid"
+import { SupplierDeliveryReportDialog } from "@/components/reports/SupplierDeliveryReportDialog"
+import { VarianceReportDialog } from "@/components/reports/VarianceReportDialog"
 import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
 import { Item } from "@/services/item.service"
@@ -41,7 +43,10 @@ export default function InventoryPage() {
     const [showAddItem, setShowAddItem] = useState(false)
     const [showStockInDialog, setShowStockInDialog] = useState(false)
     const [showStockOutDialog, setShowStockOutDialog] = useState(false)
+
     const [showStockTakeDialog, setShowStockTakeDialog] = useState(false)
+    const [showSupplierReportDialog, setShowSupplierReportDialog] = useState(false)
+    const [showVarianceReportDialog, setShowVarianceReportDialog] = useState(false)
     const [selectedItem, setSelectedItem] = useState<Item | null>(null)
     const { items, isLoading, refetch } = useItems()
     const currency = useAppStore((state) => state.userCurrency) || "KES"
@@ -313,10 +318,36 @@ export default function InventoryPage() {
 
                                     {/* Reports Tab */}
                                     <TabsContent value="reports" className="h-full p-6">
-                                        <div className="flex flex-col items-center justify-center h-64 text-center">
-                                            <BarChart3 className="h-16 w-16 text-muted-foreground/20 mb-4" />
-                                            <h3 className="text-lg font-medium text-muted-foreground">Inventory Reports</h3>
-                                            <p className="text-sm text-muted-foreground/80 max-w-xs mt-2">View detailed reports about stock levels and valuations.</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <Card
+                                                className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                                                onClick={() => setShowSupplierReportDialog(true)}
+                                            >
+                                                <CardContent className="p-6 flex items-start gap-4">
+                                                    <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                                        <Building2 className="h-6 w-6 text-primary" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-semibold text-lg mb-1">Supplier Deliveries</h3>
+                                                        <p className="text-sm text-muted-foreground">Detailed report of items received from suppliers.</p>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+
+                                            <Card
+                                                className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                                                onClick={() => setShowVarianceReportDialog(true)}
+                                            >
+                                                <CardContent className="p-6 flex items-start gap-4">
+                                                    <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                                        <ClipboardList className="h-6 w-6 text-primary" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-semibold text-lg mb-1">Stock Variance</h3>
+                                                        <p className="text-sm text-muted-foreground">Analyze discrepancies between expected and actual stock.</p>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
                                         </div>
                                     </TabsContent>
 
@@ -384,6 +415,16 @@ export default function InventoryPage() {
                     open={showStockTakeDialog}
                     onOpenChange={setShowStockTakeDialog}
                     onSuccess={handleSuccess}
+                />
+
+                <SupplierDeliveryReportDialog
+                    open={showSupplierReportDialog}
+                    onOpenChange={setShowSupplierReportDialog}
+                />
+
+                <VarianceReportDialog
+                    open={showVarianceReportDialog}
+                    onOpenChange={setShowVarianceReportDialog}
                 />
             </div>
         </div>

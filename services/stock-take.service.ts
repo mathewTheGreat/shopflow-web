@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client"
 import { StockTake } from "@/types/inventory"
+import { VarianceReportData } from "@/types/stock-report"
 
 export const stockTakeService = {
     createStockTake: (data: Partial<StockTake>) =>
@@ -13,6 +14,9 @@ export const stockTakeService = {
 
     getStockTakesByShift: (shiftId: string) =>
         apiClient.get<StockTake[]>(`/api/stock/takes/shift/${shiftId}`),
+
+    getVarianceReport: (shiftId: string) =>
+        apiClient.get<VarianceReportData>(`/api/stock/takes/variance-report?shiftId=${shiftId}`),
 
     getUnadjustedStockTakes: () =>
         apiClient.get<StockTake[]>("/api/stock/takes/unadjusted"),

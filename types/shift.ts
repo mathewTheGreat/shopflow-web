@@ -7,6 +7,7 @@ export interface Shift extends BaseEntity {
     start_time: string;
     end_time: string;
     is_closed: boolean;
+    manager_name?: string;
 }
 
 export interface ShiftReconciliation extends BaseEntity {

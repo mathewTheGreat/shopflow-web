@@ -32,4 +32,11 @@ export const shiftService = {
 
     closeShiftRecord: (id: string) =>
         apiClient.patch<Shift>(`/api/shifts/${id}`, { is_closed: true, end_time: new Date().toISOString() }),
+
+    // Reporting
+    getShiftsByShopAndDate: (shopId: string, date: string) =>
+        apiClient.get<Shift[]>(`/api/shifts/shop/${shopId}?date=${date}`),
+
+    getShiftPerformanceReport: (shiftId: string) =>
+        apiClient.get<any>(`/api/shift-reconciliation/shift/${shiftId}/performance-report`),
 }

@@ -74,7 +74,7 @@ export function CreateShopForm({ onSubmit, isLoading }: CreateShopFormProps) {
             <div className="pt-4">
                 <Button
                     type="submit"
-                    className="w-full h-14 text-base bg-blue-600 hover:bg-blue-700 text-white"
+                    className="w-full h-14 text-base bg-primary hover:bg-primary/90 text-white"
                     disabled={isLoading}
                 >
                     {isLoading ? "creating..." : (

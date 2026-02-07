@@ -38,11 +38,11 @@ export function ShopSwitcher() {
     if (!isManager) {
         return (
             <div className="flex items-center gap-3 w-full p-2 -ml-2 rounded-xl transition-colors select-none">
-                <div className="p-2 bg-blue-600/10 rounded-lg">
-                    <Store className="h-4 w-4 text-blue-500" />
+                <div className="p-2 bg-primary/10 rounded-lg">
+                    <Store className="h-4 w-4 text-primary" />
                 </div>
-                <div className="min-w-0">
-                    <p className="text-[10px] text-blue-500 uppercase tracking-widest font-black leading-none mb-1">Current Shop</p>
+                <div className="flex flex-col min-w-0">
+                    <p className="text-[10px] text-primary uppercase tracking-widest font-black leading-none mb-1">Current Shop</p>
                     <h3 className="text-sm font-bold text-foreground truncate leading-none">
                         {activeShop.name}
                     </h3>
@@ -60,14 +60,14 @@ export function ShopSwitcher() {
                     role="combobox"
                     aria-expanded={open}
                     aria-label="Select a shop"
-                    className="flex h-auto items-center gap-3 w-full p-2 -ml-2 rounded-xl hover:bg-blue-600/5 transition-colors group justify-start text-left"
+                    className="flex h-auto items-center gap-3 w-full p-2 -ml-2 rounded-xl hover:bg-primary/5 transition-colors group justify-start text-left"
                 >
-                    <div className="p-2 bg-blue-600/10 rounded-lg group-hover:bg-blue-600/20 transition-colors">
-                        <Store className="h-4 w-4 text-blue-500" />
+                    <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                        <Store className="h-4 w-4 text-primary" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-[10px] text-blue-500 uppercase tracking-widest font-black leading-none mb-1">Current Shop</p>
-                        <h3 className="text-sm font-bold text-foreground truncate leading-none group-hover:text-blue-600 transition-colors">
+                    <div className="flex flex-col min-w-0 flex-1">
+                        <p className="text-[10px] text-primary uppercase tracking-widest font-black leading-none mb-1">Current Shop</p>
+                        <h3 className="text-sm font-bold text-foreground truncate leading-none group-hover:text-primary transition-colors">
                             {activeShop.name}
                         </h3>
                     </div>
@@ -93,7 +93,7 @@ export function ShopSwitcher() {
                                     }}
                                     className="text-sm cursor-pointer"
                                 >
-                                    <Store className="mr-2 h-4 w-4 bg-blue-600/10 text-blue-500 rounded p-0.5" />
+                                    <Store className="mr-2 h-4 w-4 bg-primary/10 text-primary rounded p-0.5" />
                                     {shop.name}
                                     <Check
                                         className={cn(

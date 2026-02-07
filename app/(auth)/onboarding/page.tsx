@@ -60,13 +60,13 @@ export default function OnboardingPage() {
 
             <div className="w-full space-y-4">
                 <Link href={`/onboarding/create-shop${dbUser ? `?userId=${dbUser.id}` : ''}`} className="block">
-                    <Button className="w-full h-16 text-lg bg-blue-600 hover:bg-blue-700 text-white justify-center gap-3">
+                    <Button className="w-full h-16 text-lg bg-primary hover:bg-primary/90 text-white justify-center gap-3">
                         <User className="h-6 w-6" />
                         Create New Account &rarr;
                     </Button>
                 </Link>
                 <Link href={`/onboarding/join${dbUser ? `?userId=${dbUser.id}` : ''}`} className="block">
-                    <Button variant="outline" className="w-full h-16 text-lg bg-transparent border-blue-500/30 hover:border-blue-500 hover:bg-blue-500/10 text-blue-500 justify-center gap-3">
+                    <Button variant="outline" className="w-full h-16 text-lg bg-transparent border-primary/30 hover:border-primary hover:bg-primary/10 text-primary justify-center gap-3">
                         <Store className="h-6 w-6" />
                         Join Existing Business &rarr;
                     </Button>

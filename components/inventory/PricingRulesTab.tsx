@@ -323,8 +323,8 @@ export function PricingRulesTab({ itemId, itemName }: PricingRulesTabProps) {
                                                 <p className="text-sm text-muted-foreground">Status</p>
                                                 <span
                                                     className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${rule.is_active
-                                                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                                                            : "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300"
+                                                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                                        : "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300"
                                                         }`}
                                                 >
                                                     {rule.is_active ? "Active" : "Inactive"}
@@ -336,7 +336,7 @@ export function PricingRulesTab({ itemId, itemName }: PricingRulesTabProps) {
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => handleEdit(rule)}
-                                                className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                                                className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
                                             >
                                                 <Edit className="h-4 w-4" />
                                             </Button>

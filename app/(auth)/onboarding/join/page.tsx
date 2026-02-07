@@ -47,7 +47,7 @@ export default function JoinBusinessPage() {
     return (
         <div className="flex flex-col items-center space-y-6 relative">
             <Link href="/onboarding" className="absolute -top-12 left-0">
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-blue-600 transition-colors px-0">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary transition-colors px-0">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back
                 </Button>
@@ -72,7 +72,7 @@ export default function JoinBusinessPage() {
                 <div className="space-y-3 pt-2">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-8 space-y-2">
-                            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
                             <p className="text-sm text-muted-foreground">Fetching businessess...</p>
                         </div>
                     ) : error ? (
@@ -87,11 +87,11 @@ export default function JoinBusinessPage() {
                         filteredShops?.map((shop) => (
                             <Card
                                 key={shop.id}
-                                className={`bg-card border transition-all cursor-pointer ${selectedBusiness === shop.id ? 'border-blue-500 ring-1 ring-blue-500' : 'border-border hover:border-muted-foreground/50'}`}
+                                className={`bg-card border transition-all cursor-pointer ${selectedBusiness === shop.id ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-muted-foreground/50'}`}
                                 onClick={() => setSelectedBusiness(shop.id)}
                             >
                                 <CardContent className="p-4 flex items-center gap-4">
-                                    <div className="h-10 w-10 rounded-lg bg-blue-600/20 text-blue-500 flex items-center justify-center shrink-0">
+                                    <div className="h-10 w-10 rounded-lg bg-primary/20 text-primary flex items-center justify-center shrink-0">
                                         <Store className="h-6 w-6" />
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -110,7 +110,7 @@ export default function JoinBusinessPage() {
             <div className="w-full pt-8">
                 <Link href={`/onboarding/role?type=join&shopId=${selectedBusiness}${existingUserId ? `&userId=${existingUserId}` : ''}`}>
                     <Button
-                        className="w-full h-14 text-base bg-blue-600 hover:bg-blue-700 text-white"
+                        className="w-full h-14 text-base bg-primary hover:bg-primary/90 text-white"
                         disabled={!selectedBusiness}
                     >
                         <ArrowRight className="mr-2 h-5 w-5" />

@@ -15,7 +15,7 @@ export function ShiftStatusCard({ shiftOpen, onOpenShift, onCloseShift }: ShiftS
         <Card className="bg-card border-none shadow-sm w-full">
             <CardContent className="p-6 md:p-10 lg:p-12">
                 <div className="flex items-center gap-2 mb-4 text-muted-foreground">
-                    <Calendar className="h-5 w-5 md:h-6 md:w-6 text-blue-500" />
+                    <Calendar className="h-5 w-5 md:h-6 md:w-6 text-primary" />
                     <span className="text-sm md:text-base font-medium">Shift Status</span>
                 </div>
 
@@ -28,7 +28,7 @@ export function ShiftStatusCard({ shiftOpen, onOpenShift, onCloseShift }: ShiftS
                         <p className="text-sm md:text-lg text-muted-foreground mb-8">Active shift in progress</p>
                         <Button
                             onClick={onCloseShift}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 md:h-16 lg:h-20 rounded-xl font-bold text-base md:text-xl transition-all duration-300"
+                            className="w-full bg-primary hover:bg-primary/90 text-white h-12 md:h-16 lg:h-20 rounded-xl font-bold text-base md:text-xl transition-all duration-300"
                         >
                             <Lock className="mr-2 h-5 w-5 md:h-7 md:w-7 fill-current" />
                             Close Shift
@@ -43,7 +43,7 @@ export function ShiftStatusCard({ shiftOpen, onOpenShift, onCloseShift }: ShiftS
                         <p className="text-sm md:text-lg text-muted-foreground mb-8">No active shift</p>
                         <Button
                             onClick={onOpenShift}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 md:h-16 lg:h-20 rounded-xl font-bold text-base md:text-xl transition-all duration-300"
+                            className="w-full bg-primary hover:bg-primary/90 text-white h-12 md:h-16 lg:h-20 rounded-xl font-bold text-base md:text-xl transition-all duration-300"
                         >
                             <LockOpen className="mr-2 h-5 w-5 md:h-7 md:w-7 fill-current" />
                             Open Shift

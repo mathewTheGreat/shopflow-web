@@ -142,7 +142,7 @@ export function SupplierManager({ onBack }: SupplierManagerProps) {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                                                className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
                                                     handleEdit(supplier)

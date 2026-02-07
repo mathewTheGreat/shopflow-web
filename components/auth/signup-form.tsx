@@ -97,14 +97,14 @@ export function SignUpForm() {
         return (
             <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="text-center space-y-2">
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Verify your email</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Verify your email</h1>
+                    <p className="text-sm text-muted-foreground">
                         We sent a verification code to {email}
                     </p>
                 </div>
                 <form onSubmit={handleVerify} className="w-full space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="code" className="text-sm font-bold text-gray-500 dark:text-gray-400 ml-1">Verification Code</Label>
+                        <Label htmlFor="code" className="text-sm font-bold text-muted-foreground ml-1">Verification Code</Label>
                         <Input
                             id="code"
                             value={code}
@@ -112,10 +112,10 @@ export function SignUpForm() {
                             placeholder="Enter code"
                             required
                             disabled={isLoading}
-                            className="h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl transition-all"
+                            className="h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-primary dark:focus:border-primary rounded-2xl transition-all"
                         />
                     </div>
-                    <Button className="w-full h-14 text-lg font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all rounded-2xl shadow-lg shadow-blue-500/20 active:scale-[0.98]" disabled={isLoading}>
+                    <Button className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-white transition-all rounded-2xl shadow-lg shadow-primary/20 active:scale-[0.98]" disabled={isLoading}>
                         {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                         Verify Email
                     </Button>
@@ -138,17 +138,17 @@ export function SignUpForm() {
                     />
                 </div>
                 <div className="text-center space-y-2">
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Create an account</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Get started with ShopFlow</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Create an account</h1>
+                    <p className="text-sm text-muted-foreground">Get started with ShopFlow</p>
                 </div>
             </div>
 
             <form onSubmit={handleSubmit} className="w-full space-y-4">
                 <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-bold text-gray-500 dark:text-gray-400 ml-1">Email address</Label>
+                    <Label htmlFor="email" className="text-sm font-bold text-muted-foreground ml-1">Email address</Label>
                     <div className="relative group">
                         <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10">
-                            <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
                         </div>
                         <Input
                             id="email"
@@ -160,15 +160,15 @@ export function SignUpForm() {
                             onChange={(e) => setEmail(e.target.value)}
                             disabled={isLoading}
                             required
-                            className="pl-12 h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl transition-all"
+                            className="pl-12 h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-primary dark:focus:border-primary rounded-2xl transition-all"
                         />
                     </div>
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-bold text-gray-500 dark:text-gray-400 ml-1">Password</Label>
+                    <Label htmlFor="password" className="text-sm font-bold text-muted-foreground ml-1">Password</Label>
                     <div className="relative group">
                         <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10">
-                            <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
                         </div>
                         <Input
                             id="password"
@@ -177,7 +177,7 @@ export function SignUpForm() {
                             onChange={(e) => setPassword(e.target.value)}
                             disabled={isLoading}
                             required
-                            className="pl-12 pr-12 h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl transition-all"
+                            className="pl-12 pr-12 h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-primary dark:focus:border-primary rounded-2xl transition-all"
                         />
                         <button
                             type="button"
@@ -201,7 +201,7 @@ export function SignUpForm() {
                 <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full h-14 text-lg font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all rounded-2xl shadow-lg shadow-blue-500/20 active:scale-[0.98] mt-2"
+                    className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-white transition-all rounded-2xl shadow-lg shadow-primary/20 active:scale-[0.98] mt-2"
                 >
                     {isLoading ? (
                         <div className="flex items-center gap-2">
@@ -218,11 +218,11 @@ export function SignUpForm() {
             </form>
 
             <div className="text-center">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                     Already have an account?{" "}
                     <Link
                         href="/sign-in"
-                        className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        className="font-semibold text-primary hover:text-primary/90 dark:text-primary dark:hover:text-primary/80"
                     >
                         Sign in
                     </Link>
@@ -231,10 +231,10 @@ export function SignUpForm() {
 
             <div className="relative w-full">
                 <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+                    <div className="w-full border-t border-border"></div>
                 </div>
                 <div className="relative flex justify-center text-xs">
-                    <span className="px-2 bg-slate-50 dark:bg-slate-950 text-gray-500">
+                    <span className="px-2 bg-background text-muted-foreground transition-colors duration-500">
                         or
                     </span>
                 </div>

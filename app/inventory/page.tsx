@@ -69,7 +69,7 @@ export default function InventoryPage() {
     if (currentView === "suppliers") {
         return (
             <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
-                <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+                <div className="hidden md:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
                     <AppSidebar />
                 </div>
                 <div className="flex-1 flex flex-col min-w-0">
@@ -82,14 +82,14 @@ export default function InventoryPage() {
     return (
         <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
             {/* Desktop Sidebar */}
-            <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+            <div className="hidden md:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
                 <AppSidebar />
             </div>
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Mobile Header */}
-                <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-card border-b border-border/50 lg:hidden">
+                <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-card border-b border-border/50 md:hidden">
                     <Sheet>
                         <SheetTrigger asChild>
                             <Button variant="ghost" size="icon" className="mr-4">
@@ -104,7 +104,7 @@ export default function InventoryPage() {
                 </header>
 
                 {/* Desktop Header */}
-                <header className="hidden lg:flex items-center h-[64px] px-6 bg-card border-b border-border/50 sticky top-0 z-30">
+                <header className="hidden md:flex items-center h-[64px] px-6 bg-card border-b border-border/50 sticky top-0 z-30">
                     <div className="pl-[44px]">
                         <h1 className="text-xl font-bold tracking-tight">Inventory</h1>
                     </div>
@@ -209,7 +209,7 @@ export default function InventoryPage() {
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                                                                    className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
                                                                     onClick={() => handleEditItem(item)}
                                                                 >
                                                                     <Edit className="h-4 w-4" />
@@ -284,8 +284,8 @@ export default function InventoryPage() {
                                                 }}
                                             >
                                                 <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-                                                    <ArrowRightLeft className={`h-8 w-8 ${activeShift ? "text-blue-500" : "text-gray-400"}`} />
-                                                    <span className={`font-medium ${activeShift ? "text-blue-500" : "text-gray-400"}`}>Transfers</span>
+                                                    <ArrowRightLeft className={`h-8 w-8 ${activeShift ? "text-primary" : "text-gray-400"}`} />
+                                                    <span className={`font-medium ${activeShift ? "text-primary" : "text-gray-400"}`}>Transfers</span>
                                                 </CardContent>
                                             </Card>
 

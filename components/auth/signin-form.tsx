@@ -123,10 +123,10 @@ export function SignInForm() {
 
             {/* Title */}
             <div className="text-center space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">
                     Welcome back
                 </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                     Sign in to your ShopFlow account
                 </p>
             </div>
@@ -143,7 +143,7 @@ export function SignInForm() {
             {/* Email Input */}
             <div className="relative group">
                 <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10">
-                    <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
                 </div>
                 <Input
                     type="email"
@@ -151,7 +151,7 @@ export function SignInForm() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
-                    className="pl-12 h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl transition-all"
+                    className="pl-12 h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-primary dark:focus:border-primary rounded-2xl transition-all"
                     required
                 />
             </div>
@@ -159,7 +159,7 @@ export function SignInForm() {
             {/* Password Input */}
             <div className="relative group">
                 <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10">
-                    <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
                 </div>
                 <Input
                     type={showPassword ? "text" : "password"}
@@ -167,7 +167,7 @@ export function SignInForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
-                    className="pl-12 pr-12 h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl transition-all"
+                    className="pl-12 pr-12 h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-primary dark:focus:border-primary rounded-2xl transition-all"
                     required
                 />
                 <button
@@ -189,7 +189,7 @@ export function SignInForm() {
                 onClick={handleSubmit}
                 disabled={!isFormValid}
                 className={`w-full h-14 text-lg font-bold transition-all rounded-2xl shadow-lg ring-offset-2 ${isFormValid
-                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 active:scale-[0.98]"
+                    ? "bg-primary hover:bg-primary/90 text-white shadow-primary/20 active:scale-[0.98]"
                     : "bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                     }`}
             >
@@ -208,11 +208,11 @@ export function SignInForm() {
 
             {/* Sign Up Link */}
             <div className="text-center">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                     Don't have an account?{" "}
                     <Link
                         href="/sign-up"
-                        className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        className="font-semibold text-primary hover:text-primary/90 dark:text-primary dark:hover:text-primary/80"
                     >
                         Sign up
                     </Link>
@@ -222,10 +222,10 @@ export function SignInForm() {
             {/* Divider */}
             <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+                    <div className="w-full border-t border-border"></div>
                 </div>
                 <div className="relative flex justify-center text-xs">
-                    <span className="px-2 bg-slate-50 dark:bg-slate-950 text-gray-500">
+                    <span className="px-2 bg-background text-muted-foreground transition-colors duration-500">
                         or
                     </span>
                 </div>

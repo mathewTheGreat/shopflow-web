@@ -273,12 +273,12 @@ export function QuantityDiscountsTab({ itemId, itemName }: QuantityDiscountsTabP
                             {/* Example Calculation */}
                             {formData.min_quantity && formData.discount_value && (
                                 <div className="md:col-span-2">
-                                    <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                                    <Card className="bg-primary/5 dark:bg-primary/10 border-primary/20">
                                         <CardContent className="p-4">
-                                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                                            <p className="text-sm font-medium text-foreground mb-2">
                                                 Example Calculation
                                             </p>
-                                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                                            <p className="text-sm text-muted-foreground">
                                                 When buying {formData.min_quantity}+ units, customer gets{" "}
                                                 {formData.discount_type === "percentage"
                                                     ? `${formData.discount_value}% off`
@@ -384,8 +384,8 @@ export function QuantityDiscountsTab({ itemId, itemName }: QuantityDiscountsTabP
                                                 <p className="text-sm text-muted-foreground">Status</p>
                                                 <span
                                                     className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${discount.is_active
-                                                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                                                            : "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300"
+                                                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                                        : "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300"
                                                         }`}
                                                 >
                                                     {discount.is_active ? "Active" : "Inactive"}
@@ -397,7 +397,7 @@ export function QuantityDiscountsTab({ itemId, itemName }: QuantityDiscountsTabP
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => handleEdit(discount)}
-                                                className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                                                className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
                                             >
                                                 <Edit className="h-4 w-4" />
                                             </Button>

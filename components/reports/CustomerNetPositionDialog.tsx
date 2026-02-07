@@ -151,7 +151,7 @@ export function CustomerNetPositionDialog({ open, onOpenChange }: CustomerNetPos
                         variant="outline"
                         onClick={() => handleGenerateReport('preview')}
                         disabled={isGenerating}
-                        className="w-full sm:w-auto bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200"
+                        className="w-full sm:w-auto bg-primary/10 text-primary hover:bg-primary/20 border-primary/20"
                     >
                         {isGenerating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
                         Preview

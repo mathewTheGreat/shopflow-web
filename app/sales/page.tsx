@@ -215,7 +215,7 @@ export default function SalesPage() {
   if (currentView === "customers") {
     return (
       <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
-        <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+        <div className="hidden md:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
           <AppSidebar />
         </div>
         <div className="flex-1 flex flex-col min-w-0">
@@ -228,7 +228,7 @@ export default function SalesPage() {
   if (currentView === "payments") {
     return (
       <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
-        <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+        <div className="hidden md:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
           <AppSidebar />
         </div>
         <div className="flex-1 flex flex-col min-w-0">
@@ -242,14 +242,14 @@ export default function SalesPage() {
     <>
       <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
         {/* Desktop Sidebar */}
-        <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+        <div className="hidden md:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
           <AppSidebar />
         </div>
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile Header */}
-          <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-card border-b border-border/50 lg:hidden">
+          <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-card border-b border-border/50 md:hidden">
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="mr-4">
@@ -264,7 +264,7 @@ export default function SalesPage() {
           </header>
 
           {/* Desktop Header */}
-          <header className="hidden lg:flex items-center h-[64px] px-6 bg-card border-b border-border/50 sticky top-0 z-30">
+          <header className="hidden md:flex items-center h-[64px] px-6 bg-card border-b border-border/50 sticky top-0 z-30">
             <div className="pl-[44px]">
               <h1 className="text-xl font-bold tracking-tight">Sales and Expenses</h1>
             </div>
@@ -365,7 +365,7 @@ export default function SalesPage() {
                                   })}
                                 </div>
                                 <div>
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary transition-colors">
                                     {sale.sale_category}
                                   </span>
                                 </div>
@@ -640,16 +640,16 @@ export default function SalesPage() {
 
                       {/* Payment Method (Only for IMMEDIATE) */}
                       {saleCategory === "IMMEDIATE" && (
-                        <Card className="shadow-sm border-l-4 border-l-blue-500">
+                        <Card className="shadow-sm border-l-4 border-l-primary">
                           <CardContent className="p-6 space-y-6">
                             <div>
-                              <Label className="text-sm font-bold mb-3 block text-blue-600 uppercase tracking-wider">3. Payment Configuration</Label>
+                              <Label className="text-sm font-bold mb-3 block text-primary uppercase tracking-wider">3. Payment Configuration</Label>
                               <div className="grid grid-cols-3 gap-3">
                                 {["CASH", "MPESA", "SPLIT"].map((method) => (
                                   <Button
                                     key={method}
                                     variant={paymentMethod === method ? "default" : "outline"}
-                                    className={`h-16 flex flex-col gap-1 ${paymentMethod === method ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                                    className={`h-16 flex flex-col gap-1 ${paymentMethod === method ? "bg-primary hover:bg-primary/90" : ""}`}
                                     onClick={() => setPaymentMethod(method as PaymentMethod)}
                                   >
                                     <span className="text-xs font-bold opacity-70 uppercase">{method}</span>

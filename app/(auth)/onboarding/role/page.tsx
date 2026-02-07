@@ -118,7 +118,7 @@ export default function RoleSelectionPage() {
     return (
         <div className="flex flex-col items-center space-y-6 relative">
             <Link href={backPath} className="absolute -top-12 left-0">
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-blue-600 transition-colors px-0">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary transition-colors px-0">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back
                 </Button>
@@ -131,7 +131,7 @@ export default function RoleSelectionPage() {
 
             <div className="w-full space-y-4">
                 <Card
-                    className={`bg-card border transition-all cursor-pointer ${selectedRole === ROLES.MANAGER ? 'border-blue-600 ring-1 ring-blue-600' : 'border-border hover:border-muted-foreground/50'}`}
+                    className={`bg-card border transition-all cursor-pointer ${selectedRole === ROLES.MANAGER ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-muted-foreground/50'}`}
                     onClick={() => setSelectedRole(ROLES.MANAGER)}
                 >
                     <CardContent className="p-6">
@@ -141,7 +141,7 @@ export default function RoleSelectionPage() {
                 </Card>
 
                 <Card
-                    className={`bg-card border transition-all cursor-pointer ${selectedRole === ROLES.CASHIER ? 'border-blue-600 ring-1 ring-blue-600' : 'border-border hover:border-muted-foreground/50'}`}
+                    className={`bg-card border transition-all cursor-pointer ${selectedRole === ROLES.CASHIER ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-muted-foreground/50'}`}
                     onClick={() => setSelectedRole(ROLES.CASHIER)}
                 >
                     <CardContent className="p-6">
@@ -154,7 +154,7 @@ export default function RoleSelectionPage() {
             <div className="w-full pt-8">
                 <Button
                     onClick={handleComplete}
-                    className="w-full h-14 text-base bg-blue-600 hover:bg-blue-700 text-white"
+                    className="w-full h-14 text-base bg-primary hover:bg-primary/90 text-white"
                     disabled={!selectedRole || isSubmitting}
                 >
                     {isSubmitting ? (

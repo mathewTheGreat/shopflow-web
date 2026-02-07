@@ -119,14 +119,14 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-background text-foreground transition-colors duration-300">
       {/* Desktop Sidebar */}
-      <div className="hidden lg:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+      <div className="hidden md:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
         <AppSidebar />
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile Header */}
-        <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-card border-b border-border/50 lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-card border-b border-border/50 md:hidden">
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="mr-4">
@@ -141,7 +141,7 @@ export default function DashboardPage() {
         </header>
 
         {/* Desktop Header */}
-        <header className="hidden lg:flex items-center h-[64px] px-6 bg-card border-b border-border/50 sticky top-0 z-30">
+        <header className="hidden md:flex items-center h-[64px] px-6 bg-card border-b border-border/50 sticky top-0 z-30">
           <div className="pl-[44px]">
             <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
           </div>
@@ -154,14 +154,14 @@ export default function DashboardPage() {
             {/* Welcome Section */}
             <Card className="bg-card border-none shadow-sm">
               <CardContent className="p-6 flex items-center gap-4 md:gap-6">
-                <div className="p-2 md:p-3 bg-blue-600/10 rounded-xl flex-shrink-0">
-                  <UserIcon className="h-8 w-8 md:h-10 md:w-10 text-blue-500" />
+                <div className="p-2 md:p-3 bg-primary/10 rounded-xl flex-shrink-0">
+                  <UserIcon className="h-8 w-8 md:h-10 md:w-10 text-primary" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm text-muted-foreground whitespace-nowrap">Welcome back,</p>
                     {activeShop?.role && (
-                      <span className="px-1.5 py-0.5 bg-blue-600/10 text-blue-500 text-[10px] font-black rounded uppercase tracking-tighter">
+                      <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] font-black rounded uppercase tracking-tighter">
                         {activeShop.role}
                       </span>
                     )}

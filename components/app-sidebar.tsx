@@ -55,11 +55,11 @@ export function AppSidebar({ className }: { className?: string }) {
                                 className={cn(
                                     "w-full justify-start gap-4 h-14 rounded-xl transition-all duration-200",
                                     isActive(item.href)
-                                        ? "bg-blue-600/10 text-blue-500 font-semibold"
-                                        : "text-muted-foreground hover:bg-muted"
+                                        ? "bg-primary/10 text-primary font-semibold"
+                                        : "text-foreground hover:bg-muted"
                                 )}
                             >
-                                <item.icon className={cn("h-6 w-6", isActive(item.href) ? "text-blue-500" : "text-muted-foreground")} />
+                                <item.icon className={cn("h-6 w-6", isActive(item.href) ? "text-primary" : "text-foreground")} />
                                 <span className="text-base">{item.label}</span>
                             </Button>
                         </Link>
@@ -71,29 +71,20 @@ export function AppSidebar({ className }: { className?: string }) {
                     {/* Theme Switcher */}
                     <div className="flex items-center justify-between px-4 py-2">
                         <div className="flex items-center gap-3">
-                            {theme === "dark" ? <Moon className="h-5 w-5 text-blue-500" /> : <Sun className="h-5 w-5 text-orange-500" />}
-                            <span className="text-sm font-medium">Dark Mode</span>
+                            {theme === "dark" ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-orange-500" />}
+                            <span className="text-sm font-medium text-foreground">Dark Mode</span>
                         </div>
                         <Switch checked={theme === "dark"} onCheckedChange={toggleDarkMode} />
                     </div>
-
-                    {/* Sync Button */}
-                    <Button
-                        variant="secondary"
-                        className="w-full justify-start gap-4 h-14 rounded-xl bg-muted/50 hover:bg-muted transition-all"
-                    >
-                        <RefreshCw className="h-6 w-6 text-blue-500" />
-                        <span className="font-semibold">Sync</span>
-                    </Button>
 
                     {/* Sign Out Button */}
                     <SignOutButton>
                         <Button
                             variant="secondary"
-                            className="w-full justify-start gap-4 h-14 rounded-xl bg-muted/50 hover:bg-muted transition-all"
+                            className="w-full justify-start gap-4 h-14 rounded-xl bg-muted/50 hover:bg-muted transition-all text-foreground"
                         >
-                            <LogOut className="h-6 w-6 text-blue-500" />
-                            <span className="font-semibold">Sign Out</span>
+                            <LogOut className="h-6 w-6 text-primary" />
+                            <span className="font-semibold text-foreground">Sign Out</span>
                         </Button>
                     </SignOutButton>
 

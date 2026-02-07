@@ -30,7 +30,7 @@ export default function CreateShopPage() {
     return (
         <div className="flex flex-col items-center space-y-6 relative">
             <Link href="/onboarding" className="absolute -top-12 left-0">
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-blue-600 transition-colors px-0">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary transition-colors px-0">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back
                 </Button>

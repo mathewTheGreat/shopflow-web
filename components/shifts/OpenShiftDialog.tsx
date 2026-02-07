@@ -68,7 +68,7 @@ export function OpenShiftDialog({
                     <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isLoading}>
                         Cancel
                     </Button>
-                    <Button onClick={onSubmit} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
+                    <Button onClick={onSubmit} disabled={isLoading} className="bg-primary hover:bg-primary/90">
                         {isLoading ? "Opening..." : "Open Shift"}
                     </Button>
                 </DialogFooter>

@@ -179,6 +179,7 @@ export default function DashboardPage() {
               <div className="w-full">
                 <ShiftStatusCard
                   shiftOpen={shiftOpen}
+                  startTime={currentShift?.start_time}
                   onOpenShift={handleOpenShiftClick}
                   onCloseShift={handleCloseShiftClick}
                 />

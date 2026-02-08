@@ -111,7 +111,7 @@ export default function SalesPage() {
   const [expensePaymentMethod, setExpensePaymentMethod] = useState<"cash" | "mpesa">("cash")
 
   const calculateTotal = () => {
-    return cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    return cartItems.reduce((sum, item) => sum + item.price * (parseFloat(item.quantity) || 0), 0)
   }
 
   const addToCart = (item: any) => {
@@ -126,14 +126,63 @@ export default function SalesPage() {
     toast.success(`${item.name} added to cart`)
   }
 
+  const handleQuantityInputChange = (id: string, value: string) => {
+    // Allow empty string so user can clear the input
+    if (value === "") {
+      setCartItems(
+        cartItems.map((item) => (item.id === id ? { ...item, quantity: "" } : item))
+      )
+      return
+    }
+
+    const qty = parseFloat(value)
+    if (!isNaN(qty)) {
+      setCartItems(
+        cartItems.map((item) => (item.id === id ? { ...item, quantity: value } : item))
+      )
+    }
+  }
+
   const updateQuantity = (id: string, delta: number) => {
     setCartItems(
-      cartItems.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item))
+      cartItems.map((item) => {
+        if (item.id === id) {
+          const currentQty = parseFloat(item.quantity) || 0
+          return { ...item, quantity: Math.max(0, currentQty + delta) }
+        }
+        return item
+      })
     )
   }
 
   const removeItem = (id: string) => {
     setCartItems(cartItems.filter((item) => item.id !== id))
+  }
+
+  const handleCashAmountChange = (value: string) => {
+    setCashAmount(value)
+    const cash = parseFloat(value) || 0
+    const total = calculateTotal()
+    const remaining = Math.max(0, total - cash)
+    setMpesaAmount(remaining.toFixed(2))
+  }
+
+  const handleMpesaAmountChange = (value: string) => {
+    setMpesaAmount(value)
+    const mpesa = parseFloat(value) || 0
+    const total = calculateTotal()
+    const remaining = Math.max(0, total - mpesa)
+    setCashAmount(remaining.toFixed(2))
+  }
+
+  const handlePaymentMethodChange = (method: PaymentMethod) => {
+    setPaymentMethod(method)
+    if (method === "SPLIT") {
+      const total = calculateTotal()
+      // Initial split: 0 Cash, All Mpesa (or vice versa, but let's do 0/All)
+      setCashAmount("0")
+      setMpesaAmount(total.toFixed(2))
+    }
   }
 
   const handleCompleteSale = async () => {
@@ -173,6 +222,12 @@ export default function SalesPage() {
       }
     }
 
+    const finalItems = cartItems.filter((item) => (parseFloat(item.quantity) || 0) > 0)
+    if (finalItems.length === 0) {
+      toast.error("Cart contains no items with valid quantity")
+      return
+    }
+
     const payload = {
       sale: {
         id: uuidv4(),
@@ -184,12 +239,12 @@ export default function SalesPage() {
         sale_date: new Date().toISOString(),
         created_by: userInfo?.id || "system",
       },
-      items: cartItems.map((item) => ({
+      items: finalItems.map((item) => ({
         id: uuidv4(),
         item_id: item.id,
-        quantity: item.quantity,
+        quantity: parseFloat(item.quantity) || 0,
         unit_price: item.price,
-        total_price: item.price * item.quantity,
+        total_price: item.price * (parseFloat(item.quantity) || 0),
         created_by: userInfo?.id || "system",
       })),
       payments: payments.map((p) => ({
@@ -650,7 +705,7 @@ export default function SalesPage() {
                                     key={method}
                                     variant={paymentMethod === method ? "default" : "outline"}
                                     className={`h-16 flex flex-col gap-1 ${paymentMethod === method ? "bg-primary hover:bg-primary/90" : ""}`}
-                                    onClick={() => setPaymentMethod(method as PaymentMethod)}
+                                    onClick={() => handlePaymentMethodChange(method as PaymentMethod)}
                                   >
                                     <span className="text-xs font-bold opacity-70 uppercase">{method}</span>
                                   </Button>
@@ -661,27 +716,27 @@ export default function SalesPage() {
                             {paymentMethod === "SPLIT" && (
                               <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
                                 <div className="space-y-2">
-                                  <Label className="text-xs font-bold text-muted-foreground uppercase">Cash Portion</Label>
+                                  <Label className="text-xs font-bold text-muted-foreground uppercase">Cash Amount</Label>
                                   <div className="relative">
                                     <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
                                       type="number"
                                       placeholder="0.00"
                                       value={cashAmount}
-                                      onChange={(e) => setCashAmount(e.target.value)}
+                                      onChange={(e) => handleCashAmountChange(e.target.value)}
                                       className="h-12 pl-10 text-lg font-bold"
                                     />
                                   </div>
                                 </div>
                                 <div className="space-y-2">
-                                  <Label className="text-xs font-bold text-muted-foreground uppercase">M-Pesa Portion</Label>
+                                  <Label className="text-xs font-bold text-muted-foreground uppercase">M-Pesa Amount</Label>
                                   <div className="relative">
                                     <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
                                       type="number"
                                       placeholder="0.00"
                                       value={mpesaAmount}
-                                      onChange={(e) => setMpesaAmount(e.target.value)}
+                                      onChange={(e) => handleMpesaAmountChange(e.target.value)}
                                       className="h-12 pl-10 text-lg font-bold"
                                     />
                                   </div>
@@ -722,14 +777,19 @@ export default function SalesPage() {
                           ).map((item) => (
                             <Card
                               key={item.id}
-                              className="group cursor-pointer hover:border-primary hover:shadow-md transition-all active:scale-95 overflow-hidden"
+                              className="group cursor-pointer hover:border-primary hover:shadow-md transition-all active:scale-95 overflow-hidden border border-border/50 bg-card"
                               onClick={() => addToCart(item)}
                             >
                               <CardContent className="p-4 flex flex-col justify-between h-full space-y-2">
                                 <div>
                                   <div className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-1">{item.name}</div>
-                                  <div className="text-xs text-muted-foreground bg-muted-foreground/10 inline-block px-1.5 py-0.5 rounded mt-1 uppercase font-bold tracking-tight">
-                                    {item.unit_of_measure}
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="text-[10px] text-muted-foreground bg-muted-foreground/10 px-1.5 py-0.5 rounded uppercase font-black tracking-tight">
+                                      {item.unit_of_measure}
+                                    </div>
+                                    <div className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase font-black tracking-tight">
+                                      Stock: {item.quantity}
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="flex items-end justify-between pt-2">
@@ -737,8 +797,8 @@ export default function SalesPage() {
                                     <span className="text-xs font-bold mr-0.5">KES</span>
                                     {item.sale_price.toLocaleString()}
                                   </div>
-                                  <div className="p-1.5 rounded-full bg-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">
-                                    <Plus className="h-4 w-4" />
+                                  <div className="p-2 rounded-xl bg-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">
+                                    <Plus className="h-5 w-5" />
                                   </div>
                                 </div>
                               </CardContent>
@@ -801,7 +861,13 @@ export default function SalesPage() {
                                     >
                                       <Minus className="h-4 w-4" />
                                     </Button>
-                                    <span className="font-black w-10 text-center text-lg">{item.quantity}</span>
+                                    <Input
+                                      type="number"
+                                      step="any"
+                                      value={item.quantity}
+                                      onChange={(e) => handleQuantityInputChange(item.id, e.target.value)}
+                                      className="w-16 h-10 border-none bg-transparent text-center font-black text-lg focus-visible:ring-0 p-0"
+                                    />
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -816,7 +882,7 @@ export default function SalesPage() {
                                       {item.quantity} x {item.price.toLocaleString()}
                                     </div>
                                     <div className="text-xl font-black text-primary tracking-tighter">
-                                      KES {(item.price * item.quantity).toLocaleString()}
+                                      KES {(item.price * (parseFloat(item.quantity) || 0)).toLocaleString()}
                                     </div>
                                   </div>
                                 </div>

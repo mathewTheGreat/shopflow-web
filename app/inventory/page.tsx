@@ -117,7 +117,7 @@ export default function InventoryPage() {
                             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
                                 {/* Tab Navigation */}
                                 <div className="border-b px-6 flex-shrink-0">
-                                    <TabsList className="flex h-auto w-full justify-start gap-8 bg-transparent p-0">
+                                    <TabsList className="flex h-auto w-full justify-start gap-8 bg-transparent p-0 overflow-x-auto scrollbar-hide whitespace-nowrap">
                                         <TabsTrigger
                                             value="items"
                                             className="relative h-14 rounded-none border-b-2 border-transparent px-4 pb-3 pt-3 font-medium text-muted-foreground hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary"
@@ -186,42 +186,44 @@ export default function InventoryPage() {
                                                 <p className="text-sm text-muted-foreground/80 mt-1">Add your first item to get started</p>
                                             </div>
                                         ) : (
-                                            <div className="border rounded-lg">
-                                                <div className="grid grid-cols-5 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
-                                                    <div className="col-span-2">Item Name</div>
-                                                    <div>Type</div>
-                                                    <div>Unit</div>
-                                                    <div className="text-right">Price</div>
-                                                    <div className="text-right sr-only">Actions</div>
-                                                </div>
-                                                <div className="divide-y">
-                                                    {items.map((item) => (
-                                                        <div key={item.id} className="grid grid-cols-5 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm">
-                                                            <div className="col-span-2 font-medium text-foreground">{item.name}</div>
-                                                            <div>
-                                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
-                                                                    {item.item_type}
-                                                                </span>
+                                            <div className="overflow-x-auto pb-4">
+                                                <div className="border rounded-lg min-w-[600px]">
+                                                    <div className="grid grid-cols-5 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
+                                                        <div className="col-span-2">Item Name</div>
+                                                        <div>Type</div>
+                                                        <div>Unit</div>
+                                                        <div className="text-right">Price</div>
+                                                        <div className="text-right sr-only">Actions</div>
+                                                    </div>
+                                                    <div className="divide-y">
+                                                        {items.map((item) => (
+                                                            <div key={item.id} className="grid grid-cols-5 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm">
+                                                                <div className="col-span-2 font-medium text-foreground">{item.name}</div>
+                                                                <div>
+                                                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
+                                                                        {item.item_type}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-muted-foreground">{item.unit_of_measure}</div>
+                                                                <div className="text-right font-bold">{currency} {item.sale_price.toFixed(2)}</div>
+                                                                <div className="flex justify-end gap-2">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
+                                                                        onClick={() => handleEditItem(item)}
+                                                                    >
+                                                                        <Edit className="h-4 w-4" />
+                                                                        <span className="sr-only">Edit</span>
+                                                                    </Button>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50">
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                        <span className="sr-only">Delete</span>
+                                                                    </Button>
+                                                                </div>
                                                             </div>
-                                                            <div className="text-muted-foreground">{item.unit_of_measure}</div>
-                                                            <div className="text-right font-bold">{currency} {item.sale_price.toFixed(2)}</div>
-                                                            <div className="flex justify-end gap-2">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
-                                                                    onClick={() => handleEditItem(item)}
-                                                                >
-                                                                    <Edit className="h-4 w-4" />
-                                                                    <span className="sr-only">Edit</span>
-                                                                </Button>
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50">
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                    <span className="sr-only">Delete</span>
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}

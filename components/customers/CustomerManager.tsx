@@ -123,47 +123,49 @@ export function CustomerManager({ onBack }: CustomerManagerProps) {
                             )}
                         </div>
                     ) : (
-                        <div className="border rounded-lg bg-card overflow-hidden">
-                            <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
-                                <div className="col-span-1">Name</div>
-                                <div>Email</div>
-                                <div>Phone</div>
-                                <div className="text-right">Actions</div>
-                            </div>
-                            <div className="divide-y">
-                                {filteredCustomers.map((customer) => (
-                                    <div key={customer.id} className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm" onClick={() => handleEdit(customer)}>
-                                        <div className="font-medium text-foreground">{customer.name}</div>
-                                        <div className="text-muted-foreground truncate pr-4">{customer.email || "-"}</div>
-                                        <div className="text-muted-foreground">{customer.phone || "-"}</div>
-                                        <div className="flex justify-end gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    handleEdit(customer)
-                                                }}
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                                <span className="sr-only">Edit</span>
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    handleDelete(customer.id)
-                                                }}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                                <span className="sr-only">Delete</span>
-                                            </Button>
+                        <div className="overflow-x-auto pb-4">
+                            <div className="border rounded-lg bg-card overflow-hidden min-w-[550px]">
+                                <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
+                                    <div className="col-span-1">Name</div>
+                                    <div>Email</div>
+                                    <div>Phone</div>
+                                    <div className="text-right">Actions</div>
+                                </div>
+                                <div className="divide-y">
+                                    {filteredCustomers.map((customer) => (
+                                        <div key={customer.id} className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm" onClick={() => handleEdit(customer)}>
+                                            <div className="font-medium text-foreground">{customer.name}</div>
+                                            <div className="text-muted-foreground truncate pr-4">{customer.email || "-"}</div>
+                                            <div className="text-muted-foreground">{customer.phone || "-"}</div>
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleEdit(customer)
+                                                    }}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                    <span className="sr-only">Edit</span>
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleDelete(customer.id)
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    <span className="sr-only">Delete</span>
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}

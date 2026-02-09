@@ -332,7 +332,7 @@ export default function SalesPage() {
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
                   {/* Tab Navigation */}
                   <div className="border-b px-6 flex-shrink-0">
-                    <TabsList className="flex h-auto w-full justify-start gap-8 bg-transparent p-0">
+                    <TabsList className="flex h-auto w-full justify-start gap-8 bg-transparent p-0 overflow-x-auto scrollbar-hide whitespace-nowrap">
                       <TabsTrigger
                         value="sales"
                         className="relative h-14 rounded-none border-b-2 border-transparent px-4 pb-3 pt-3 font-medium text-muted-foreground hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary"
@@ -388,45 +388,47 @@ export default function SalesPage() {
                         </Button>
                       </div>
 
-                      <div className="border rounded-lg">
-                        <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
-                          <div>Sale ID</div>
-                          <div>Date</div>
-                          <div>Type</div>
-                          <div className="text-right">Amount</div>
-                        </div>
-                        <div className="divide-y">
-                          {salesLoading ? (
-                            <div className="p-8 text-center text-muted-foreground">Loading sales...</div>
-                          ) : sales?.length === 0 ? (
-                            <div className="p-8 text-center text-muted-foreground">No recent sales</div>
-                          ) : (
-                            sales?.map((sale: any) => (
-                              <div
-                                key={sale.id}
-                                className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm"
-                                onClick={() => setSelectedSaleId(sale.id)}
-                              >
-                                <div className="font-medium text-primary" title={sale.id}>#{sale.id.slice(0, 8)}</div>
-                                <div className="text-muted-foreground">
-                                  {new Date(sale.sale_date).toLocaleString('en-US', {
-                                    weekday: 'short',
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                    hour: 'numeric',
-                                    minute: 'numeric',
-                                    hour12: true
-                                  })}
+                      <div className="overflow-x-auto pb-4">
+                        <div className="border rounded-lg min-w-[600px]">
+                          <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
+                            <div>Sale ID</div>
+                            <div>Date</div>
+                            <div>Type</div>
+                            <div className="text-right">Amount</div>
+                          </div>
+                          <div className="divide-y">
+                            {salesLoading ? (
+                              <div className="p-8 text-center text-muted-foreground">Loading sales...</div>
+                            ) : sales?.length === 0 ? (
+                              <div className="p-8 text-center text-muted-foreground">No recent sales</div>
+                            ) : (
+                              sales?.map((sale: any) => (
+                                <div
+                                  key={sale.id}
+                                  className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm"
+                                  onClick={() => setSelectedSaleId(sale.id)}
+                                >
+                                  <div className="font-medium text-primary" title={sale.id}>#{sale.id.slice(0, 8)}</div>
+                                  <div className="text-muted-foreground">
+                                    {new Date(sale.sale_date).toLocaleString('en-US', {
+                                      weekday: 'short',
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                      hour: 'numeric',
+                                      minute: 'numeric',
+                                      hour12: true
+                                    })}
+                                  </div>
+                                  <div>
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary transition-colors">
+                                      {sale.sale_category}
+                                    </span>
+                                  </div>
+                                  <div className="text-right font-bold">KES {sale.total_amount.toLocaleString()}</div>
                                 </div>
-                                <div>
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary transition-colors">
-                                    {sale.sale_category}
-                                  </span>
-                                </div>
-                                <div className="text-right font-bold">KES {sale.total_amount.toLocaleString()}</div>
-                              </div>
-                            )))}
+                              )))}
+                          </div>
                         </div>
                       </div>
                     </TabsContent>
@@ -448,51 +450,53 @@ export default function SalesPage() {
                         </Button>
                       </div>
 
-                      <div className="border rounded-lg overflow-hidden">
-                        <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
-                          <div>Category</div>
-                          <div>Description</div>
-                          <div>Date</div>
-                          <div className="text-right">Amount</div>
-                        </div>
-                        <div className="divide-y max-h-[500px] overflow-y-auto">
-                          {expensesLoading ? (
-                            <div className="p-8 text-center text-muted-foreground">Loading expenses...</div>
-                          ) : expenses?.length === 0 ? (
-                            <div className="p-12 text-center border-2 border-dashed rounded-lg bg-muted/5 m-4">
-                              <div className="bg-muted/20 p-4 rounded-full mb-4 inline-block">
-                                <Receipt className="h-10 w-10 text-muted-foreground/50" />
+                      <div className="overflow-x-auto pb-4">
+                        <div className="border rounded-lg overflow-hidden min-w-[600px]">
+                          <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
+                            <div>Category</div>
+                            <div>Description</div>
+                            <div>Date</div>
+                            <div className="text-right">Amount</div>
+                          </div>
+                          <div className="divide-y max-h-[500px] overflow-y-auto">
+                            {expensesLoading ? (
+                              <div className="p-8 text-center text-muted-foreground">Loading expenses...</div>
+                            ) : expenses?.length === 0 ? (
+                              <div className="p-12 text-center border-2 border-dashed rounded-lg bg-muted/5 m-4">
+                                <div className="bg-muted/20 p-4 rounded-full mb-4 inline-block">
+                                  <Receipt className="h-10 w-10 text-muted-foreground/50" />
+                                </div>
+                                <h3 className="text-lg font-semibold">No expenses recorded</h3>
+                                <p className="text-muted-foreground text-sm max-w-sm mt-2 mb-6 mx-auto">
+                                  Expenses recorded for this branch will appear here.
+                                </p>
+                                <Button variant="outline" onClick={() => setShowExpenseDialog(true)}>
+                                  Record First Expense
+                                </Button>
                               </div>
-                              <h3 className="text-lg font-semibold">No expenses recorded</h3>
-                              <p className="text-muted-foreground text-sm max-w-sm mt-2 mb-6 mx-auto">
-                                Expenses recorded for this branch will appear here.
-                              </p>
-                              <Button variant="outline" onClick={() => setShowExpenseDialog(true)}>
-                                Record First Expense
-                              </Button>
-                            </div>
-                          ) : (
-                            expenses?.map((expense: any) => (
-                              <div key={expense.id} className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm">
-                                <div className="font-medium text-primary">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 uppercase">
-                                    {expense.category}
-                                  </span>
+                            ) : (
+                              expenses?.map((expense: any) => (
+                                <div key={expense.id} className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm">
+                                  <div className="font-medium text-primary">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 uppercase">
+                                      {expense.category}
+                                    </span>
+                                  </div>
+                                  <div className="truncate text-muted-foreground pr-4" title={expense.description || ""}>
+                                    {expense.description || "No description"}
+                                  </div>
+                                  <div className="text-muted-foreground/80">
+                                    {new Date(expense.expense_date).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: '2-digit'
+                                    })}
+                                  </div>
+                                  <div className="text-right font-bold text-orange-600">KES {expense.amount.toLocaleString()}</div>
                                 </div>
-                                <div className="truncate text-muted-foreground pr-4" title={expense.description || ""}>
-                                  {expense.description || "No description"}
-                                </div>
-                                <div className="text-muted-foreground/80">
-                                  {new Date(expense.expense_date).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: '2-digit'
-                                  })}
-                                </div>
-                                <div className="text-right font-bold text-orange-600">KES {expense.amount.toLocaleString()}</div>
-                              </div>
-                            ))
-                          )}
+                              ))
+                            )}
+                          </div>
                         </div>
                       </div>
                     </TabsContent>
@@ -600,10 +604,10 @@ export default function SalesPage() {
                 onOpenChange={setShowNetPositionDialog}
               />
             </div>
-          </main>
+          </main >
 
           {/* Point of Sale Dialog */}
-          <Sheet open={showPOS} onOpenChange={setShowPOS}>
+          < Sheet open={showPOS} onOpenChange={setShowPOS} >
             <SheetContent
               side="bottom"
               className="h-[100vh] w-full p-0 gap-0 overflow-hidden flex flex-col max-w-none"
@@ -936,11 +940,12 @@ export default function SalesPage() {
                 </div>
               </div>
             </SheetContent>
-          </Sheet>
+          </Sheet >
 
           {/* Receipt Dialog */}
-          <ReceiptDialog
-            open={!!selectedSaleId}
+          < ReceiptDialog
+            open={!!selectedSaleId
+            }
             onOpenChange={(open) => !open && setSelectedSaleId(null)}
             saleId={selectedSaleId || ""}
           />

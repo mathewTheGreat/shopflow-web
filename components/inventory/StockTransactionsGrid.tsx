@@ -50,53 +50,55 @@ export function StockTransactionsGrid() {
     }
 
     return (
-        <div className="border rounded-lg">
-            <div className="grid grid-cols-7 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
-                <div>Date/Time</div>
-                <div>Item</div>
-                <div>Type</div>
-                <div className="text-right">Quantity</div>
-                <div>Reason</div>
-                <div>Reference</div>
-                <div>Created By</div>
-            </div>
-            <div className="divide-y max-h-[500px] overflow-y-auto">
-                {sortedTransactions.map((transaction) => (
-                    <div
-                        key={transaction.id}
-                        className="grid grid-cols-7 p-4 items-center hover:bg-muted/50 transition-colors text-sm"
-                    >
-                        <div className="text-muted-foreground">
-                            {transaction.created_at
-                                ? format(new Date(transaction.created_at), "MMM dd, HH:mm")
-                                : "N/A"}
+        <div className="overflow-x-auto pb-4">
+            <div className="border rounded-lg min-w-[700px]">
+                <div className="grid grid-cols-7 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
+                    <div>Date/Time</div>
+                    <div>Item</div>
+                    <div>Type</div>
+                    <div className="text-right">Quantity</div>
+                    <div>Reason</div>
+                    <div>Reference</div>
+                    <div>Created By</div>
+                </div>
+                <div className="divide-y max-h-[500px] overflow-y-auto">
+                    {sortedTransactions.map((transaction) => (
+                        <div
+                            key={transaction.id}
+                            className="grid grid-cols-7 p-4 items-center hover:bg-muted/50 transition-colors text-sm"
+                        >
+                            <div className="text-muted-foreground">
+                                {transaction.created_at
+                                    ? format(new Date(transaction.created_at), "MMM dd, HH:mm")
+                                    : "N/A"}
+                            </div>
+                            <div className="font-medium text-foreground truncate">
+                                {transaction.item_id}
+                            </div>
+                            <div>
+                                <span
+                                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${transactionTypeColors[
+                                        transaction.type as keyof typeof transactionTypeColors
+                                    ] || "bg-gray-100 text-gray-700"
+                                        }`}
+                                >
+                                    {transaction.type}
+                                </span>
+                            </div>
+                            <div className="text-right font-semibold">
+                                {transaction.quantity > 0 ? "+" : ""}
+                                {transaction.quantity}
+                            </div>
+                            <div className="text-muted-foreground">{transaction.reason || "N/A"}</div>
+                            <div className="text-muted-foreground truncate">
+                                {transaction.reference_id || "-"}
+                            </div>
+                            <div className="text-muted-foreground truncate">
+                                {transaction.created_by || "System"}
+                            </div>
                         </div>
-                        <div className="font-medium text-foreground truncate">
-                            {transaction.item_id}
-                        </div>
-                        <div>
-                            <span
-                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${transactionTypeColors[
-                                    transaction.type as keyof typeof transactionTypeColors
-                                ] || "bg-gray-100 text-gray-700"
-                                    }`}
-                            >
-                                {transaction.type}
-                            </span>
-                        </div>
-                        <div className="text-right font-semibold">
-                            {transaction.quantity > 0 ? "+" : ""}
-                            {transaction.quantity}
-                        </div>
-                        <div className="text-muted-foreground">{transaction.reason || "N/A"}</div>
-                        <div className="text-muted-foreground truncate">
-                            {transaction.reference_id || "-"}
-                        </div>
-                        <div className="text-muted-foreground truncate">
-                            {transaction.created_by || "System"}
-                        </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
         </div>
     )

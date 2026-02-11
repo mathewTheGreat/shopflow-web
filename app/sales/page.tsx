@@ -111,7 +111,7 @@ export default function SalesPage() {
   const [expensePaymentMethod, setExpensePaymentMethod] = useState<"cash" | "mpesa">("cash")
 
   const calculateTotal = () => {
-    return cartItems.reduce((sum, item) => sum + item.price * (parseFloat(item.quantity) || 0), 0)
+    return cartItems.reduce((sum, item) => sum + (item.price || 0) * (parseFloat(item.quantity) || 0), 0)
   }
 
   const addToCart = (item: any) => {
@@ -121,7 +121,7 @@ export default function SalesPage() {
         cartItems.map((ci) => (ci.id === item.id ? { ...ci, quantity: ci.quantity + 1 } : ci))
       )
     } else {
-      setCartItems([...cartItems, { id: item.id, name: item.name, price: item.sale_price, quantity: 1 }])
+      setCartItems([...cartItems, { id: item.id, name: item.name, price: item.sale_price || 0, quantity: 1 }])
     }
     toast.success(`${item.name} added to cart`)
   }
@@ -799,7 +799,7 @@ export default function SalesPage() {
                                 <div className="flex items-end justify-between pt-2">
                                   <div className="text-primary font-black text-xl leading-none">
                                     <span className="text-xs font-bold mr-0.5">KES</span>
-                                    {item.sale_price.toLocaleString()}
+                                    {item.sale_price?.toLocaleString()}
                                   </div>
                                   <div className="p-2 rounded-xl bg-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">
                                     <Plus className="h-5 w-5" />

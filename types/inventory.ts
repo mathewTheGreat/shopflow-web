@@ -7,6 +7,7 @@ export interface Item extends BaseEntity {
     unit_of_measure: string;
     sale_price?: number | null;
     cost_price: number;
+    quantity?: number | null;
     created_by?: string | null;
 }
 

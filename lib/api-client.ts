@@ -7,6 +7,7 @@ async function fetcher<T>(url: string, options?: FetchOptions): Promise<T> {
         ...options,
         headers: {
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
             ...options?.headers,
         },
     })
@@ -18,7 +19,13 @@ async function fetcher<T>(url: string, options?: FetchOptions): Promise<T> {
             const errorData = await response.json()
             errorMessage = errorData.message || errorData.error || errorMessage
         } catch {
-            // Ignore JSON parse error if response body is not JSON
+            // If body is not JSON, try to get text to see what happened
+            try {
+                const text = await response.text()
+                console.error(`[API Client] Non-JSON error response from ${url}:`, text.slice(0, 500))
+            } catch (textErr) {
+                // Ignore text parse errors
+            }
         }
         const error = new Error(errorMessage) as Error & { status: number }
         error.status = response.status
@@ -30,7 +37,14 @@ async function fetcher<T>(url: string, options?: FetchOptions): Promise<T> {
         return {} as T
     }
 
-    return response.json()
+    try {
+        return await response.json()
+    } catch (jsonErr) {
+        // Clone response to read text if json fails
+        const text = await response.text()
+        console.error(`[API Client] Failed to parse JSON response from ${url}. Body snippet:`, text.slice(0, 1000))
+        throw jsonErr
+    }
 }
 
 export const apiClient = {

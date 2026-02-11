@@ -6,8 +6,9 @@ export interface Item {
     description?: string
     item_type: "Sale" | "In-house"
     unit_of_measure: string
-    sale_price: number
+    sale_price: number | null
     cost_price: number
+    quantity: number
     createdAt: string
     updatedAt: string
 }

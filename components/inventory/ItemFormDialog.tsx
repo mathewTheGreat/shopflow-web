@@ -49,8 +49,8 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
                 description: item.description || "",
                 item_type: item.item_type,
                 unit_of_measure: item.unit_of_measure,
-                sale_price: item.sale_price.toString(),
-                cost_price: item.cost_price.toString(),
+                sale_price: item.sale_price?.toString() || "",
+                cost_price: item.cost_price?.toString() || "",
             })
             setCurrentItemId(item.id)
         } else {
@@ -84,7 +84,7 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
             return
         }
 
-        if (!formData.sale_price || parseFloat(formData.sale_price) < 0) {
+        if (formData.sale_price && parseFloat(formData.sale_price) < 0) {
             alert("Valid sale price is required")
             return
         }

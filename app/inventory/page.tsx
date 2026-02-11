@@ -205,7 +205,7 @@ export default function InventoryPage() {
                                                                     </span>
                                                                 </div>
                                                                 <div className="text-muted-foreground">{item.unit_of_measure}</div>
-                                                                <div className="text-right font-bold">{currency} {item.sale_price.toFixed(2)}</div>
+                                                                <div className="text-right font-bold">{currency} {item.sale_price?.toFixed(2)}</div>
                                                                 <div className="flex justify-end gap-2">
                                                                     <Button
                                                                         variant="ghost"

@@ -14,9 +14,13 @@ export const stockTransactionService = {
     getTransactionById: (id: string) =>
         apiClient.get<StockTransaction>(`/api/stock/transactions/${id}`),
 
-    createTransaction: (data: Partial<StockTransaction>) =>
-        apiClient.post<StockTransaction>("/api/stock/transactions", data),
+    createTransaction: (data: Partial<StockTransaction>) => {
+        console.log("[StockTransactionService] Creating transaction:", data);
+        return apiClient.post<StockTransaction>("/api/stock/transactions", data);
+    },
 
-    createBulkTransactions: (data: Partial<StockTransaction>[]) =>
-        apiClient.post<StockTransaction[]>("/api/stock/transactions/bulk", data),
+    createBulkTransactions: (data: Partial<StockTransaction>[]) => {
+        console.log("[StockTransactionService] Creating bulk transactions:", data);
+        return apiClient.post<StockTransaction[]>("/api/stock/transactions/bulk", data);
+    },
 }

@@ -167,8 +167,8 @@ export function PricingRulesTab({ itemId, itemName }: PricingRulesTabProps) {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Override Price */}
                             <div className="md:col-span-2">
-                                <Label htmlFor="override_price" className="text-base mb-2 block">
-                                    Override Price ({currency}) <span className="text-destructive">*</span>
+                                <Label htmlFor="override_price" className="text-base mb-2 block font-bold">
+                                    Override Unit Price ({currency}) <span className="text-destructive">*</span>
                                 </Label>
                                 <Input
                                     id="override_price"
@@ -180,8 +180,11 @@ export function PricingRulesTab({ itemId, itemName }: PricingRulesTabProps) {
                                     onChange={(e) =>
                                         setFormData((prev) => ({ ...prev, override_price: e.target.value }))
                                     }
-                                    className="h-12 text-base"
+                                    className="h-12 text-base font-bold"
                                 />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    This is the price for **1.0 unit**. The system will multiply this by the actual quantity in the cart.
+                                </p>
                             </div>
 
                             {/* Minimum Quantity */}

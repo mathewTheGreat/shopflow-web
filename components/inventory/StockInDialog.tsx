@@ -104,21 +104,20 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
         try {
             // 1. Create the transaction record
             const transactionData = {
-                id: uuidv4(),
-                type: "IN",
                 item_id: formData.item_id,
                 shop_id: activeShop!.id,
+                shift_id: activeShift!.id,
+                type: "IN",
                 quantity: parseFloat(formData.quantity),
                 reason: formData.reason,
-                supplier_id: formData.reason === "PURCHASE" ? formData.supplier_id : undefined,
-                reference_id: formData.reference_id || undefined,
-                notes: formData.notes || undefined,
-                shift_id: activeShift!.id,
-                created_by: userInfo?.id || "system",
-                created_at: new Date().toISOString(),
-            }
+                supplierId: formData.supplier_id || null,
+                reference_id: formData.reference_id || null,
+                notes: formData.notes || null,
+                created_by: userInfo?.id,
+            };
 
-            await createTransaction(transactionData)
+            console.log("[StockInDialog] Submitting transaction with data:", transactionData);
+            await createTransaction(transactionData);
 
             // 2. Update the stock level
             // We need to fetch the current level first, then add to it
@@ -135,6 +134,7 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
                 // Note: If the API returns the object, we use it. If it returns null/error, we catch below.
                 if (currentLevel) {
                     const newQuantity = (currentLevel.quantity || 0) + parseFloat(formData.quantity)
+                    console.log(`[StockInDialog] Updating existing stock level. Current: ${currentLevel.quantity}, Added: ${formData.quantity}, New Total: ${newQuantity}`);
                     await stockLevelService.updateStockLevel(
                         formData.item_id,
                         activeShop!.id,
@@ -143,6 +143,7 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
                 }
             } catch (error) {
                 // If fetching fails (likely 404 Not Found), we create a new stock level record
+                console.log("[StockInDialog] No existing stock level found, creating new record for item:", formData.item_id);
                 await stockLevelService.setStockLevel({
                     item_id: formData.item_id,
                     shop_id: activeShop!.id,

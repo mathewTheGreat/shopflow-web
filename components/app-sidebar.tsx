@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { ShopSwitcher } from "@/components/shops/ShopSwitcher"
+import { ImportOutboxButton } from "@/components/sync/ImportOutboxButton"
 
 export function AppSidebar({ className }: { className?: string }) {
     const pathname = usePathname()
@@ -76,6 +77,9 @@ export function AppSidebar({ className }: { className?: string }) {
                         </div>
                         <Switch checked={theme === "dark"} onCheckedChange={toggleDarkMode} />
                     </div>
+
+                    {/* Import Outbox Button */}
+                    <ImportOutboxButton />
 
                     {/* Sign Out Button */}
                     <SignOutButton>

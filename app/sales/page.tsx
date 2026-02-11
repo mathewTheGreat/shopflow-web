@@ -49,6 +49,11 @@ import { ShiftPerformanceDialog } from "@/components/reports/ShiftPerformanceDia
 import { SalesReportDialog } from "@/components/reports/SalesReportDialog"
 import { CustomerNetPositionDialog } from "@/components/reports/CustomerNetPositionDialog"
 import { Loader2, ChevronLeft } from "lucide-react"
+import { useAllItemPricing } from "@/hooks/use-item-pricing"
+import { useAllQuantityDiscounts } from "@/hooks/use-quantity-discounts"
+import { calculateEffectivePrice } from "@/lib/pricing"
+import { useStockLevelsByShop, useBulkUpdateStockLevels } from "@/hooks/use-stock-levels"
+import { useCreateBulkTransactions } from "@/hooks/use-stock-transactions"
 
 type SaleCategory = "IMMEDIATE" | "CREDIT" | "PREPAID"
 type PaymentMethod = "CASH" | "MPESA" | "SPLIT"
@@ -88,6 +93,15 @@ export default function SalesPage() {
   const { mutateAsync: completeSale, isPending: isSubmitting } = useCreateSale()
   const { mutateAsync: createExpense, isPending: isExpenseSubmitting } = useCreateExpense()
 
+  // Stock Integration
+  const { data: stockLevels = [] } = useStockLevelsByShop(activeShop?.id || "")
+  const { mutateAsync: bulkUpdateLevels } = useBulkUpdateStockLevels()
+  const { mutateAsync: createBulkTransactions } = useCreateBulkTransactions()
+
+  // Advanced Pricing Data
+  const { pricingRules = [] } = useAllItemPricing(activeShop?.id)
+  const { discounts = [] } = useAllQuantityDiscounts(activeShop?.id)
+
   // POS State
   const [saleCategory, setSaleCategory] = useState<SaleCategory>("IMMEDIATE")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH")
@@ -117,17 +131,37 @@ export default function SalesPage() {
   const addToCart = (item: any) => {
     const existing = cartItems.find((ci) => ci.id === item.id)
     if (existing) {
+      const newQty = (parseFloat(existing.quantity) || 0) + 1
+      const priceResult = calculateEffectivePrice({
+        basePrice: item.sale_price || 0,
+        quantity: newQty,
+        pricingRules: pricingRules.filter(r => r.item_id === item.id),
+        discountRules: discounts.filter(d => d.item_id === item.id)
+      })
+
       setCartItems(
-        cartItems.map((ci) => (ci.id === item.id ? { ...ci, quantity: ci.quantity + 1 } : ci))
+        cartItems.map((ci) => (ci.id === item.id ? { ...ci, quantity: newQty, price: priceResult.unitPrice } : ci))
       )
     } else {
-      setCartItems([...cartItems, { id: item.id, name: item.name, price: item.sale_price || 0, quantity: 1 }])
+      const priceResult = calculateEffectivePrice({
+        basePrice: item.sale_price || 0,
+        quantity: 1,
+        pricingRules: pricingRules.filter(r => r.item_id === item.id),
+        discountRules: discounts.filter(d => d.item_id === item.id)
+      })
+      setCartItems([...cartItems, {
+        id: item.id,
+        name: item.name,
+        base_price: item.sale_price || 0,
+        price: priceResult.unitPrice,
+        quantity: 1,
+        original_item: item
+      }])
     }
     toast.success(`${item.name} added to cart`)
   }
 
   const handleQuantityInputChange = (id: string, value: string) => {
-    // Allow empty string so user can clear the input
     if (value === "") {
       setCartItems(
         cartItems.map((item) => (item.id === id ? { ...item, quantity: "" } : item))
@@ -138,7 +172,18 @@ export default function SalesPage() {
     const qty = parseFloat(value)
     if (!isNaN(qty)) {
       setCartItems(
-        cartItems.map((item) => (item.id === id ? { ...item, quantity: value } : item))
+        cartItems.map((item) => {
+          if (item.id === id) {
+            const priceResult = calculateEffectivePrice({
+              basePrice: item.base_price || item.original_item.sale_price || 0,
+              quantity: qty,
+              pricingRules: pricingRules.filter(r => r.item_id === id),
+              discountRules: discounts.filter(d => d.item_id === id)
+            })
+            return { ...item, quantity: value, price: priceResult.unitPrice }
+          }
+          return item
+        })
       )
     }
   }
@@ -148,7 +193,14 @@ export default function SalesPage() {
       cartItems.map((item) => {
         if (item.id === id) {
           const currentQty = parseFloat(item.quantity) || 0
-          return { ...item, quantity: Math.max(0, currentQty + delta) }
+          const newQty = Math.max(0, currentQty + delta)
+          const priceResult = calculateEffectivePrice({
+            basePrice: item.base_price || item.original_item.sale_price || 0,
+            quantity: newQty,
+            pricingRules: pricingRules.filter(r => r.item_id === id),
+            discountRules: discounts.filter(d => d.item_id === id)
+          })
+          return { ...item, quantity: newQty, price: priceResult.unitPrice }
         }
         return item
       })
@@ -257,6 +309,61 @@ export default function SalesPage() {
 
     try {
       await completeSale(payload)
+
+      // Inventory Integration: Prepare and execute updates
+      try {
+        const stockTransactions = []
+        const stockLevelUpdates = []
+        const timestamp = new Date().toISOString()
+
+        for (const cartItem of finalItems) {
+          const soldQty = parseFloat(cartItem.quantity) || 0
+          if (soldQty <= 0) continue
+
+          // 1. Prepare Stock Transaction (OUT for SALE)
+          stockTransactions.push({
+            id: uuidv4(),
+            type: "ADJUSTMENT",
+            item_id: cartItem.id,
+            shop_id: activeShop.id,
+            quantity: soldQty,
+            reason: "SALE",
+            notes: `Sale Transaction #${payload.sale.id.slice(0, 8)}`,
+            reference_id: payload.sale.id,
+            shift_id: activeShift.id,
+            created_by: userInfo?.id || "system",
+            created_at: timestamp
+          })
+
+          // 2. Prepare Stock Level Update
+          const currentLevel = stockLevels.find(l => l.item_id === cartItem.id)
+          const newQty = (currentLevel?.quantity || 0) - soldQty
+
+          stockLevelUpdates.push({
+            item_id: cartItem.id,
+            shop_id: activeShop.id,
+            quantity: newQty,
+            last_updated: timestamp
+          })
+        }
+
+        if (stockTransactions.length > 0) {
+          console.log("[SalesPage] Recording inventory changes:", {
+            transactions: stockTransactions.length,
+            updates: stockLevelUpdates.length
+          })
+
+          // Execute concurrently
+          await Promise.all([
+            createBulkTransactions(stockTransactions),
+            bulkUpdateLevels(stockLevelUpdates)
+          ])
+        }
+      } catch (inventoryError) {
+        console.error("Sale recorded but inventory update failed:", inventoryError)
+        toast.error("Sale completed but inventory levels might be inaccurate. Please check.")
+      }
+
       setCartItems([])
       setSelectedCustomerId("")
       setShowPOS(false)
@@ -882,8 +989,12 @@ export default function SalesPage() {
                                     </Button>
                                   </div>
                                   <div className="text-right">
-                                    <div className="text-xs font-bold text-muted-foreground/60 uppercase">
-                                      {item.quantity} x {item.price.toLocaleString()}
+                                    <div className="text-xs font-bold text-muted-foreground/60 uppercase flex items-center justify-end gap-1 whitespace-nowrap">
+                                      {item.quantity} x
+                                      {item.price < item.base_price && (
+                                        <span className="line-through opacity-50"> {item.base_price.toLocaleString()}</span>
+                                      )}
+                                      <span> {item.price.toLocaleString()}</span>
                                     </div>
                                     <div className="text-xl font-black text-primary tracking-tighter">
                                       KES {(item.price * (parseFloat(item.quantity) || 0)).toLocaleString()}

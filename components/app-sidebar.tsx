@@ -20,10 +20,13 @@ import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { ShopSwitcher } from "@/components/shops/ShopSwitcher"
 import { ImportOutboxButton } from "@/components/sync/ImportOutboxButton"
+import { useAppStore } from "@/store/use-app-store"
 
 export function AppSidebar({ className }: { className?: string }) {
     const pathname = usePathname()
     const { theme, setTheme } = useTheme()
+    const activeShop = useAppStore((state) => state.activeShop)
+    const isManager = activeShop?.role === "Manager"
 
     const toggleDarkMode = () => {
         setTheme(theme === "dark" ? "light" : "dark")
@@ -78,8 +81,8 @@ export function AppSidebar({ className }: { className?: string }) {
                         <Switch checked={theme === "dark"} onCheckedChange={toggleDarkMode} />
                     </div>
 
-                    {/* Import Outbox Button */}
-                    <ImportOutboxButton />
+                    {/* Import Outbox Button - Managers only */}
+                    {isManager && <ImportOutboxButton />}
 
                     {/* Sign Out Button */}
                     <SignOutButton>

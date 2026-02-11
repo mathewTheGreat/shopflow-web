@@ -51,6 +51,8 @@ export default function InventoryPage() {
     const { items, isLoading, refetch } = useItems()
     const currency = useAppStore((state) => state.userCurrency) || "KES"
     const activeShift = useAppStore((state) => state.activeShift)
+    const activeShop = useAppStore((state) => state.activeShop)
+    const isManager = activeShop?.role === "Manager"
 
     const handleEditItem = (item: Item) => {
         setSelectedItem(item)
@@ -160,10 +162,12 @@ export default function InventoryPage() {
                                 <div className="flex-1 overflow-y-auto min-h-0">
                                     {/* Items Tab */}
                                     <TabsContent value="items" className="h-full p-6 space-y-6">
-                                        <Button onClick={() => setShowAddItem(true)} className="w-full bg-primary hover:bg-primary/90 h-14 text-base">
-                                            <Plus className="h-5 w-5 mr-2" />
-                                            Add Item
-                                        </Button>
+                                        {isManager && (
+                                            <Button onClick={() => setShowAddItem(true)} className="w-full bg-primary hover:bg-primary/90 h-14 text-base">
+                                                <Plus className="h-5 w-5 mr-2" />
+                                                Add Item
+                                            </Button>
+                                        )}
 
                                         <div className="flex items-center justify-between">
                                             <h2 className="text-xl font-semibold">Items ({items.length})</h2>
@@ -206,21 +210,23 @@ export default function InventoryPage() {
                                                                 </div>
                                                                 <div className="text-muted-foreground">{item.unit_of_measure}</div>
                                                                 <div className="text-right font-bold">{currency} {item.sale_price?.toFixed(2)}</div>
-                                                                <div className="flex justify-end gap-2">
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
-                                                                        onClick={() => handleEditItem(item)}
-                                                                    >
-                                                                        <Edit className="h-4 w-4" />
-                                                                        <span className="sr-only">Edit</span>
-                                                                    </Button>
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50">
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                        <span className="sr-only">Delete</span>
-                                                                    </Button>
-                                                                </div>
+                                                                {isManager && (
+                                                                    <div className="flex justify-end gap-2">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-primary hover:text-primary/90 hover:bg-primary/10"
+                                                                            onClick={() => handleEditItem(item)}
+                                                                        >
+                                                                            <Edit className="h-4 w-4" />
+                                                                            <span className="sr-only">Edit</span>
+                                                                        </Button>
+                                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50">
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                            <span className="sr-only">Delete</span>
+                                                                        </Button>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>
@@ -232,85 +238,87 @@ export default function InventoryPage() {
                                     {/* Stock Tab */}
                                     <TabsContent value="stock" className="h-full p-6 space-y-8">
                                         {/* Action Grid */}
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {/* Stock In Card */}
-                                            <Card
-                                                className={`bg-card border transition-colors cursor-pointer ${activeShift
-                                                    ? "hover:bg-accent/50"
-                                                    : "opacity-50 cursor-not-allowed hover:bg-card"
-                                                    }`}
-                                                onClick={() => {
-                                                    if (activeShift) {
-                                                        setShowStockInDialog(true)
-                                                    } else {
-                                                        alert("Please open a shift to perform stock operations")
-                                                    }
-                                                }}
-                                            >
-                                                <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-                                                    <ArrowDown className={`h-8 w-8 ${activeShift ? "text-green-500" : "text-gray-400"}`} />
-                                                    <span className={`font-medium ${activeShift ? "text-green-500" : "text-gray-400"}`}>Stock In</span>
-                                                </CardContent>
-                                            </Card>
+                                        {isManager && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {/* Stock In Card */}
+                                                <Card
+                                                    className={`bg-card border transition-colors cursor-pointer ${activeShift
+                                                        ? "hover:bg-accent/50"
+                                                        : "opacity-50 cursor-not-allowed hover:bg-card"
+                                                        }`}
+                                                    onClick={() => {
+                                                        if (activeShift) {
+                                                            setShowStockInDialog(true)
+                                                        } else {
+                                                            alert("Please open a shift to perform stock operations")
+                                                        }
+                                                    }}
+                                                >
+                                                    <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
+                                                        <ArrowDown className={`h-8 w-8 ${activeShift ? "text-green-500" : "text-gray-400"}`} />
+                                                        <span className={`font-medium ${activeShift ? "text-green-500" : "text-gray-400"}`}>Stock In</span>
+                                                    </CardContent>
+                                                </Card>
 
-                                            {/* Stock Out Card */}
-                                            <Card
-                                                className={`bg-card border transition-colors cursor-pointer ${activeShift
-                                                    ? "hover:bg-accent/50"
-                                                    : "opacity-50 cursor-not-allowed hover:bg-card"
-                                                    }`}
-                                                onClick={() => {
-                                                    if (activeShift) {
-                                                        setShowStockOutDialog(true)
-                                                    } else {
-                                                        alert("Please open a shift to perform stock operations")
-                                                    }
-                                                }}
-                                            >
-                                                <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-                                                    <ArrowUp className={`h-8 w-8 ${activeShift ? "text-red-500" : "text-gray-400"}`} />
-                                                    <span className={`font-medium ${activeShift ? "text-red-500" : "text-gray-400"}`}>Stock Out</span>
-                                                </CardContent>
-                                            </Card>
+                                                {/* Stock Out Card */}
+                                                <Card
+                                                    className={`bg-card border transition-colors cursor-pointer ${activeShift
+                                                        ? "hover:bg-accent/50"
+                                                        : "opacity-50 cursor-not-allowed hover:bg-card"
+                                                        }`}
+                                                    onClick={() => {
+                                                        if (activeShift) {
+                                                            setShowStockOutDialog(true)
+                                                        } else {
+                                                            alert("Please open a shift to perform stock operations")
+                                                        }
+                                                    }}
+                                                >
+                                                    <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
+                                                        <ArrowUp className={`h-8 w-8 ${activeShift ? "text-red-500" : "text-gray-400"}`} />
+                                                        <span className={`font-medium ${activeShift ? "text-red-500" : "text-gray-400"}`}>Stock Out</span>
+                                                    </CardContent>
+                                                </Card>
 
-                                            {/* Transfers Card */}
-                                            <Card
-                                                className={`bg-card border transition-colors cursor-pointer ${activeShift
-                                                    ? "hover:bg-accent/50"
-                                                    : "opacity-50 cursor-not-allowed hover:bg-card"
-                                                    }`}
-                                                onClick={() => {
-                                                    if (!activeShift) {
-                                                        alert("Please open a shift to perform stock operations")
-                                                    }
-                                                }}
-                                            >
-                                                <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-                                                    <ArrowRightLeft className={`h-8 w-8 ${activeShift ? "text-primary" : "text-gray-400"}`} />
-                                                    <span className={`font-medium ${activeShift ? "text-primary" : "text-gray-400"}`}>Transfers</span>
-                                                </CardContent>
-                                            </Card>
+                                                {/* Transfers Card */}
+                                                <Card
+                                                    className={`bg-card border transition-colors cursor-pointer ${activeShift
+                                                        ? "hover:bg-accent/50"
+                                                        : "opacity-50 cursor-not-allowed hover:bg-card"
+                                                        }`}
+                                                    onClick={() => {
+                                                        if (!activeShift) {
+                                                            alert("Please open a shift to perform stock operations")
+                                                        }
+                                                    }}
+                                                >
+                                                    <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
+                                                        <ArrowRightLeft className={`h-8 w-8 ${activeShift ? "text-primary" : "text-gray-400"}`} />
+                                                        <span className={`font-medium ${activeShift ? "text-primary" : "text-gray-400"}`}>Transfers</span>
+                                                    </CardContent>
+                                                </Card>
 
-                                            {/* Stock Take Card */}
-                                            <Card
-                                                className={`bg-card border transition-colors cursor-pointer ${activeShift
-                                                    ? "hover:bg-accent/50"
-                                                    : "opacity-50 cursor-not-allowed hover:bg-card"
-                                                    }`}
-                                                onClick={() => {
-                                                    if (activeShift) {
-                                                        setShowStockTakeDialog(true)
-                                                    } else {
-                                                        alert("Please open a shift to perform stock operations")
-                                                    }
-                                                }}
-                                            >
-                                                <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-                                                    <ClipboardList className={`h-8 w-8 ${activeShift ? "text-purple-500" : "text-gray-400"}`} />
-                                                    <span className={`font-medium ${activeShift ? "text-purple-500" : "text-gray-400"}`}>Stock Take</span>
-                                                </CardContent>
-                                            </Card>
-                                        </div>
+                                                {/* Stock Take Card */}
+                                                <Card
+                                                    className={`bg-card border transition-colors cursor-pointer ${activeShift
+                                                        ? "hover:bg-accent/50"
+                                                        : "opacity-50 cursor-not-allowed hover:bg-card"
+                                                        }`}
+                                                    onClick={() => {
+                                                        if (activeShift) {
+                                                            setShowStockTakeDialog(true)
+                                                        } else {
+                                                            alert("Please open a shift to perform stock operations")
+                                                        }
+                                                    }}
+                                                >
+                                                    <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
+                                                        <ClipboardList className={`h-8 w-8 ${activeShift ? "text-purple-500" : "text-gray-400"}`} />
+                                                        <span className={`font-medium ${activeShift ? "text-purple-500" : "text-gray-400"}`}>Stock Take</span>
+                                                    </CardContent>
+                                                </Card>
+                                            </div>
+                                        )}
 
                                         <div>
                                             <h3 className="text-lg font-semibold mb-4">Recent Stock Transactions</h3>
@@ -320,56 +328,68 @@ export default function InventoryPage() {
 
                                     {/* Reports Tab */}
                                     <TabsContent value="reports" className="h-full p-6">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <Card
-                                                className="border hover:border-primary/50 transition-colors cursor-pointer group"
-                                                onClick={() => setShowSupplierReportDialog(true)}
-                                            >
-                                                <CardContent className="p-6 flex items-start gap-4">
-                                                    <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                                                        <Building2 className="h-6 w-6 text-primary" />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="font-semibold text-lg mb-1">Supplier Deliveries</h3>
-                                                        <p className="text-sm text-muted-foreground">Detailed report of items received from suppliers.</p>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
+                                        {isManager ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <Card
+                                                    className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                                                    onClick={() => setShowSupplierReportDialog(true)}
+                                                >
+                                                    <CardContent className="p-6 flex items-start gap-4">
+                                                        <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                                            <Building2 className="h-6 w-6 text-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-semibold text-lg mb-1">Supplier Deliveries</h3>
+                                                            <p className="text-sm text-muted-foreground">Detailed report of items received from suppliers.</p>
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
 
-                                            <Card
-                                                className="border hover:border-primary/50 transition-colors cursor-pointer group"
-                                                onClick={() => setShowVarianceReportDialog(true)}
-                                            >
-                                                <CardContent className="p-6 flex items-start gap-4">
-                                                    <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                                                        <ClipboardList className="h-6 w-6 text-primary" />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="font-semibold text-lg mb-1">Stock Variance</h3>
-                                                        <p className="text-sm text-muted-foreground">Analyze discrepancies between expected and actual stock.</p>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </div>
+                                                <Card
+                                                    className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                                                    onClick={() => setShowVarianceReportDialog(true)}
+                                                >
+                                                    <CardContent className="p-6 flex items-start gap-4">
+                                                        <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                                            <ClipboardList className="h-6 w-6 text-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-semibold text-lg mb-1">Stock Variance</h3>
+                                                            <p className="text-sm text-muted-foreground">Analyze discrepancies between expected and actual stock.</p>
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg bg-muted/5">
+                                                <div className="bg-muted/20 p-4 rounded-full mb-4">
+                                                    <BarChart3 className="h-10 w-10 text-muted-foreground/50" />
+                                                </div>
+                                                <p className="text-muted-foreground">Access Restricted</p>
+                                                <p className="text-sm text-muted-foreground/80 mt-1">Please contact your manager for inventory reports.</p>
+                                            </div>
+                                        )}
                                     </TabsContent>
 
                                     {/* More Tab */}
                                     <TabsContent value="more" className="h-full p-6">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <Card
-                                                className="border hover:border-primary/50 transition-colors cursor-pointer group"
-                                                onClick={() => setCurrentView("suppliers")}
-                                            >
-                                                <CardContent className="p-6 flex items-start gap-4">
-                                                    <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                                                        <Building2 className="h-6 w-6 text-primary" />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="font-semibold text-lg mb-1">Suppliers</h3>
-                                                        <p className="text-sm text-muted-foreground">Manage item suppliers and contact information.</p>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
+                                            {isManager && (
+                                                <Card
+                                                    className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                                                    onClick={() => setCurrentView("suppliers")}
+                                                >
+                                                    <CardContent className="p-6 flex items-start gap-4">
+                                                        <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                                            <Building2 className="h-6 w-6 text-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-semibold text-lg mb-1">Suppliers</h3>
+                                                            <p className="text-sm text-muted-foreground">Manage item suppliers and contact information.</p>
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            )}
 
                                             <Card className="border hover:border-primary/50 transition-colors cursor-pointer group opacity-50">
                                                 <CardContent className="p-6 flex items-start gap-4">

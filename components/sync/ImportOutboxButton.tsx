@@ -38,39 +38,73 @@ export function ImportOutboxButton() {
                         return
                     }
 
-                    // Prepare payload by parsing the 'delta' JSON string
-                    const payload = rows.map((row) => ({
+                    // Prepare payload
+                    const allPayloadItems = rows.map((row) => ({
                         id: row.id,
                         syncId: row.syncId,
                         entity_id: row.entity_id,
                         entity_name: row.entity_name,
                         operation: row.operation,
-                        delta: row.delta, // Keep as string as expected by the mobile sync cloud API
+                        delta: row.delta,
                         local_version: parseInt(row.local_version),
                         created_at: row.created_at,
                     }))
 
-                    // Pushing to cloud
-                    const response = await syncService.sync(payload)
+                    const BATCH_SIZE = 50
+                    const totalBatches = Math.ceil(allPayloadItems.length / BATCH_SIZE)
+                    const batchResponses = []
+                    let successCount = 0
 
-                    // Write response to file and trigger download
+                    for (let i = 0; i < totalBatches; i++) {
+                        const start = i * BATCH_SIZE
+                        const end = Math.min(start + BATCH_SIZE, allPayloadItems.length)
+                        const currentBatch = allPayloadItems.slice(start, end)
+
+                        toast.loading(`Syncing batch ${i + 1} of ${totalBatches}...`, { id: toastId })
+
+                        try {
+                            const response = await syncService.sync(currentBatch)
+                            batchResponses.push({
+                                batch: i + 1,
+                                status: "success",
+                                range: `${start + 1}-${end}`,
+                                response
+                            })
+                            successCount += currentBatch.length
+                        } catch (err: any) {
+                            console.error(`Error in batch ${i + 1}:`, err)
+                            batchResponses.push({
+                                batch: i + 1,
+                                status: "error",
+                                range: `${start + 1}-${end}`,
+                                error: err.message
+                            })
+                        }
+                    }
+
+                    // Write combined response log
                     const logContent = JSON.stringify({
                         timestamp: new Date().toISOString(),
-                        entriesProcessed: payload.length,
-                        response: response
+                        totalEntries: allPayloadItems.length,
+                        successfullySynced: successCount,
+                        batches: batchResponses
                     }, null, 2)
 
                     const blob = new Blob([logContent], { type: "application/json" })
                     const url = URL.createObjectURL(blob)
                     const a = document.createElement("a")
                     a.href = url
-                    a.download = `sync_response_${new Date().getTime()}.json`
+                    a.download = `sync_report_${new Date().getTime()}.json`
                     document.body.appendChild(a)
                     a.click()
                     document.body.removeChild(a)
                     URL.revokeObjectURL(url)
 
-                    toast.success(`Successfully synced ${payload.length} entries. Response log downloaded.`, { id: toastId })
+                    if (successCount === allPayloadItems.length) {
+                        toast.success(`Successfully synced all ${allPayloadItems.length} entries. Report downloaded.`, { id: toastId })
+                    } else {
+                        toast.warning(`Sync partially completed: ${successCount}/${allPayloadItems.length} synced. Check the downloaded report for details.`, { id: toastId })
+                    }
                 } catch (err: any) {
                     console.error("Error during sync process:", err)
                     toast.error(`Sync failed: ${err.message}`, { id: toastId })

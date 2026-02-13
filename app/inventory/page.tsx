@@ -238,87 +238,85 @@ export default function InventoryPage() {
                                     {/* Stock Tab */}
                                     <TabsContent value="stock" className="h-full p-6 space-y-8">
                                         {/* Action Grid */}
-                                        {isManager && (
-                                            <div className="grid grid-cols-2 gap-4">
-                                                {/* Stock In Card */}
-                                                <Card
-                                                    className={`bg-card border transition-colors cursor-pointer ${activeShift
-                                                        ? "hover:bg-accent/50"
-                                                        : "opacity-50 cursor-not-allowed hover:bg-card"
-                                                        }`}
-                                                    onClick={() => {
-                                                        if (activeShift) {
-                                                            setShowStockInDialog(true)
-                                                        } else {
-                                                            alert("Please open a shift to perform stock operations")
-                                                        }
-                                                    }}
-                                                >
-                                                    <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-                                                        <ArrowDown className={`h-8 w-8 ${activeShift ? "text-green-500" : "text-gray-400"}`} />
-                                                        <span className={`font-medium ${activeShift ? "text-green-500" : "text-gray-400"}`}>Stock In</span>
-                                                    </CardContent>
-                                                </Card>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {/* Stock In Card */}
+                                            <Card
+                                                className={`bg-card border transition-colors cursor-pointer ${activeShift
+                                                    ? "hover:bg-accent/50"
+                                                    : "opacity-50 cursor-not-allowed hover:bg-card"
+                                                    }`}
+                                                onClick={() => {
+                                                    if (activeShift) {
+                                                        setShowStockInDialog(true)
+                                                    } else {
+                                                        alert("Please open a shift to perform stock operations")
+                                                    }
+                                                }}
+                                            >
+                                                <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
+                                                    <ArrowDown className={`h-8 w-8 ${activeShift ? "text-green-500" : "text-gray-400"}`} />
+                                                    <span className={`font-medium ${activeShift ? "text-green-500" : "text-gray-400"}`}>Stock In</span>
+                                                </CardContent>
+                                            </Card>
 
-                                                {/* Stock Out Card */}
-                                                <Card
-                                                    className={`bg-card border transition-colors cursor-pointer ${activeShift
-                                                        ? "hover:bg-accent/50"
-                                                        : "opacity-50 cursor-not-allowed hover:bg-card"
-                                                        }`}
-                                                    onClick={() => {
-                                                        if (activeShift) {
-                                                            setShowStockOutDialog(true)
-                                                        } else {
-                                                            alert("Please open a shift to perform stock operations")
-                                                        }
-                                                    }}
-                                                >
-                                                    <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-                                                        <ArrowUp className={`h-8 w-8 ${activeShift ? "text-red-500" : "text-gray-400"}`} />
-                                                        <span className={`font-medium ${activeShift ? "text-red-500" : "text-gray-400"}`}>Stock Out</span>
-                                                    </CardContent>
-                                                </Card>
+                                            {/* Stock Out Card */}
+                                            <Card
+                                                className={`bg-card border transition-colors cursor-pointer ${activeShift
+                                                    ? "hover:bg-accent/50"
+                                                    : "opacity-50 cursor-not-allowed hover:bg-card"
+                                                    }`}
+                                                onClick={() => {
+                                                    if (activeShift) {
+                                                        setShowStockOutDialog(true)
+                                                    } else {
+                                                        alert("Please open a shift to perform stock operations")
+                                                    }
+                                                }}
+                                            >
+                                                <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
+                                                    <ArrowUp className={`h-8 w-8 ${activeShift ? "text-red-500" : "text-gray-400"}`} />
+                                                    <span className={`font-medium ${activeShift ? "text-red-500" : "text-gray-400"}`}>Stock Out</span>
+                                                </CardContent>
+                                            </Card>
 
-                                                {/* Transfers Card */}
-                                                <Card
-                                                    className={`bg-card border transition-colors cursor-pointer ${activeShift
-                                                        ? "hover:bg-accent/50"
-                                                        : "opacity-50 cursor-not-allowed hover:bg-card"
-                                                        }`}
-                                                    onClick={() => {
-                                                        if (!activeShift) {
-                                                            alert("Please open a shift to perform stock operations")
-                                                        }
-                                                    }}
-                                                >
-                                                    <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-                                                        <ArrowRightLeft className={`h-8 w-8 ${activeShift ? "text-primary" : "text-gray-400"}`} />
-                                                        <span className={`font-medium ${activeShift ? "text-primary" : "text-gray-400"}`}>Transfers</span>
-                                                    </CardContent>
-                                                </Card>
+                                            {/* Transfers Card */}
+                                            <Card
+                                                className={`bg-card border transition-colors cursor-pointer ${activeShift
+                                                    ? "hover:bg-accent/50"
+                                                    : "opacity-50 cursor-not-allowed hover:bg-card"
+                                                    }`}
+                                                onClick={() => {
+                                                    if (!activeShift) {
+                                                        alert("Please open a shift to perform stock operations")
+                                                    }
+                                                }}
+                                            >
+                                                <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
+                                                    <ArrowRightLeft className={`h-8 w-8 ${activeShift ? "text-primary" : "text-gray-400"}`} />
+                                                    <span className={`font-medium ${activeShift ? "text-primary" : "text-gray-400"}`}>Transfers</span>
+                                                </CardContent>
+                                            </Card>
 
-                                                {/* Stock Take Card */}
-                                                <Card
-                                                    className={`bg-card border transition-colors cursor-pointer ${activeShift
-                                                        ? "hover:bg-accent/50"
-                                                        : "opacity-50 cursor-not-allowed hover:bg-card"
-                                                        }`}
-                                                    onClick={() => {
-                                                        if (activeShift) {
-                                                            setShowStockTakeDialog(true)
-                                                        } else {
-                                                            alert("Please open a shift to perform stock operations")
-                                                        }
-                                                    }}
-                                                >
-                                                    <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-                                                        <ClipboardList className={`h-8 w-8 ${activeShift ? "text-purple-500" : "text-gray-400"}`} />
-                                                        <span className={`font-medium ${activeShift ? "text-purple-500" : "text-gray-400"}`}>Stock Take</span>
-                                                    </CardContent>
-                                                </Card>
-                                            </div>
-                                        )}
+                                            {/* Stock Take Card */}
+                                            <Card
+                                                className={`bg-card border transition-colors cursor-pointer ${activeShift
+                                                    ? "hover:bg-accent/50"
+                                                    : "opacity-50 cursor-not-allowed hover:bg-card"
+                                                    }`}
+                                                onClick={() => {
+                                                    if (activeShift) {
+                                                        setShowStockTakeDialog(true)
+                                                    } else {
+                                                        alert("Please open a shift to perform stock operations")
+                                                    }
+                                                }}
+                                            >
+                                                <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
+                                                    <ClipboardList className={`h-8 w-8 ${activeShift ? "text-purple-500" : "text-gray-400"}`} />
+                                                    <span className={`font-medium ${activeShift ? "text-purple-500" : "text-gray-400"}`}>Stock Take</span>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
 
                                         <div>
                                             <h3 className="text-lg font-semibold mb-4">Recent Stock Transactions</h3>

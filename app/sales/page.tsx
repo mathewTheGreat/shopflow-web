@@ -898,9 +898,22 @@ export default function SalesPage() {
                                     <div className="text-[10px] text-muted-foreground bg-muted-foreground/10 px-1.5 py-0.5 rounded uppercase font-black tracking-tight">
                                       {item.unit_of_measure}
                                     </div>
-                                    <div className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase font-black tracking-tight">
-                                      Stock: {item.quantity}
-                                    </div>
+                                    {(() => {
+                                      const cartItem = cartItems.find((ci) => ci.id === item.id);
+                                      const cartQty = cartItem ? parseFloat(cartItem.quantity) || 0 : 0;
+                                      const stockLevel = stockLevels.find((sl: any) => sl.item_id === item.id);
+                                      const balance = (stockLevel?.quantity || 0) - cartQty;
+
+                                      let statusColor = "text-primary bg-primary/10";
+                                      if (balance <= 0) statusColor = "text-destructive bg-destructive/10";
+                                      else if (balance < 5) statusColor = "text-orange-600 bg-orange-100";
+
+                                      return (
+                                        <div className={`text-[10px] ${statusColor} px-1.5 py-0.5 rounded uppercase font-black tracking-tight`}>
+                                          Balance: {balance}
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                                 <div className="flex items-end justify-between pt-2">
@@ -1197,8 +1210,8 @@ export default function SalesPage() {
               </div>
             </SheetContent>
           </Sheet>
-        </div >
-      </div >
+        </div>
+      </div>
     </>
   )
 }

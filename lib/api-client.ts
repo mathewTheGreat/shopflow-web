@@ -49,23 +49,29 @@ async function fetcher<T>(url: string, options?: FetchOptions): Promise<T> {
 
 export const apiClient = {
     get: <T>(url: string, options?: FetchOptions) => fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, { ...options, method: "GET" }),
-    post: <T>(url: string, data: unknown, options?: FetchOptions) =>
-        fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
+    post: <T>(url: string, data: unknown, options?: FetchOptions) => {
+        console.log(`[API Client] POST ${url}`, data);
+        return fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
             ...options,
             method: "POST",
             body: JSON.stringify(data),
-        }),
-    put: <T>(url: string, data: unknown, options?: FetchOptions) =>
-        fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
+        });
+    },
+    put: <T>(url: string, data: unknown, options?: FetchOptions) => {
+        console.log(`[API Client] PUT ${url}`, data);
+        return fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
             ...options,
             method: "PUT",
             body: JSON.stringify(data),
-        }),
-    patch: <T>(url: string, data: unknown, options?: FetchOptions) =>
-        fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
+        });
+    },
+    patch: <T>(url: string, data: unknown, options?: FetchOptions) => {
+        console.log(`[API Client] PATCH ${url}`, data);
+        return fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
             ...options,
             method: "PATCH",
             body: JSON.stringify(data),
-        }),
+        });
+    },
     delete: <T>(url: string, options?: FetchOptions) => fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, { ...options, method: "DELETE" }),
 }

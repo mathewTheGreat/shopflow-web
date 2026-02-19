@@ -323,11 +323,11 @@ export default function SalesPage() {
           // 1. Prepare Stock Transaction (OUT for SALE)
           stockTransactions.push({
             id: uuidv4(),
-            type: "ADJUSTMENT",
+            type: "OUT",
             item_id: cartItem.id,
             shop_id: activeShop.id,
             quantity: soldQty,
-            reason: "SALE",
+            reason: "ADJUSTMENT",
             notes: `Sale Transaction #${payload.sale.id.slice(0, 8)}`,
             reference_id: payload.sale.id,
             shift_id: activeShift.id,

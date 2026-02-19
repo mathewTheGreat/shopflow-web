@@ -102,53 +102,48 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
         setIsSubmitting(true)
 
         try {
+            const parsedQuantity = parseFloat(formData.quantity);
+
             // 1. Create the transaction record
             const transactionData = {
                 item_id: formData.item_id,
                 shop_id: activeShop!.id,
                 shift_id: activeShift!.id,
                 type: "IN",
-                quantity: parseFloat(formData.quantity),
+                quantity: parsedQuantity,
                 reason: formData.reason,
-                supplierId: formData.supplier_id || null,
+                supplier_id: formData.supplier_id || null,
                 reference_id: formData.reference_id || null,
                 notes: formData.notes || null,
                 created_by: userInfo?.id,
             };
 
-            console.log("[StockInDialog] Submitting transaction with data:", transactionData);
             await createTransaction(transactionData);
 
             // 2. Update the stock level
-            // We need to fetch the current level first, then add to it
             const { stockLevelService } = await import("@/services/stock-level.service")
 
             try {
-                // Try to get existing stock level
                 const currentLevel = await stockLevelService.getStockLevelByItemAndShop(
                     formData.item_id,
                     activeShop!.id
-                )
+                );
 
-                // If exists, update (PUSH/PATCH)
-                // Note: If the API returns the object, we use it. If it returns null/error, we catch below.
                 if (currentLevel) {
-                    const newQuantity = (currentLevel.quantity || 0) + parseFloat(formData.quantity)
-                    console.log(`[StockInDialog] Updating existing stock level. Current: ${currentLevel.quantity}, Added: ${formData.quantity}, New Total: ${newQuantity}`);
+                    const newQuantity = (currentLevel.quantity || 0) + parsedQuantity;
                     await stockLevelService.updateStockLevel(
                         formData.item_id,
                         activeShop!.id,
                         { quantity: newQuantity }
-                    )
+                    );
                 }
             } catch (error) {
                 // If fetching fails (likely 404 Not Found), we create a new stock level record
-                console.log("[StockInDialog] No existing stock level found, creating new record for item:", formData.item_id);
                 await stockLevelService.setStockLevel({
                     item_id: formData.item_id,
                     shop_id: activeShop!.id,
-                    quantity: parseFloat(formData.quantity),
-                })
+                    quantity: parsedQuantity,
+                });
             }
 
             // Close dialog and trigger success callback

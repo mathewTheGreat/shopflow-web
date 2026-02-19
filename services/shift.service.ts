@@ -31,7 +31,7 @@ export const shiftService = {
 
 
     closeShiftRecord: (id: string) =>
-        apiClient.patch<Shift>(`/api/shifts/${id}`, { is_closed: true, end_time: new Date().toISOString() }),
+        apiClient.patch<Shift>(`/api/shifts/${id}`, { is_closed: true, end_time: new Date().toISOString(), _last_modified_at: new Date().toISOString() }),
 
     // Reporting
     getShiftsByShopAndDate: (shopId: string, date: string) =>

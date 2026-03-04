@@ -23,6 +23,7 @@ import { useAppStore } from "@/store/use-app-store"
 import { saleService } from "@/services/sale.service"
 import { userService } from "@/services/user.service"
 import { useCustomersByShop } from "@/hooks/use-customers"
+import { useItems } from "@/hooks/use-items"
 import { useShops } from "@/hooks/use-shops"
 import { useQuery } from "@tanstack/react-query"
 import { Loader2, FileSpreadsheet, FileText, Printer } from "lucide-react"
@@ -47,6 +48,7 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
     const [selectedCustomerId, setSelectedCustomerId] = useState<string>("all")
     const [selectedCashierId, setSelectedCashierId] = useState<string>("all")
     const [selectedSaleCategory, setSelectedSaleCategory] = useState<string>("all")
+    const [selectedItemId, setSelectedItemId] = useState<string>("all")
     const [isGenerating, setIsGenerating] = useState(false)
 
     // Sync with active shop when dialog opens
@@ -62,6 +64,7 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
     // Data Hooks
     const { data: shops = [] } = useShops()
     const { data: customers = [] } = useCustomersByShop(selectedShopId)
+    const { items } = useItems()
 
     const { data: staff = [], isLoading: isLoadingStaff } = useQuery({
         queryKey: ["shop-staff", selectedShopId, "CASHIER"],
@@ -83,7 +86,8 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                 endDate,
                 cashierId: selectedCashierId,
                 customerId: selectedCustomerId,
-                saleCategory: selectedSaleCategory
+                saleCategory: selectedSaleCategory,
+                itemId: selectedItemId
             })
 
             const shopName = shops.find(s => s.id === selectedShopId)?.name || activeShop?.name || "Unknown Shop"
@@ -93,6 +97,7 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                 ? "All Cashiers"
                 : (selectedStaff?.name || selectedStaff?.email || (selectedCashierId === userInfo?.id ? (userInfo?.name || userInfo?.email) : null) || "User")
             const categoryName = selectedSaleCategory === "all" ? "All Categories" : selectedSaleCategory
+            const itemName = selectedItemId === "all" ? "All Items" : items.find(i => i.id === selectedItemId)?.name || "Unknown Item"
 
             if (action === 'excel') {
                 await exportSalesToExcelWeb(
@@ -104,6 +109,7 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                     customerName,
                     categoryName,
                     cashierName,
+                    itemName,
                     `Sales_Report_${startDate}_${endDate}.xlsx`
                 )
                 toast.success("Excel report exported")
@@ -117,7 +123,8 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                     endDate,
                     customerName,
                     categoryName,
-                    cashierName
+                    cashierName,
+                    itemName
                 )
 
                 const printWindow = window.open('', '_blank')
@@ -235,6 +242,23 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                             </SelectContent>
                         </Select>
                     </div>
+
+                    <div className="space-y-2">
+                        <Label>Item</Label>
+                        <Select value={selectedItemId} onValueChange={setSelectedItemId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select item" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Items</SelectItem>
+                                {items.map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                        {item.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -284,7 +308,8 @@ function formatSalesReportHTML(
     endDate: string,
     customerFilter: string,
     categoryFilter: string,
-    cashierFilter: string
+    cashierFilter: string,
+    itemFilter: string
 ) {
     const totalAmount = sales.reduce((sum, sale) => sum + sale.total_amount, 0);
     const totalItems = sales.reduce((sum, sale) => sum + sale.saleItems.reduce((is, item) => is + item.quantity, 0), 0);
@@ -343,7 +368,8 @@ function formatSalesReportHTML(
             <div>
                 <strong>Customer Filter:</strong> ${customerFilter}<br>
                 <strong>Category Filter:</strong> ${categoryFilter}<br>
-                <strong>Cashier Filter:</strong> ${cashierFilter}
+                <strong>Cashier Filter:</strong> ${cashierFilter}<br>
+                <strong>Item Filter:</strong> ${itemFilter}
             </div>
         </div>
 
@@ -417,6 +443,7 @@ const exportSalesToExcelWeb = async (
     customerFilter: string,
     categoryFilter: string,
     cashierFilter: string,
+    itemFilter: string,
     fileName: string
 ): Promise<void> => {
     const workbook = XLSX.utils.book_new();
@@ -434,6 +461,7 @@ const exportSalesToExcelWeb = async (
         ['Customer:', customerFilter],
         ['Category:', categoryFilter],
         ['Cashier:', cashierFilter],
+        ['Item:', itemFilter],
         [],
         ['Metrics'],
         ['Total Transactions:', sales.length],

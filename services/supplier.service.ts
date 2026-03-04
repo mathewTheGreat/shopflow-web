@@ -9,11 +9,12 @@ export const supplierService = {
     deleteSupplier: (id: string) => apiClient.delete(`/api/suppliers/${id}`),
 
     // Reports
-    getSupplierDeliveries: (supplierId: string | undefined, startDate: string, endDate: string) => {
+    getSupplierDeliveries: (supplierId: string | undefined, startDate: string, endDate: string, itemId?: string) => {
         const queryParams = new URLSearchParams({
             startDate,
             endDate,
-            supplierId: supplierId || ""
+            supplierId: supplierId || "",
+            item: itemId || ""
         })
         return apiClient.get<any[]>(`/api/suppliers/deliveries?${queryParams.toString()}`)
     }

@@ -38,6 +38,7 @@ export const saleService = {
         cashierId?: string;
         customerId?: string;
         saleCategory?: string;
+        itemId?: string;
     }) => {
         const queryParams = new URLSearchParams();
         queryParams.append('shopId', params.shopId);
@@ -46,6 +47,7 @@ export const saleService = {
         if (params.cashierId && params.cashierId !== 'all') queryParams.append('cashierId', params.cashierId);
         if (params.customerId && params.customerId !== 'all') queryParams.append('customerId', params.customerId);
         if (params.saleCategory && params.saleCategory !== 'all') queryParams.append('saleCategory', params.saleCategory);
+        if (params.itemId && params.itemId !== 'all') queryParams.append('item', params.itemId);
 
         return apiClient.get<any[]>(`/api/sales/report?${queryParams.toString()}`);
     },

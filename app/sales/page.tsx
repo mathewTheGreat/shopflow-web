@@ -54,6 +54,7 @@ import { useAllQuantityDiscounts } from "@/hooks/use-quantity-discounts"
 import { calculateEffectivePrice } from "@/lib/pricing"
 import { useStockLevelsByShop, useBulkUpdateStockLevels } from "@/hooks/use-stock-levels"
 import { useCreateBulkTransactions } from "@/hooks/use-stock-transactions"
+import { FinancialBreakdownDialog } from "@/components/reports/FinancialBreakdownDialog"
 
 type SaleCategory = "IMMEDIATE" | "CREDIT" | "PREPAID"
 type PaymentMethod = "CASH" | "MPESA" | "SPLIT"
@@ -78,6 +79,8 @@ export default function SalesPage() {
   const [showShiftReportDialog, setShowShiftReportDialog] = useState(false)
   const [showSalesReportDialog, setShowSalesReportDialog] = useState(false)
   const [showNetPositionDialog, setShowNetPositionDialog] = useState(false)
+  const [showFinancialBreakdown, setShowFinancialBreakdown] = useState(false)
+
   const [currentView, setCurrentView] = useState<"main" | "customers" | "payments">("main")
 
   // Global State
@@ -655,6 +658,21 @@ export default function SalesPage() {
                             </div>
                           </CardContent>
                         </Card>
+
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setShowFinancialBreakdown(true)}
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <User className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Financial Breakdown</h3>
+                              <p className="text-sm text-muted-foreground">Detailed history of financial breakdown.</p>
+                            </div>
+                          </CardContent>
+                        </Card>
                       </div>
                     </TabsContent>
 
@@ -709,6 +727,10 @@ export default function SalesPage() {
               <CustomerNetPositionDialog
                 open={showNetPositionDialog}
                 onOpenChange={setShowNetPositionDialog}
+              />
+              <FinancialBreakdownDialog
+                open={showFinancialBreakdown}
+                onOpenChange={setShowFinancialBreakdown}
               />
             </div>
           </main >

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useSuppliers } from "@/hooks/use-supplier"
+import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
 import { supplierService } from "@/services/supplier.service"
 import { Loader2, FileSpreadsheet, FileText, Printer } from "lucide-react"
@@ -38,20 +39,27 @@ export function SupplierDeliveryReportDialog({ open, onOpenChange }: SupplierDel
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
     const [selectedSupplierId, setSelectedSupplierId] = useState<string>("all")
+    const [selectedItemId, setSelectedItemId] = useState<string>("all")
     const [isGenerating, setIsGenerating] = useState(false)
 
     // Data Hooks
     const { data: suppliers = [] } = useSuppliers()
+    const { items } = useItems()
 
     const handleGenerateReport = async (action: 'preview' | 'excel' | 'pdf') => {
         setIsGenerating(true)
         try {
             const supplierIdArg = selectedSupplierId === "all" ? undefined : selectedSupplierId
-            const reportData = await supplierService.getSupplierDeliveries(supplierIdArg, startDate, endDate)
+            const itemIdArg = selectedItemId === "all" ? undefined : selectedItemId
+            const reportData = await supplierService.getSupplierDeliveries(supplierIdArg, startDate, endDate, itemIdArg)
 
             const supplierName = selectedSupplierId === "all"
                 ? "All Suppliers"
                 : suppliers.find(s => s.id === selectedSupplierId)?.name || "Unknown Supplier"
+
+            const itemName = selectedItemId === "all"
+                ? "All Items"
+                : items.find(i => i.id === selectedItemId)?.name || "Unknown Item"
 
             if (action === 'excel') {
                 await exportSupplierDeliveriesToExcelWeb(
@@ -61,6 +69,7 @@ export function SupplierDeliveryReportDialog({ open, onOpenChange }: SupplierDel
                     new Date(startDate),
                     new Date(endDate),
                     supplierName,
+                    itemName,
                     `Supplier_Deliveries_${startDate}_${endDate}.xlsx`
                 )
                 toast.success("Excel report exported")
@@ -72,7 +81,8 @@ export function SupplierDeliveryReportDialog({ open, onOpenChange }: SupplierDel
                     userInfo?.name || "User",
                     new Date(startDate),
                     new Date(endDate),
-                    supplierName
+                    supplierName,
+                    itemName
                 )
 
                 const printWindow = window.open('', '_blank')
@@ -135,6 +145,23 @@ export function SupplierDeliveryReportDialog({ open, onOpenChange }: SupplierDel
                             </SelectContent>
                         </Select>
                     </div>
+
+                    <div className="space-y-2">
+                        <Label>Item</Label>
+                        <Select value={selectedItemId} onValueChange={setSelectedItemId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select item" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Items</SelectItem>
+                                {items.map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                        {item.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -181,7 +208,8 @@ const formatSupplierDeliveriesHTML = (
     managerName: string,
     startDate: Date,
     endDate: Date,
-    supplierFilter: string
+    supplierFilter: string,
+    itemFilter: string
 ): string => {
     const formatTime = (timeString: string) => {
         const date = new Date(timeString);
@@ -237,6 +265,7 @@ const formatSupplierDeliveriesHTML = (
         <div class="report-info">
           <p><strong>Period:</strong> ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}</p>
           <p><strong>Supplier Filter:</strong> ${supplierFilter}</p>
+          <p><strong>Item Filter:</strong> ${itemFilter}</p>
           <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
         </div>
         <div class="summary">
@@ -293,6 +322,7 @@ const exportSupplierDeliveriesToExcelWeb = async (
     startDate: Date,
     endDate: Date,
     supplierFilter: string,
+    itemFilter: string,
     fileName: string
 ): Promise<void> => {
     // Create workbook and worksheet
@@ -305,6 +335,7 @@ const exportSupplierDeliveriesToExcelWeb = async (
         ['Report Information'],
         ['Period:', `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`],
         ['Supplier Filter:', supplierFilter],
+        ['Item Filter:', itemFilter],
         ['Generated:', new Date().toLocaleString()],
         ['Total Deliveries:', deliveries.length],
         ['Total Items Received:', deliveries.reduce((sum, delivery) => sum + (delivery.quantity || 0), 0)],

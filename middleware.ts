@@ -5,6 +5,11 @@ const isPublicRoute = createRouteMatcher([
     '/sign-up(.*)'
 ])
 
+// Validate Clerk configuration
+if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+    console.error("CRITICAL: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing. Check your .env.local file.")
+}
+
 export default clerkMiddleware(async (auth, request) => {
     if (!isPublicRoute(request)) {
         await auth.protect()

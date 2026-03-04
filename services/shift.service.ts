@@ -39,4 +39,13 @@ export const shiftService = {
 
     getShiftPerformanceReport: (shiftId: string) =>
         apiClient.get<any>(`/api/shift-reconciliation/shift/${shiftId}/performance-report`),
+
+    getExpectedFinancials: (shiftId: string) =>
+        apiClient.get<any>(`/api/shift-reconciliation/shift/${shiftId}/expected-financials`),
+
+    getShiftReconciliation: (shiftId: string) =>
+        apiClient.get<ShiftReconciliation | null>(`/api/shift-reconciliation/shift/${shiftId}`),
+
+    getActiveShift: (shopId: string) =>
+        apiClient.get<Shift | null>(`/api/shifts/shop/${shopId}/active-shift`),
 }

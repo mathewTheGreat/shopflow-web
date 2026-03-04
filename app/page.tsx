@@ -5,6 +5,8 @@ import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { apiClient } from "@/lib/api-client"
+import { shiftService } from "@/services/shift.service"
+import { toast } from "sonner"
 import {
   Menu,
   ShoppingCart,
@@ -64,7 +66,22 @@ export default function DashboardPage() {
 
   const shiftOpen = !!(currentShift && !currentShift.is_closed)
 
-  const handleOpenShiftClick = () => {
+  const handleOpenShiftClick = async () => {
+    if (!activeShop) {
+      toast.error("No shop selected")
+      return
+    }
+
+    try {
+      const activeShift = await shiftService.getActiveShift(activeShop.id)
+      if (activeShift) {
+        toast.error("A shift is already active in this shop. Please close it before opening a new one.")
+        return
+      }
+    } catch (error) {
+      console.error("Failed to check active shift:", error)
+    }
+
     setCashAmount("0")
     setMpesaAmount("0")
     setShowOpenDialog(true)

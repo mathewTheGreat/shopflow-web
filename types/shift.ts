@@ -33,3 +33,20 @@ export interface ShiftCashMovement extends BaseEntity {
     reason?: string | null;
     created_by: string;
 }
+
+export interface ShiftFinancialsBreakdownDetailed {
+    expectedCashSalesOnly: number;
+    expectedMpesaSalesOnly: number;
+    customerCashInflows: number;
+    customerMpesaInflows: number;
+    cashOpeningFloat: number;
+    cashAdditionalFloat: number;
+    cashPayIn: number;
+    cashPayOut: number;
+    mpesaOpeningFloat: number;
+    mpesaAdditionalFloat: number;
+    mpesaPayIn: number;
+    mpesaPayOut: number;
+    totalExpectedCash: number;
+    totalExpectedMpesa: number;
+}

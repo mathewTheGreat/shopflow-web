@@ -326,7 +326,7 @@ export default function InventoryPage() {
 
                                     {/* Reports Tab */}
                                     <TabsContent value="reports" className="h-full p-6">
-                                        {isManager ? (
+                                        {true ? (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <Card
                                                     className="border hover:border-primary/50 transition-colors cursor-pointer group"

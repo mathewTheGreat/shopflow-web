@@ -16,7 +16,7 @@ const transactionTypeColors = {
 export function StockTransactionsGrid() {
     const activeShop = useAppStore((state) => state.activeShop)
     const { data: transactions = [], isLoading } = useStockTransactionsByShop(activeShop?.id || "", 50)
-
+    console.log("transactions", transactions)
     // Sort transactions by date descending (newest first)
     const sortedTransactions = [...transactions].sort((a, b) => {
         const dateA = new Date(a.created_at || 0).getTime()

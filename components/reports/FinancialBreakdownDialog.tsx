@@ -75,6 +75,7 @@ export function FinancialBreakdownDialog({ open, onOpenChange }: FinancialBreakd
     setIsGenerating(true)
     try {
       const breakdown = await shiftService.getExpectedFinancials(selectedShiftId)
+      console.log("breakdown", breakdown)
 
       let reconciliation = null
       try {
@@ -90,13 +91,13 @@ export function FinancialBreakdownDialog({ open, onOpenChange }: FinancialBreakd
       const reportData = {
         shopName: activeShop?.name || "Unknown Shop",
         userName: userInfo?.name || "User",
+        shiftManager: selectedShift?.manager_name || userInfo?.name || "User",
         shiftDate: date,
         shiftName: shiftName,
         shiftId: selectedShiftId,
         breakdown: breakdown,
         reconciliation: reconciliation
       }
-
       if (action === 'excel') {
         await exportFinancialBreakdownToExcel(reportData)
         toast.success("Excel report exported")
@@ -149,7 +150,10 @@ export function FinancialBreakdownDialog({ open, onOpenChange }: FinancialBreakd
               <SelectContent>
                 {shifts.map((shift) => (
                   <SelectItem key={shift.id} value={shift.id}>
-                    Shift {new Date(shift.start_time).toLocaleTimeString()} ({new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {shift.end_time ? new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'})
+                    {shift.manager_name || `Shift ${new Date(shift.start_time).toLocaleTimeString()}`}
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {shift.end_time ? new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'})
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -196,7 +200,7 @@ export function FinancialBreakdownDialog({ open, onOpenChange }: FinancialBreakd
   )
 }
 
-function formatFinancialBreakdownHTML(report: any) {
+export function formatFinancialBreakdownHTML(report: any) {
   if (!report?.breakdown) {
     return "<div>No financial breakdown data available.</div>";
   }
@@ -204,8 +208,6 @@ function formatFinancialBreakdownHTML(report: any) {
   const b = report.breakdown;
   const r = report.reconciliation;
 
-  console.log("r", r)
-  console.log("b", b)
   const totalExpectedCash = b.totalExpectedCash;
   const totalExpectedMpesa = b.totalExpectedMpesa;
   const totalExpected = totalExpectedCash + totalExpectedMpesa;
@@ -246,272 +248,170 @@ function formatFinancialBreakdownHTML(report: any) {
 <head>
 <meta charset="UTF-8">
 <style>
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 11px;
-  margin: 20px;
-  color: #000;
-}
-
-h1 {
-  text-align: center;
-  color: #2c5aa0;
-  margin-bottom: 5px;
-}
-
-.meta {
-  text-align: center;
-  font-size: 10px;
-  margin-bottom: 20px;
-  color: #555;
-}
-
-.section-title {
-  font-weight: bold;
-  font-size: 13px;
-  margin: 25px 0 8px 0;
-  padding-bottom: 4px;
-  border-bottom: 2px solid #2c5aa0;
-  color: #2c5aa0;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 20px;
-}
-
-th, td {
-  border: 1px solid #ddd;
-  padding: 6px;
-}
-
-th {
-  background: #f0f4fa;
-  text-align: center;
-  color: #2c5aa0;
-}
-
-td:first-child { text-align: left; }
-td:not(:first-child) { text-align: right; }
-
-.total-row {
-  font-weight: bold;
-  background: #f8f9fb;
-}
-
-.grand-total {
-  font-weight: bold;
-  background: #e3f2fd;
-  color: #1565c0;
-}
-
-.variance-section {
-  border: 1px solid #ffd54f;
-  background: #fff8e6;
-}
-
-.variance-title {
-  font-weight: bold;
-  color: #e65100;
-  padding: 6px;
-  border-bottom: 1px solid #ffd54f;
-}
-
-.positive { color: #28a745; font-weight: bold; }
-.negative { color: #dc3545; font-weight: bold; }
-
-.reconciliation-box {
-  border: 1px solid #4caf50;
-  background: #e8f5e8;
-  padding: 10px;
-}
-
-.reconciliation-title {
-  font-weight: bold;
-  color: #2e7d32;
-  margin-bottom: 6px;
-}
-
-.summary-section {
-  border: 1px solid #2196f3;
-  background: #e3f2fd;
-  padding: 10px;
-}
-
-.summary-title {
-  font-weight: bold;
-  color: #1565c0;
-  margin-bottom: 6px;
-}
+  @page { size: A4; margin: 0.5cm; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 10pt; line-height: 1.2; color: #000; background: white; margin: 0; padding: 0.5cm; }
+  .report-header { text-align: center; border-bottom: 2px solid #2c5aa0; padding-bottom: 0.1cm; margin-bottom: 0.3cm; }
+  .report-title { font-size: 16pt; font-weight: bold; color: #2c5aa0; margin: 0 0 0.05cm 0; }
+  .report-subtitle { font-size: 10pt; color: #666; margin: 0.02cm 0; }
+  .report-meta { display: flex; justify-content: space-between; background: #f8f9fa; padding: 0.2cm; border-radius: 4px; margin-bottom: 0.3cm; font-size: 8pt; flex-wrap: wrap; gap: 10px; border: 1px solid #eee; }
+  .report-meta strong { color: #555; }
+  
+  .section-title { font-weight: bold; font-size: 11pt; margin: 0.4cm 0 0.2cm 0; padding-bottom: 0.1cm; border-bottom: 1px solid #e0e0e0; color: #2c5aa0; }
+  
+  table { width: 100%; border-collapse: collapse; margin-bottom: 0.3cm; font-size: 8.5pt; }
+  th, td { border: 1px solid #eee; padding: 5px 8px; }
+  th { background: #f0f4fa; text-align: center; color: #2c5aa0; font-weight: bold; }
+  td:first-child { text-align: left; }
+  td:not(:first-child) { text-align: right; }
+  
+  .total-row { font-weight: bold; background: #fcfcfc; }
+  .grand-total { font-weight: bold; background: #e3f2fd; color: #1565c0; font-size: 9pt; }
+  .variance-section { border: 1px solid #ffd54f; background: #fff8e6; padding: 0.2cm; border-radius: 4px; }
+  .positive { color: #28a745; font-weight: bold; }
+  .negative { color: #dc3545; font-weight: bold; }
+  
+  .reconciliation-box { border: 1px solid #4caf50; background: #e8f5e8; padding: 0.2cm; border-radius: 4px; }
+  .summary-section { border: 1px solid #2196f3; background: #e3f2fd; padding: 0.2cm; border-radius: 4px; }
+  .footer { text-align: center; margin-top: 0.5cm; padding-top: 0.2cm; border-top: 1px solid #eee; color: #888; font-size: 7.5pt; font-style: italic; }
 </style>
 </head>
-
 <body>
+  <div class="report-header">
+    <h1 class="report-title">Financial Breakdown Report</h1>
+    <div class="report-subtitle">${report.shopName} Branch</div>
+    <div class="report-subtitle">${report.shiftDate} ${report.shiftName || ""}</div>
+  </div>
 
-<h1>Financial Breakdown Report</h1>
+  <div class="report-meta">
+    <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
+    <div><strong>Generated By:</strong> ${report.userName}</div>
+    <div><strong>Shift Manager:</strong> ${report.shiftManager || "N/A"}</div>
+  </div>
 
-<div class="meta">
-  ${report.shopName} Branch<br>
-  Date: ${report.shiftDate} ${report.shiftName || ""}<br>
-  Generated: ${new Date().toLocaleString()}<br>
-  Shift Manager: ${report.userName}
-</div>
+  <div class="section-title">Expected Financial Breakdown</div>
+  <table>
+  <thead>
+  <tr>
+    <th>Description</th>
+    <th>Cash (KSh)</th>
+    <th>Mpesa (KSh)</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+    <td>Opening Float</td>
+    <td>${b.cashOpeningFloat.toFixed(2)}</td>
+    <td>${b.mpesaOpeningFloat.toFixed(2)}</td>
+  </tr>
+  <tr>
+    <td>Expected Sales</td>
+    <td>${b.expectedCashSalesOnly.toFixed(2)}</td>
+    <td>${b.expectedMpesaSalesOnly.toFixed(2)}</td>
+  </tr>
+  <tr>
+    <td>Customer Ledger Inflows</td>
+    <td>${b.customerCashInflows.toFixed(2)}</td>
+    <td>${b.customerMpesaInflows.toFixed(2)}</td>
+  </tr>
+  <tr>
+    <td>Additional Float</td>
+    <td>${b.cashAdditionalFloat.toFixed(2)}</td>
+    <td>${b.mpesaAdditionalFloat.toFixed(2)}</td>
+  </tr>
+  <tr>
+    <td>Pay-Ins</td>
+    <td>${b.cashPayIn.toFixed(2)}</td>
+    <td>${b.mpesaPayIn.toFixed(2)}</td>
+  </tr>
+  <tr>
+    <td>Expenses (Pay-Outs)</td>
+    <td>-${b.cashPayOut.toFixed(2)}</td>
+    <td>-${b.mpesaPayOut.toFixed(2)}</td>
+  </tr>
+  <tr class="total-row">
+    <td>Total Expected</td>
+    <td>${totalExpectedCash.toFixed(2)}</td>
+    <td>${totalExpectedMpesa.toFixed(2)}</td>
+  </tr>
+  <tr class="grand-total">
+    <td>Grand Total Expected</td>
+    <td colspan="2">${totalExpected.toFixed(2)}</td>
+  </tr>
+  </tbody>
+  </table>
 
-<div class="section-title">Expected Financial Breakdown</div>
+  <div class="section-title">Actual Reconciliation</div>
+  <table>
+  <thead>
+  <tr>
+    <th>Description</th>
+    <th>Cash (KSh)</th>
+    <th>Mpesa (KSh)</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+    <td>Actual Amount Counted</td>
+    <td>${actualCash.toFixed(2)}</td>
+    <td>${actualMpesa.toFixed(2)}</td>
+  </tr>
+  <tr class="grand-total">
+    <td>Total Actual</td>
+    <td colspan="2">${totalActual.toFixed(2)}</td>
+  </tr>
+  </tbody>
+  </table>
 
-<table>
-<thead>
-<tr>
-  <th>Description</th>
-  <th>Cash (KSh)</th>
-  <th>Mpesa (KSh)</th>
-</tr>
-</thead>
-<tbody>
+  <div class="section-title">Variance Analysis</div>
+  <div class="variance-section">
+    <table style="margin:0; border:none;">
+    <thead>
+    <tr>
+      <th style="background:transparent; border:none; text-align:left; color:#e65100;">Description</th>
+      <th style="background:transparent; border:none; color:#e65100;">Cash (KSh)</th>
+      <th style="background:transparent; border:none; color:#e65100;">Mpesa (KSh)</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td style="border:none;">Variance</td>
+      <td style="border:none;" class="${cashVariance >= 0 ? "positive" : "negative"}">
+        ${cashVariance.toFixed(2)} ${cashVariance >= 0 ? "(Surplus)" : "(Shortage)"}
+      </td>
+      <td style="border:none;" class="${mpesaVariance >= 0 ? "positive" : "negative"}">
+        ${mpesaVariance.toFixed(2)} ${mpesaVariance >= 0 ? "(Surplus)" : "(Shortage)"}
+      </td>
+    </tr>
+    <tr class="grand-total" style="background:transparent;">
+      <td style="border:none;">Total Variance</td>
+      <td style="border:none;" colspan="2" class="${totalVariance >= 0 ? "positive" : "negative"}">
+        ${totalVariance.toFixed(2)} ${totalVariance >= 0 ? "(Surplus)" : "(Shortage)"}
+      </td>
+    </tr>
+    </tbody>
+    </table>
+  </div>
 
-<tr>
-  <td>Opening Float</td>
-  <td>${b.cashOpeningFloat.toFixed(2)}</td>
-  <td>${b.mpesaOpeningFloat.toFixed(2)}</td>
-</tr>
+  <div class="section-title">Reconciliation Status</div>
+  <div class="reconciliation-box">
+    Status: <strong style="color:${r?.status === "RECONCILED" ? "#28a745" : "#ffc107"};">
+      ${r?.status || "PENDING"}
+    </strong><br>
+    Reconciled By: ${r?.reconciled_by || "Not reconciled"}<br>
+    Reconciliation Date: ${r?.reconciliation_date ? new Date(r.reconciliation_date).toLocaleString() : "Not reconciled"}<br>
+    ${r?.notes ? `Notes: ${r.notes}` : ""}
+  </div>
 
-<tr>
-  <td>Expected Sales</td>
-  <td>${b.expectedCashSalesOnly.toFixed(2)}</td>
-  <td>${b.expectedMpesaSalesOnly.toFixed(2)}</td>
-</tr>
+  <div class="section-title">Performance Summary</div>
+  <div class="summary-section">
+    Cash Accuracy: ${cashAccuracy.toFixed(2)}% – ${rating(cashAccuracy)}<br>
+    Mpesa Accuracy: ${mpesaAccuracy.toFixed(2)}% – ${rating(mpesaAccuracy)}<br>
+    Overall Accuracy: ${overallAccuracy.toFixed(2)}% – ${rating(overallAccuracy)}
+  </div>
 
-<tr>
-  <td>Customer Ledger Inflows</td>
-  <td>${b.customerCashInflows.toFixed(2)}</td>
-  <td>${b.customerMpesaInflows.toFixed(2)}</td>
-</tr>
-
-
-
-<tr>
-  <td>Additional Float</td>
-  <td>${b.cashAdditionalFloat.toFixed(2)}</td>
-  <td>${b.mpesaAdditionalFloat.toFixed(2)}</td>
-</tr>
-
-<tr>
-  <td>Pay-Ins</td>
-  <td>${b.cashPayIn.toFixed(2)}</td>
-  <td>${b.mpesaPayIn.toFixed(2)}</td>
-</tr>
-
-<tr>
-  <td>Expenses (Pay-Outs)</td>
-  <td>-${b.cashPayOut.toFixed(2)}</td>
-  <td>-${b.mpesaPayOut.toFixed(2)}</td>
-</tr>
-
-<tr class="total-row">
-  <td>Total Expected</td>
-  <td>${totalExpectedCash.toFixed(2)}</td>
-  <td>${totalExpectedMpesa.toFixed(2)}</td>
-</tr>
-
-<tr class="grand-total">
-  <td>Grand Total Expected</td>
-  <td colspan="2">${totalExpected.toFixed(2)}</td>
-</tr>
-
-</tbody>
-</table>
-
-
-<div class="section-title">Actual Reconciliation</div>
-
-<table>
-<thead>
-<tr>
-  <th>Description</th>
-  <th>Cash (KSh)</th>
-  <th>Mpesa (KSh)</th>
-</tr>
-</thead>
-<tbody>
-
-<tr>
-  <td>Actual Amount Counted</td>
-  <td>${actualCash.toFixed(2)}</td>
-  <td>${actualMpesa.toFixed(2)}</td>
-</tr>
-
-<tr class="grand-total">
-  <td>Total Actual</td>
-  <td colspan="2">${totalActual.toFixed(2)}</td>
-</tr>
-
-</tbody>
-</table>
-
-
-<div class="section-title">Variance Analysis</div>
-
-<div class="variance-section">
-<div class="variance-title">Variance Breakdown</div>
-
-<table style="margin:0;">
-<thead>
-<tr>
-  <th>Description</th>
-  <th>Cash (KSh)</th>
-  <th>Mpesa (KSh)</th>
-</tr>
-</thead>
-<tbody>
-
-<tr>
-  <td>Variance</td>
-  <td class="${cashVariance >= 0 ? "positive" : "negative"}">
-    ${cashVariance.toFixed(2)} ${cashVariance >= 0 ? "(Surplus)" : "(Shortage)"}
-  </td>
-  <td class="${mpesaVariance >= 0 ? "positive" : "negative"}">
-    ${mpesaVariance.toFixed(2)} ${mpesaVariance >= 0 ? "(Surplus)" : "(Shortage)"}
-  </td>
-</tr>
-
-<tr class="grand-total">
-  <td>Total Variance</td>
-  <td colspan="2" class="${totalVariance >= 0 ? "positive" : "negative"}">
-    ${totalVariance.toFixed(2)} ${totalVariance >= 0 ? "(Surplus)" : "(Shortage)"}
-  </td>
-</tr>
-
-</tbody>
-</table>
-</div>
-
-
-<div class="section-title">Reconciliation Status</div>
-
-<div class="reconciliation-box">
-  <div class="reconciliation-title">Status Details</div>
-  Status: <strong style="color:${r?.status === "RECONCILED" ? "#28a745" : "#ffc107"};">
-    ${r?.status || "PENDING"}
-  </strong><br>
-  Reconciled By: ${r?.reconciled_by || "Not reconciled"}<br>
-  Reconciliation Date: ${r?.reconciliation_date
-      ? new Date(r.reconciliation_date).toLocaleString()
-      : "Not reconciled"
-    }<br>
-  ${r?.notes ? `Notes: ${r.notes}` : ""}
-</div>
-
-
-<div class="section-title">Performance Summary</div>
-
-<div class="summary-section">
-  <div class="summary-title">Accuracy Metrics</div>
-  Cash Accuracy: ${cashAccuracy.toFixed(2)}% – ${rating(cashAccuracy)}<br>
-  Mpesa Accuracy: ${mpesaAccuracy.toFixed(2)}% – ${rating(mpesaAccuracy)}<br>
-  Overall Accuracy: ${overallAccuracy.toFixed(2)}% – ${rating(overallAccuracy)}
-</div>
-
+  <div class="footer">
+    Financial Breakdown Report generated on ${new Date().toLocaleString()} by ${report.userName}
+  </div>
 </body>
 </html>
 `;

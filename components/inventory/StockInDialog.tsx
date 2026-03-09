@@ -118,6 +118,7 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
                 created_by: userInfo?.id,
             };
 
+
             await createTransaction(transactionData);
 
             // 2. Update the stock level

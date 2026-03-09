@@ -112,7 +112,10 @@ export function VarianceReportDialog({ open, onOpenChange }: VarianceReportDialo
       } else {
         // Preview or PDF (Print)
         const html = formatVarianceReportHTML(
-          reportData,
+          {
+            ...reportData,
+            shiftManager: selectedShift?.manager_name || userInfo?.name || "User"
+          },
           activeShop?.name || "Unknown Shop",
           userInfo?.name || "User",
           date,
@@ -168,8 +171,10 @@ export function VarianceReportDialog({ open, onOpenChange }: VarianceReportDialo
               <SelectContent>
                 {shifts.map((shift) => (
                   <SelectItem key={shift.id} value={shift.id}>
-                    {/*  Format: Shift HH:MM:SS (HH:MM - HH:MM) */}
-                    Shift {new Date(shift.start_time).toLocaleTimeString()} ({new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {shift.end_time ? new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'})
+                    {shift.manager_name || `Shift ${new Date(shift.start_time).toLocaleTimeString()}`}
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {shift.end_time ? new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'})
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -239,306 +244,57 @@ function formatVarianceReportHTML(
     <head>
       <meta charset="UTF-8">
       <style>
-        /* A4 Print Optimization */
-        @page {
-          size: A4;
-          margin: 0.5cm;
-        }
-        
-        body {
-          margin: 0;
-          padding: 0;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          font-size: 10pt;
-          line-height: 1.2;
-          color: #000;
-          background: white;
-        }
-        
-        .variance-report {
-          width: 100%;
-          max-width: 21cm;
-          margin: 0 auto;
-          padding: 0.5cm;
-          box-sizing: border-box;
-        }
-        
-        /* Header Styles */
-        .report-header {
-          text-align: center;
-          border-bottom: 1px solid #2c5aa0;
-          padding-bottom: 0.3cm;
-          margin-bottom: 0.5cm;
-          page-break-after: avoid;
-        }
-        
-        .report-title {
-          font-size: 14pt;
-          font-weight: bold;
-          color: #2c5aa0;
-          margin: 0 0 0.2cm 0;
-        }
-        
-        .report-subtitle {
-          font-size: 9pt;
-          color: #666;
-          margin: 0.1cm 0;
-        }
-        
-        .report-meta {
-          display: flex;
-          justify-content: space-between;
-          background: #f8f9fa;
-          padding: 0.3cm;
-          border-radius: 3px;
-          margin: 0.3cm 0;
-          font-size: 8pt;
-          page-break-after: avoid;
-        }
-        
-        /* Section Styles */
-        .section-title {
-          font-size: 11pt;
-          font-weight: bold;
-          color: #2c5aa0;
-          margin: 0.4cm 0 0.2cm 0;
-          padding-bottom: 0.2cm;
-          border-bottom: 1px solid #e0e0e0;
-          page-break-after: avoid;
-        }
-        
-        /* Summary Cards */
-        .summary-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-          gap: 0.3cm;
-          margin: 0.3cm 0;
-          page-break-after: avoid;
-        }
-        
-        .summary-card {
-          background: white;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          padding: 0.3cm;
-          text-align: center;
-          page-break-inside: avoid;
-        }
-        
-        .summary-value {
-          font-size: 14pt;
-          font-weight: bold;
-          color: #2c5aa0;
-          margin: 0.1cm 0;
-        }
-        
-        .summary-label {
-          font-size: 8pt;
-          color: #666;
-          text-transform: uppercase;
-        }
-        
-        .positive {
-          color: #28a745;
-        }
-        
-        .negative {
-          color: #dc3545;
-        }
-        
-        .neutral {
-          color: #6c757d;
-        }
-        
-        /* Variance Table */
-        .variance-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 0.3cm 0;
-          font-size: 8pt;
-          page-break-inside: avoid;
-        }
-        
-        .variance-table th {
-          background: #2c5aa0;
-          color: white;
-          padding: 0.2cm;
-          text-align: left;
-          font-weight: bold;
-        }
-        
-        .variance-table td {
-          padding: 0.15cm;
-          border-bottom: 1px solid #eee;
-        }
-        
-        .variance-table tr:nth-child(even) {
-          background: #f8f9fa;
-        }
-        
-        .variance-table tr:hover {
-          background: #e3f2fd;
-        }
-        
-        /* Status Indicators */
-        .status-perfect {
-          background: #d4edda;
-          color: #155724;
-          padding: 0.1cm 0.2cm;
-          border-radius: 2px;
-          font-weight: bold;
-        }
-        
-        .status-over {
-          background: #fff3cd;
-          color: #856404;
-          padding: 0.1cm 0.2cm;
-          border-radius: 2px;
-          font-weight: bold;
-        }
-        
-        .status-under {
-          background: #f8d7da;
-          color: #721c24;
-          padding: 0.1cm 0.2cm;
-          border-radius: 2px;
-          font-weight: bold;
-        }
-        
-        /* Performance Section */
-        .performance-section {
-          background: #e8f5e8;
-          border: 1px solid #4caf50;
-          border-radius: 4px;
-          padding: 0.3cm;
-          margin: 0.4cm 0;
-          page-break-inside: avoid;
-        }
-        
-        .performance-title {
-          font-size: 10pt;
-          font-weight: bold;
-          color: #2e7d32;
-          margin-bottom: 0.2cm;
-        }
-        
-        .performance-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-          gap: 0.2cm;
-          font-size: 8pt;
-        }
-        
-        .performance-item {
-          display: flex;
-          justify-content: space-between;
-          padding: 0.1cm 0;
-          border-bottom: 1px dashed #c8e6c9;
-        }
-        
-        /* Recommendations */
-        .recommendations {
-          background: #fff3cd;
-          border: 1px solid #ffc107;
-          border-radius: 4px;
-          padding: 0.3cm;
-          margin: 0.3cm 0;
-          page-break-inside: avoid;
-        }
-        
-        .recommendations-title {
-          font-size: 10pt;
-          font-weight: bold;
-          color: #856404;
-          margin-bottom: 0.2cm;
-        }
-        
-        .recommendation-item {
-          padding: 0.1cm 0;
-          border-bottom: 1px dashed #ffeaa7;
-          font-size: 8pt;
-        }
-        
-        /* Footer */
-        .footer {
-          text-align: center;
-          margin-top: 0.5cm;
-          padding-top: 0.3cm;
-          border-top: 1px solid #ddd;
-          color: #666;
-          font-style: italic;
-          font-size: 8pt;
-          page-break-before: avoid;
-        }
-        
-        /* Print-specific optimizations */
-        @media print {
-          body {
-            font-size: 9pt;
-          }
-          
-          .variance-report {
-            padding: 0;
-            margin: 0;
-          }
-          
-          .summary-grid {
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-          
-          .variance-table {
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-          
-          .section-title {
-            page-break-after: avoid;
-            break-after: avoid;
-          }
-          
-          .report-header {
-            page-break-after: avoid;
-            break-after: avoid;
-          }
-        }
-        
-        /* Utility Classes */
-        .text-right {
-          text-align: right;
-        }
-        
-        .text-center {
-          text-align: center;
-        }
-        
-        .bold {
-          font-weight: bold;
-        }
-        
-        .highlight {
-          background: #fff3cd;
-          padding: 0.2cm;
-          border-radius: 3px;
-          border-left: 3px solid #ffc107;
-          margin: 0.2cm 0;
-          font-size: 8pt;
-        }
+        @page { size: A4; margin: 0.5cm; }
+        body { margin: 0; padding: 0.5cm; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 10pt; line-height: 1.2; color: #000; background: white; }
+        .variance-report { width: 100%; max-width: 21cm; margin: 0 auto; box-sizing: border-box; }
+        .report-header { text-align: center; border-bottom: 2px solid #2c5aa0; padding-bottom: 0.1cm; margin-bottom: 0.3cm; page-break-after: avoid; }
+        .report-title { font-size: 16pt; font-weight: bold; color: #2c5aa0; margin: 0 0 0.05cm 0; }
+        .report-subtitle { font-size: 10pt; color: #666; margin: 0.02cm 0; }
+        .report-meta { display: flex; justify-content: space-between; background: #f8f9fa; padding: 0.2cm; border-radius: 4px; border: 1px solid #eee; margin-bottom: 0.3cm; font-size: 8pt; flex-wrap: wrap; gap: 10px; }
+        .section-title { font-size: 11pt; font-weight: bold; color: #2c5aa0; margin: 0.4cm 0 0.2cm 0; padding-bottom: 0.1cm; border-bottom: 1px solid #e0e0e0; page-break-after: avoid; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.3cm; margin: 0.3cm 0; page-break-after: avoid; }
+        .summary-card { background: white; border: 1px solid #ddd; border-radius: 4px; padding: 0.3cm; text-align: center; page-break-inside: avoid; }
+        .summary-value { font-size: 14pt; font-weight: bold; color: #2c5aa0; margin: 0.1cm 0; }
+        .summary-label { font-size: 8pt; color: #666; text-transform: uppercase; }
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        .neutral { color: #6c757d; }
+        .variance-table { width: 100%; border-collapse: collapse; margin: 0.3cm 0; font-size: 8pt; page-break-inside: auto; }
+        .variance-table th { background: #2c5aa0; color: white; padding: 0.2cm; text-align: left; font-weight: bold; }
+        .variance-table td { padding: 0.15cm; border-bottom: 1px solid #eee; }
+        .variance-table tr:nth-child(even) { background: #f8f9fa; }
+        .variance-table tr:hover { background: #e3f2fd; }
+        .status-perfect { background: #d4edda; color: #155724; padding: 0.1cm 0.2cm; border-radius: 2px; font-weight: bold; }
+        .status-over { background: #fff3cd; color: #856404; padding: 0.1cm 0.2cm; border-radius: 2px; font-weight: bold; }
+        .status-under { background: #f8d7da; color: #721c24; padding: 0.1cm 0.2cm; border-radius: 2px; font-weight: bold; }
+        .performance-section { background: #e8f5e8; border: 1px solid #4caf50; border-radius: 4px; padding: 0.3cm; margin: 0.4cm 0; page-break-inside: avoid; }
+        .performance-title { font-size: 10pt; font-weight: bold; color: #2e7d32; margin-bottom: 0.2cm; }
+        .performance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.2cm; font-size: 8pt; }
+        .performance-item { display: flex; justify-content: space-between; padding: 0.1cm 0; border-bottom: 1px dashed #c8e6c9; }
+        .recommendations { background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 0.3cm; margin: 0.3cm 0; page-break-inside: avoid; }
+        .recommendations-title { font-size: 10pt; font-weight: bold; color: #856404; margin-bottom: 0.2cm; }
+        .recommendation-item { padding: 0.1cm 0; border-bottom: 1px dashed #ffeaa7; font-size: 8pt; }
+        .footer { text-align: center; margin-top: 0.5cm; padding-top: 0.2cm; border-top: 1px solid #ddd; color: #666; font-style: italic; font-size: 7.5pt; page-break-before: avoid; }
+        @media print { body { font-size: 9pt; } .variance-report { padding: 0; margin: 0; } .summary-grid { page-break-inside: avoid; break-inside: avoid; } .variance-table { page-break-inside: auto; } .section-title { page-break-after: avoid; break-after: avoid; } .report-header { page-break-after: avoid; break-after: avoid; } }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .bold { font-weight: bold; }
+        .highlight { background: #fff3cd; padding: 0.2cm; border-radius: 3px; border-left: 3px solid #ffc107; margin: 0.2cm 0; font-size: 8pt; }
       </style>
     </head>
-    <body onload="window.print()">
+    <body>
       <div class="variance-report">
         <div class="report-header">
           <h1 class="report-title">Stock Variance Report</h1>
           <div class="report-subtitle">${shopName} Branch</div>
-          <div class="report-subtitle">${shiftDate}</div>
-          ${shiftName ? `<div class="report-subtitle">${shiftName}</div>` : ''}
+          <div class="report-subtitle">${shiftDate} ${shiftName ? ` — ${shiftName}` : ''}</div>
         </div>
-
         <div class="report-meta">
           <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
-          <div><strong>Shift Manager:</strong> ${userName}</div>
+          <div><strong>Generated By:</strong> ${userName}</div>
+          <div><strong>Shift Manager:</strong> ${varianceData.shiftManager || "N/A"}</div>
         </div>
+
   `;
 
   // === EXECUTIVE SUMMARY ===

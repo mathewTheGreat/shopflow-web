@@ -48,4 +48,24 @@ export const shiftService = {
 
     getActiveShift: (shopId: string) =>
         apiClient.get<Shift | null>(`/api/shifts/shop/${shopId}/active-shift`),
+
+    // Float Allocation
+    simulateFloatAllocation: (data: { shiftId: string; amount: number }) =>
+        apiClient.post<any>("/api/shifts/float/simulate", data),
+
+    allocateFloat: (data: {
+        targetShiftId: string;
+        amount: number;
+        paymentMethod: string;
+        reason?: string;
+    }) => apiClient.post<any>("/api/shifts/float/allocate", data),
+
+    getFloatSources: (shopId: string, shiftStartTime: string) =>
+        apiClient.get<any>(`/api/shifts/float/sources?shopId=${shopId}&shiftStartTime=${shiftStartTime}`),
+
+    getFloatTransaction: (floatTransactionId: string) =>
+        apiClient.get<any>(`/api/shifts/float/transaction/${floatTransactionId}`),
+
+    deleteFloatTransaction: (floatTransactionId: string) =>
+        apiClient.delete<any>(`/api/shifts/float/transaction/${floatTransactionId}`),
 }

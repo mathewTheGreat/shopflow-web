@@ -55,6 +55,7 @@ import { calculateEffectivePrice } from "@/lib/pricing"
 import { useStockLevelsByShop, useBulkUpdateStockLevels } from "@/hooks/use-stock-levels"
 import { useCreateBulkTransactions } from "@/hooks/use-stock-transactions"
 import { FinancialBreakdownDialog } from "@/components/reports/FinancialBreakdownDialog"
+import { AddFloatDialog } from "@/components/shifts/AddFloatDialog"
 
 type SaleCategory = "IMMEDIATE" | "CREDIT" | "PREPAID"
 type PaymentMethod = "CASH" | "MPESA" | "SPLIT"
@@ -80,6 +81,7 @@ export default function SalesPage() {
   const [showSalesReportDialog, setShowSalesReportDialog] = useState(false)
   const [showNetPositionDialog, setShowNetPositionDialog] = useState(false)
   const [showFinancialBreakdown, setShowFinancialBreakdown] = useState(false)
+  const [showAddFloatDialog, setShowAddFloatDialog] = useState(false)
 
   const [currentView, setCurrentView] = useState<"main" | "customers" | "payments">("main")
 
@@ -708,6 +710,34 @@ export default function SalesPage() {
                             </div>
                           </CardContent>
                         </Card>
+
+                        <Card
+                          className={`border transition-colors cursor-pointer group ${activeShift
+                              ? "hover:border-primary/50"
+                              : "opacity-50 cursor-not-allowed"
+                            }`}
+                          onClick={() => {
+                            if (activeShift) {
+                              setShowAddFloatDialog(true)
+                            } else {
+                              toast.error("You need an open shift to add float")
+                            }
+                          }}
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <Wallet className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Add Float</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {activeShift
+                                  ? "Add float for large cash expenses."
+                                  : "Open a shift to add float."}
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
                       </div>
                     </TabsContent>
                   </div>
@@ -731,6 +761,13 @@ export default function SalesPage() {
               <FinancialBreakdownDialog
                 open={showFinancialBreakdown}
                 onOpenChange={setShowFinancialBreakdown}
+              />
+
+              <AddFloatDialog
+                open={showAddFloatDialog}
+                onOpenChange={setShowAddFloatDialog}
+                activeShift={activeShift}
+                shopId={activeShop?.id}
               />
             </div>
           </main >

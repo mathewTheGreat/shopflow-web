@@ -170,6 +170,53 @@ Base path: `/api/sales`
 
 ---
 
+## Production Batches
+
+Base path: `/api/production-batches`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/` | Open a production batch |
+
+**Request Body for POST /:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | Yes | UUID for the batch (client-generated) |
+| `shop_id` | string | Yes | UUID of the shop |
+| `start_shift_id` | string | Yes | UUID of the shift starting the batch |
+| `created_by` | string | Yes | UUID of the user creating the batch |
+| `process_type` | string | Yes | Either `PASTEURIZATION` or `OTHER` |
+| `notes` | string | No | Optional notes |
+| `inputs` | array | Yes | Array of input items |
+| `inputs[].item_id` | string | Yes | UUID of the input item |
+| `inputs[].quantity` | number | Yes | Quantity of input item |
+
+**Example Request:**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440005",
+  "shop_id": "550e8400-e29b-41d4-a716-446655440000",
+  "start_shift_id": "550e8400-e29b-41d4-a716-446655440001",
+  "created_by": "550e8400-e29b-41d4-a716-446655440002",
+  "process_type": "PASTEURIZATION",
+  "notes": "First batch of the day",
+  "inputs": [
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440003",
+      "quantity": 10.5
+    },
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440004",
+      "quantity": 2.0
+    }
+  ]
+}
+```
+
+---
+
 ## Sale Items
 
 Base path: `/api/sale-items`

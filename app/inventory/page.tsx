@@ -18,6 +18,7 @@ import {
     Loader2,
     Building2,
     ChevronLeft,
+    Factory,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -33,13 +34,14 @@ import { SupplierManager } from "@/components/inventory/SupplierManager"
 import { StockTransactionsGrid } from "@/components/inventory/StockTransactionsGrid"
 import { SupplierDeliveryReportDialog } from "@/components/reports/SupplierDeliveryReportDialog"
 import { VarianceReportDialog } from "@/components/reports/VarianceReportDialog"
+import { ProductionManager } from "@/components/production/ProductionManager"
 import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
 import { Item } from "@/services/item.service"
 
 export default function InventoryPage() {
     const [activeTab, setActiveTab] = useState("items")
-    const [currentView, setCurrentView] = useState<"main" | "suppliers">("main")
+    const [currentView, setCurrentView] = useState<"main" | "suppliers" | "production">("main")
     const [showAddItem, setShowAddItem] = useState(false)
     const [showStockInDialog, setShowStockInDialog] = useState(false)
     const [showStockOutDialog, setShowStockOutDialog] = useState(false)
@@ -76,6 +78,19 @@ export default function InventoryPage() {
                 </div>
                 <div className="flex-1 flex flex-col min-w-0">
                     <SupplierManager onBack={() => setCurrentView("main")} />
+                </div>
+            </div>
+        )
+    }
+
+    if (currentView === "production") {
+        return (
+            <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
+                <div className="hidden md:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+                    <AppSidebar />
+                </div>
+                <div className="flex-1 flex flex-col min-w-0">
+                    <ProductionManager onBack={() => setCurrentView("main")} />
                 </div>
             </div>
         )
@@ -372,6 +387,32 @@ export default function InventoryPage() {
                                     {/* More Tab */}
                                     <TabsContent value="more" className="h-full p-6">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <Card
+                                                className={`border transition-colors cursor-pointer group ${activeShift
+                                                    ? "hover:border-primary/50"
+                                                    : "opacity-50 cursor-not-allowed"
+                                                    }`}
+                                                onClick={() => {
+                                                    if (activeShift) {
+                                                        setCurrentView("production")
+                                                    }
+                                                }}
+                                            >
+                                                <CardContent className="p-6 flex items-start gap-4">
+                                                    <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                                        <Factory className="h-6 w-6 text-primary" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-semibold text-lg mb-1">Production</h3>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {activeShift
+                                                                ? "Manage pasteurization and production batches."
+                                                                : "Open a shift to manage production."}
+                                                        </p>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+
                                             {isManager && (
                                                 <Card
                                                     className="border hover:border-primary/50 transition-colors cursor-pointer group"

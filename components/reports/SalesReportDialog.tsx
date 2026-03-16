@@ -314,6 +314,21 @@ function formatSalesReportHTML(
     const totalAmount = sales.reduce((sum, sale) => sum + sale.total_amount, 0);
     const totalItems = sales.reduce((sum, sale) => sum + sale.saleItems.reduce((is, item) => is + item.quantity, 0), 0);
 
+    const paymentTotals: Record<string, number> = {};
+    sales.forEach(sale => {
+        sale.salePayments.forEach(payment => {
+            const method = payment.payment_method;
+            paymentTotals[method] = (paymentTotals[method] || 0) + payment.amount;
+        });
+    });
+
+    // Separate totals for cash, Mpesa, and other methods
+    const cashTotal = paymentTotals['CASH'] || 0;
+    const mpesaTotal = paymentTotals['MPESA'] || 0;
+    const otherTotal = Object.entries(paymentTotals)
+        .filter(([method]) => method !== 'CASH' && method !== 'MPESA')
+        .reduce((sum, [, amount]) => sum + amount, 0);
+
     const formatTime = (dateStr: string) => {
         return new Date(dateStr).toLocaleString('en-US', {
             month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true
@@ -352,6 +367,7 @@ function formatSalesReportHTML(
         .badge-PREPAID { background: #e8f5e9; color: #1b5e20; }
         .footer { text-align: center; margin-top: 0.4cm; padding-top: 0.2cm; border-top: 1px solid #ddd; color: #666; font-style: italic; font-size: 7.5pt; }
         .items-list { font-size: 7.5pt; color: #555; margin-top: 2px; }
+        .grand-total-row { background: #e3f2fd; font-weight: bold; border-top: 2px solid #2196f3; border-bottom: 2px solid #2196f3; }
       </style>
     </head>
     <body>
@@ -371,7 +387,7 @@ function formatSalesReportHTML(
             <div><strong>Item:</strong> ${itemFilter}</div>
         </div>
 
-
+        <!-- Top summary: transaction count, items, total revenue only -->
         <div class="summary">
           <div class="summary-grid">
             <div class="summary-item">
@@ -383,7 +399,7 @@ function formatSalesReportHTML(
                 <div class="summary-label">Items Sold</div>
             </div>
             <div class="summary-item">
-                <div class="summary-value">KES ${totalAmount.toLocaleString()}</div>
+                <div class="summary-value"> ${totalAmount.toLocaleString()}</div>
                 <div class="summary-label">Total Revenue</div>
             </div>
           </div>
@@ -397,11 +413,26 @@ function formatSalesReportHTML(
               <th>Category</th>
               <th>Cashier</th>
               <th>Items</th>
-              <th class="text-right">Amount</th>
+              <th class="text-right">Cash</th>
+              <th class="text-right">Mpesa</th>
+              <th class="text-right">Other</th>
+              <th class="text-right">Total</th>
             </tr>
           </thead>
           <tbody>
-            ${sales.length > 0 ? sales.map(sale => `
+            ${sales.length > 0 ? sales.map(sale => {
+        // Calculate payment amounts per method for this sale
+        const cashAmount = sale.salePayments
+            .filter(p => p.payment_method === 'CASH')
+            .reduce((sum, p) => sum + p.amount, 0);
+        const mpesaAmount = sale.salePayments
+            .filter(p => p.payment_method === 'MPESA')
+            .reduce((sum, p) => sum + p.amount, 0);
+        const otherAmount = sale.salePayments
+            .filter(p => p.payment_method !== 'CASH' && p.payment_method !== 'MPESA')
+            .reduce((sum, p) => sum + p.amount, 0);
+
+        return `
               <tr>
                 <td>${formatTime(sale.sale_date)}</td>
                 <td>${sale.customer?.name || 'Walk-in'}</td>
@@ -412,14 +443,20 @@ function formatSalesReportHTML(
                         ${sale.saleItems.map(item => `${item.quantity}x ${item.item.name}`).join(', ')}
                     </div>
                 </td>
-                <td class="text-right font-bold">KES ${sale.total_amount.toLocaleString()}</td>
+                <td class="text-right">${cashAmount ? cashAmount.toLocaleString() : '-'}</td>
+                <td class="text-right">${mpesaAmount ? mpesaAmount.toLocaleString() : '-'}</td>
+                <td class="text-right">${otherAmount ? otherAmount.toLocaleString() : '-'}</td>
+                <td class="text-right font-bold">${sale.total_amount.toLocaleString()}</td>
               </tr>
-            `).join('') : '<tr><td colspan="6" style="text-align:center; padding: 20px;">No sales found for the selected period.</td></tr>'}
+            `}).join('') : '<tr><td colspan="9" style="text-align:center; padding: 20px;">No sales found for the selected period.</td></tr>'}
           </tbody>
           <tfoot>
-            <tr style="background: #e3f2fd; font-weight: bold; border-top: 2px solid #2196f3;">
-                <td colspan="5" class="text-right">GRAND TOTAL</td>
-                <td class="text-right">KES ${totalAmount.toLocaleString()}</td>
+            <tr class="grand-total-row">
+                <td colspan="5"><strong>GRAND TOTAL</strong></td>
+                <td class="text-right"><strong> ${cashTotal.toLocaleString()}</strong></td>
+                <td class="text-right"><strong> ${mpesaTotal.toLocaleString()}</strong></td>
+                <td class="text-right"><strong> ${otherTotal.toLocaleString()}</strong></td>
+                <td class="text-right"><strong> ${totalAmount.toLocaleString()}</strong></td>
             </tr>
           </tfoot>
         </table>
@@ -447,8 +484,16 @@ const exportSalesToExcelWeb = async (
 ): Promise<void> => {
     const workbook = XLSX.utils.book_new();
 
+    const paymentTotals: Record<string, number> = {};
+    sales.forEach(sale => {
+        sale.salePayments.forEach(payment => {
+            const method = payment.payment_method;
+            paymentTotals[method] = (paymentTotals[method] || 0) + payment.amount;
+        });
+    });
+
     // --- SUMMARY SHEET ---
-    const summaryData = [
+    const summaryData: any[][] = [
         ['SALES REPORT Summary'],
         [],
         ['Shop Name:', shopName],
@@ -465,18 +510,23 @@ const exportSalesToExcelWeb = async (
         ['Metrics'],
         ['Total Transactions:', sales.length],
         ['Total Revenue:', sales.reduce((sum, s) => sum + s.total_amount, 0)],
+        ...Object.entries(paymentTotals).map(([method, amount]) => [`${method} Total:`, amount]),
         ['Total Items Sold:', sales.reduce((sum, s) => sum + s.saleItems.reduce((is, item) => is + item.quantity, 0), 0)],
     ];
     const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(workbook, summaryWs, 'Summary');
 
     // --- DETAILED SALES SHEET ---
-    const salesData = [
-        ['Date', 'Time', 'Sale ID', 'Customer', 'Category', 'Cashier', 'Items Summary', 'Total Amount']
+    const salesData: any[][] = [
+        ['Date', 'Time', 'Sale ID', 'Customer', 'Category', 'Cashier', 'Items Summary', 'Payment Methods', 'Total Amount']
     ];
 
     sales.forEach(sale => {
         const date = new Date(sale.sale_date);
+        const paymentMethods = sale.salePayments.length > 0
+            ? sale.salePayments.map(p => p.payment_method).join(', ')
+            : (sale.sale_category === 'CREDIT' ? 'Account Credit' : (sale.sale_category === 'PREPAID' ? 'Account Prepaid' : '-'));
+
         salesData.push([
             date.toLocaleDateString(),
             date.toLocaleTimeString(),
@@ -485,16 +535,19 @@ const exportSalesToExcelWeb = async (
             sale.sale_category,
             sale.createdBy?.name || sale.createdBy?.email || 'User',
             sale.saleItems.map(i => `${i.quantity}x ${i.item.name}`).join(', '),
+            sale.salePayments.length > 0
+                ? sale.salePayments.map(p => `${p.payment_method} (${p.amount})`).join(', ')
+                : (sale.sale_category === 'CREDIT' ? 'Account Credit' : (sale.sale_category === 'PREPAID' ? 'Account Prepaid' : '-')),
             sale.total_amount
         ]);
     });
 
     const salesWs = XLSX.utils.aoa_to_sheet(salesData);
-    salesWs['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 50 }, { wch: 15 }];
+    salesWs['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 50 }, { wch: 20 }, { wch: 15 }];
     XLSX.utils.book_append_sheet(workbook, salesWs, 'Sales Data');
 
     // --- DETAILED ITEMS SHEET ---
-    const itemsData = [
+    const itemsData: any[][] = [
         ['Sale ID', 'Date', 'Item Name', 'Quantity', 'Unit Price', 'Total Price']
     ];
 

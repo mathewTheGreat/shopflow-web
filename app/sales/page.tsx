@@ -31,6 +31,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
@@ -49,9 +50,8 @@ import { ShiftPerformanceDialog } from "@/components/reports/ShiftPerformanceDia
 import { SalesReportDialog } from "@/components/reports/SalesReportDialog"
 import { CustomerNetPositionDialog } from "@/components/reports/CustomerNetPositionDialog"
 import { Loader2, ChevronLeft } from "lucide-react"
-import { useAllItemPricing } from "@/hooks/use-item-pricing"
-import { useAllQuantityDiscounts } from "@/hooks/use-quantity-discounts"
-import { calculateEffectivePrice } from "@/lib/pricing"
+import { useAllItemPrices } from "@/hooks/use-item-prices"
+import { getSelectedPrice, getActivePrices, getApplicablePrice, getPriceQuantityLabel, calculateTotalPrice, isFlatPriceTier, isQuantityInPriceRange } from "@/lib/pricing"
 import { useStockLevelsByShop, useBulkUpdateStockLevels } from "@/hooks/use-stock-levels"
 import { useCreateBulkTransactions } from "@/hooks/use-stock-transactions"
 import { FinancialBreakdownDialog } from "@/components/reports/FinancialBreakdownDialog"
@@ -104,8 +104,7 @@ export default function SalesPage() {
   const { mutateAsync: createBulkTransactions } = useCreateBulkTransactions()
 
   // Advanced Pricing Data
-  const { pricingRules = [] } = useAllItemPricing(activeShop?.id)
-  const { discounts = [] } = useAllQuantityDiscounts(activeShop?.id)
+  const { prices: allItemPrices = [] } = useAllItemPrices(activeShop?.id)
 
   // POS State
   const [saleCategory, setSaleCategory] = useState<SaleCategory>("IMMEDIATE")
@@ -130,40 +129,105 @@ export default function SalesPage() {
   const [expensePaymentMethod, setExpensePaymentMethod] = useState<"cash" | "mpesa">("cash")
 
   const calculateTotal = () => {
-    return cartItems.reduce((sum, item) => sum + (item.price || 0) * (parseFloat(item.quantity) || 0), 0)
+    return cartItems.reduce((sum, item) => {
+      const basePrice = item.base_price || item.original_item?.sale_price || 0
+      const qty = parseFloat(item.quantity) || 0
+
+      if (qty === 0) return sum
+
+      const itemPrices = allItemPrices.filter(p => p.item_id === item.id && p.shop_id === activeShop?.id)
+      const activePrices = getActivePrices(itemPrices)
+
+      // Check for manually selected price first
+      if (item.selected_price_id) {
+        const manualPrice = activePrices.find(p => p.id === item.selected_price_id)
+        if (manualPrice) {
+          const manualIsFlat = isFlatPriceTier(manualPrice, qty)
+          if (manualIsFlat) {
+            return sum + manualPrice.price
+          } else if (isQuantityInPriceRange(manualPrice, qty)) {
+            return sum + manualPrice.price * qty
+          }
+        }
+      }
+
+      // Fall back to applicable price (default or other)
+      const applicablePrice = getApplicablePrice(itemPrices, qty)
+
+      if (applicablePrice && isFlatPriceTier(applicablePrice, qty)) {
+        return sum + applicablePrice.price // Flat price
+      } else if (applicablePrice) {
+        return sum + applicablePrice.price * qty // Default/other price option × quantity
+      }
+
+      return sum + basePrice * qty
+    }, 0)
   }
 
-  const addToCart = (item: any) => {
+  const addToCartWithPrice = (item: any, priceId?: string) => {
+    const itemPrices = allItemPrices.filter(p => p.item_id === item.id && p.shop_id === activeShop?.id)
+    const basePrice = item.sale_price || 0
+
     const existing = cartItems.find((ci) => ci.id === item.id)
     if (existing) {
       const newQty = (parseFloat(existing.quantity) || 0) + 1
-      const priceResult = calculateEffectivePrice({
-        basePrice: item.sale_price || 0,
-        quantity: newQty,
-        pricingRules: pricingRules.filter(r => r.item_id === item.id),
-        discountRules: discounts.filter(d => d.item_id === item.id)
-      })
+      const applicablePrice = getApplicablePrice(itemPrices, newQty)
+
+      let newTotalPrice: number
+      if (applicablePrice && isFlatPriceTier(applicablePrice, newQty)) {
+        newTotalPrice = applicablePrice.price // Flat price
+      } else if (applicablePrice) {
+        newTotalPrice = applicablePrice.price * newQty // Default/other price option × quantity
+      } else {
+        newTotalPrice = basePrice * newQty // No price options, use base price
+      }
 
       setCartItems(
-        cartItems.map((ci) => (ci.id === item.id ? { ...ci, quantity: newQty, price: priceResult.unitPrice } : ci))
+        cartItems.map((ci) => (ci.id === item.id ? { ...ci, quantity: newQty, price: newTotalPrice, selected_price_id: priceId } : ci))
       )
     } else {
-      const priceResult = calculateEffectivePrice({
-        basePrice: item.sale_price || 0,
-        quantity: 1,
-        pricingRules: pricingRules.filter(r => r.item_id === item.id),
-        discountRules: discounts.filter(d => d.item_id === item.id)
-      })
+      const qty = 1
+      const applicablePrice = getApplicablePrice(itemPrices, qty)
+
+      let finalTotalPrice: number
+      if (applicablePrice && isFlatPriceTier(applicablePrice, qty)) {
+        finalTotalPrice = applicablePrice.price // Flat price
+      } else if (applicablePrice) {
+        finalTotalPrice = applicablePrice.price * qty // Default/other price option × quantity
+      } else {
+        finalTotalPrice = basePrice * qty // No price options, use base price
+      }
+
       setCartItems([...cartItems, {
         id: item.id,
         name: item.name,
-        base_price: item.sale_price || 0,
-        price: priceResult.unitPrice,
+        base_price: basePrice,
+        price: finalTotalPrice,
         quantity: 1,
-        original_item: item
+        original_item: item,
+        selected_price_id: priceId
       }])
     }
     toast.success(`${item.name} added to cart`)
+  }
+
+  const handleAddToCart = (item: any) => {
+    const itemPrices = allItemPrices.filter(p => p.item_id === item.id && p.shop_id === activeShop?.id)
+
+    if (itemPrices.length === 0) {
+      addToCartWithPrice(item)
+      return
+    }
+
+    const activePrices = getActivePrices(itemPrices)
+
+    if (activePrices.length === 1) {
+      addToCartWithPrice(item, activePrices[0].id)
+      return
+    }
+
+    const defaultPrice = activePrices.find(p => p.is_default)
+    addToCartWithPrice(item, defaultPrice?.id || activePrices[0].id)
   }
 
   const handleQuantityInputChange = (id: string, value: string) => {
@@ -179,13 +243,49 @@ export default function SalesPage() {
       setCartItems(
         cartItems.map((item) => {
           if (item.id === id) {
-            const priceResult = calculateEffectivePrice({
-              basePrice: item.base_price || item.original_item.sale_price || 0,
-              quantity: qty,
-              pricingRules: pricingRules.filter(r => r.item_id === id),
-              discountRules: discounts.filter(d => d.item_id === id)
-            })
-            return { ...item, quantity: value, price: priceResult.unitPrice }
+            const basePrice = item.base_price || item.original_item?.sale_price || 0
+            const itemPrices = allItemPrices.filter(p => p.item_id === item.id && p.shop_id === activeShop?.id)
+            const activePrices = getActivePrices(itemPrices)
+
+            let newPrice: number
+            if (item.selected_price_id) {
+              const manualPrice = activePrices.find(p => p.id === item.selected_price_id)
+              if (manualPrice) {
+                if (isFlatPriceTier(manualPrice, qty)) {
+                  newPrice = manualPrice.price
+                } else if (isQuantityInPriceRange(manualPrice, qty)) {
+                  newPrice = manualPrice.price * qty
+                } else {
+                  const applicablePrice = getApplicablePrice(itemPrices, qty)
+                  if (applicablePrice && isFlatPriceTier(applicablePrice, qty)) {
+                    newPrice = applicablePrice.price
+                  } else if (applicablePrice) {
+                    newPrice = applicablePrice.price * qty
+                  } else {
+                    newPrice = basePrice * qty
+                  }
+                }
+              } else {
+                const applicablePrice = getApplicablePrice(itemPrices, qty)
+                if (applicablePrice && isFlatPriceTier(applicablePrice, qty)) {
+                  newPrice = applicablePrice.price
+                } else if (applicablePrice) {
+                  newPrice = applicablePrice.price * qty
+                } else {
+                  newPrice = basePrice * qty
+                }
+              }
+            } else {
+              const applicablePrice = getApplicablePrice(itemPrices, qty)
+              if (applicablePrice && isFlatPriceTier(applicablePrice, qty)) {
+                newPrice = applicablePrice.price
+              } else if (applicablePrice) {
+                newPrice = applicablePrice.price * qty
+              } else {
+                newPrice = basePrice * qty
+              }
+            }
+            return { ...item, quantity: value, price: newPrice }
           }
           return item
         })
@@ -199,13 +299,51 @@ export default function SalesPage() {
         if (item.id === id) {
           const currentQty = parseFloat(item.quantity) || 0
           const newQty = Math.max(0, currentQty + delta)
-          const priceResult = calculateEffectivePrice({
-            basePrice: item.base_price || item.original_item.sale_price || 0,
-            quantity: newQty,
-            pricingRules: pricingRules.filter(r => r.item_id === id),
-            discountRules: discounts.filter(d => d.item_id === id)
-          })
-          return { ...item, quantity: newQty, price: priceResult.unitPrice }
+          const basePrice = item.base_price || item.original_item?.sale_price || 0
+
+          const itemPrices = allItemPrices.filter(p => p.item_id === item.id && p.shop_id === activeShop?.id)
+          const activePrices = getActivePrices(itemPrices)
+
+          let newPrice: number
+          if (item.selected_price_id) {
+            const manualPrice = activePrices.find(p => p.id === item.selected_price_id)
+            if (manualPrice) {
+              if (isFlatPriceTier(manualPrice, newQty)) {
+                newPrice = manualPrice.price
+              } else if (isQuantityInPriceRange(manualPrice, newQty)) {
+                newPrice = manualPrice.price * newQty
+              } else {
+                const applicablePrice = getApplicablePrice(itemPrices, newQty)
+                if (applicablePrice && isFlatPriceTier(applicablePrice, newQty)) {
+                  newPrice = applicablePrice.price
+                } else if (applicablePrice) {
+                  newPrice = applicablePrice.price * newQty
+                } else {
+                  newPrice = basePrice * newQty
+                }
+              }
+            } else {
+              const applicablePrice = getApplicablePrice(itemPrices, newQty)
+              if (applicablePrice && isFlatPriceTier(applicablePrice, newQty)) {
+                newPrice = applicablePrice.price
+              } else if (applicablePrice) {
+                newPrice = applicablePrice.price * newQty
+              } else {
+                newPrice = basePrice * newQty
+              }
+            }
+          } else {
+            const applicablePrice = getApplicablePrice(itemPrices, newQty)
+            if (applicablePrice && isFlatPriceTier(applicablePrice, newQty)) {
+              newPrice = applicablePrice.price
+            } else if (applicablePrice) {
+              newPrice = applicablePrice.price * newQty
+            } else {
+              newPrice = basePrice * newQty
+            }
+          }
+
+          return { ...item, quantity: newQty, price: newPrice }
         }
         return item
       })
@@ -713,8 +851,8 @@ export default function SalesPage() {
 
                         <Card
                           className={`border transition-colors cursor-pointer group ${activeShift
-                              ? "hover:border-primary/50"
-                              : "opacity-50 cursor-not-allowed"
+                            ? "hover:border-primary/50"
+                            : "opacity-50 cursor-not-allowed"
                             }`}
                           onClick={() => {
                             if (activeShift) {
@@ -944,49 +1082,94 @@ export default function SalesPage() {
                           ) : items.filter(i =>
                             i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
                             i.id.includes(itemSearchQuery)
-                          ).map((item) => (
-                            <Card
-                              key={item.id}
-                              className="group cursor-pointer hover:border-primary hover:shadow-md transition-all active:scale-95 overflow-hidden border border-border/50 bg-card"
-                              onClick={() => addToCart(item)}
-                            >
-                              <CardContent className="p-4 flex flex-col justify-between h-full space-y-2">
-                                <div>
-                                  <div className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-1">{item.name}</div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <div className="text-[10px] text-muted-foreground bg-muted-foreground/10 px-1.5 py-0.5 rounded uppercase font-black tracking-tight">
-                                      {item.unit_of_measure}
+                          ).map((item) => {
+                            const itemPrices = allItemPrices.filter(p => p.item_id === item.id && p.shop_id === activeShop?.id)
+                            const activePrices = getActivePrices(itemPrices)
+                            const hasMultiplePrices = activePrices.length > 1
+
+                            return (
+                              <Card
+                                key={item.id}
+                                className="group cursor-pointer hover:border-primary hover:shadow-md transition-all active:scale-95 overflow-hidden border border-border/50 bg-card"
+                              >
+                                <CardContent className="p-4 flex flex-col justify-between h-full space-y-2">
+                                  <div>
+                                    <div className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-1">{item.name}</div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <div className="text-[10px] text-muted-foreground bg-muted-foreground/10 px-1.5 py-0.5 rounded uppercase font-black tracking-tight">
+                                        {item.unit_of_measure}
+                                      </div>
+                                      {(() => {
+                                        const cartItem = cartItems.find((ci) => ci.id === item.id);
+                                        const cartQty = cartItem ? parseFloat(cartItem.quantity) || 0 : 0;
+                                        const stockLevel = stockLevels.find((sl: any) => sl.item_id === item.id);
+                                        const balance = (stockLevel?.quantity || 0) - cartQty;
+
+                                        let statusColor = "text-primary bg-primary/10";
+                                        if (balance <= 0) statusColor = "text-destructive bg-destructive/10";
+                                        else if (balance < 5) statusColor = "text-orange-600 bg-orange-100";
+
+                                        return (
+                                          <div className={`text-[10px] ${statusColor} px-1.5 py-0.5 rounded uppercase font-black tracking-tight`}>
+                                            Balance: {balance}
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
-                                    {(() => {
-                                      const cartItem = cartItems.find((ci) => ci.id === item.id);
-                                      const cartQty = cartItem ? parseFloat(cartItem.quantity) || 0 : 0;
-                                      const stockLevel = stockLevels.find((sl: any) => sl.item_id === item.id);
-                                      const balance = (stockLevel?.quantity || 0) - cartQty;
-
-                                      let statusColor = "text-primary bg-primary/10";
-                                      if (balance <= 0) statusColor = "text-destructive bg-destructive/10";
-                                      else if (balance < 5) statusColor = "text-orange-600 bg-orange-100";
-
-                                      return (
-                                        <div className={`text-[10px] ${statusColor} px-1.5 py-0.5 rounded uppercase font-black tracking-tight`}>
-                                          Balance: {balance}
-                                        </div>
-                                      );
-                                    })()}
                                   </div>
-                                </div>
-                                <div className="flex items-end justify-between pt-2">
-                                  <div className="text-primary font-black text-xl leading-none">
-                                    <span className="text-xs font-bold mr-0.5">KES</span>
-                                    {item.sale_price?.toLocaleString()}
+                                  <div className="flex items-end justify-between pt-2">
+                                    {hasMultiplePrices ? (
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <div className="text-primary font-black text-xl leading-none cursor-pointer hover:underline flex items-center gap-1">
+                                            <span className="text-xs font-bold mr-0.5">KES</span>
+                                            {item.sale_price?.toLocaleString()}
+                                            <span className="text-xs font-normal text-muted-foreground">(Change)</span>
+                                          </div>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-56">
+                                          <div className="space-y-2">
+                                            <div className="text-sm font-semibold">Select Price</div>
+                                            {activePrices.map((price) => {
+                                              const isInRange = isQuantityInPriceRange(price, 1)
+                                              return (
+                                                <button
+                                                  key={price.id}
+                                                  disabled={!isInRange}
+                                                  onClick={() => addToCartWithPrice(item, price.id)}
+                                                  className={`w-full flex items-center justify-between p-2 rounded transition-colors text-left ${isInRange ? 'hover:bg-muted' : 'opacity-40 cursor-not-allowed'
+                                                    }`}
+                                                >
+                                                  <div>
+                                                    <div className="font-medium">{price.label}</div>
+                                                    <div className="text-xs text-muted-foreground">{getPriceQuantityLabel(price)}</div>
+                                                  </div>
+                                                  <div className="font-bold">KES {price.price.toLocaleString()}</div>
+                                                </button>
+                                              )
+                                            })}
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
+                                    ) : (
+                                      <div
+                                        className="text-primary font-black text-xl leading-none"
+                                      >
+                                        <span className="text-xs font-bold mr-0.5">KES</span>
+                                        {item.sale_price?.toLocaleString()}
+                                      </div>
+                                    )}
+                                    <div
+                                      className="p-2 rounded-xl bg-primary/10 group-hover:bg-primary group-hover:text-white transition-colors cursor-pointer"
+                                      onClick={() => handleAddToCart(item)}
+                                    >
+                                      <Plus className="h-5 w-5" />
+                                    </div>
                                   </div>
-                                  <div className="p-2 rounded-xl bg-primary/10 group-hover:bg-primary group-hover:text-white transition-colors">
-                                    <Plus className="h-5 w-5" />
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
                         </div>
                       </div>
                     </div>
@@ -1061,16 +1244,117 @@ export default function SalesPage() {
                                     </Button>
                                   </div>
                                   <div className="text-right">
-                                    <div className="text-xs font-bold text-muted-foreground/60 uppercase flex items-center justify-end gap-1 whitespace-nowrap">
-                                      {item.quantity} x
-                                      {item.price < item.base_price && (
-                                        <span className="line-through opacity-50"> {item.base_price.toLocaleString()}</span>
-                                      )}
-                                      <span> {item.price.toLocaleString()}</span>
-                                    </div>
-                                    <div className="text-xl font-black text-primary tracking-tighter">
-                                      KES {(item.price * (parseFloat(item.quantity) || 0)).toLocaleString()}
-                                    </div>
+                                    {(() => {
+                                      const itemPrices = allItemPrices.filter(p => p.item_id === item.id && p.shop_id === activeShop?.id)
+                                      const activePrices = getActivePrices(itemPrices)
+                                      const qty = parseFloat(item.quantity) || 0
+                                      const basePrice = item.base_price || item.original_item?.sale_price || 0
+
+                                      // Check for manually selected price first
+                                      const manualPrice = item.selected_price_id
+                                        ? activePrices.find(p => p.id === item.selected_price_id)
+                                        : null
+
+                                      // Use manual selection if exists and is in range, otherwise use applicable price
+                                      let currentPrice: typeof applicablePrice | null = null
+                                      let total = 0
+
+                                      if (manualPrice) {
+                                        const manualIsFlat = isFlatPriceTier(manualPrice, qty)
+                                        if (manualIsFlat) {
+                                          currentPrice = manualPrice
+                                          total = manualPrice.price
+                                        } else if (isQuantityInPriceRange(manualPrice, qty)) {
+                                          currentPrice = manualPrice
+                                          total = manualPrice.price * qty
+                                        }
+                                      }
+
+                                      // If no manual selection or manual not in range, use applicable
+                                      if (!currentPrice) {
+                                        const applicablePrice = getApplicablePrice(itemPrices, qty)
+                                        const isFlat = applicablePrice ? isFlatPriceTier(applicablePrice, qty) : false
+                                        if (isFlat && applicablePrice) {
+                                          currentPrice = applicablePrice
+                                          total = applicablePrice.price
+                                        } else if (applicablePrice) {
+                                          currentPrice = applicablePrice
+                                          total = applicablePrice.price * qty
+                                        } else {
+                                          total = basePrice * qty
+                                        }
+                                      }
+
+                                      const isFlat = currentPrice ? isFlatPriceTier(currentPrice, qty) : false
+
+                                      return (
+                                        <>
+                                          {isFlat ? (
+                                            <div className="text-xs font-bold text-muted-foreground/60 uppercase">
+                                              Flat price
+                                            </div>
+                                          ) : currentPrice ? (
+                                            <div className="text-xs font-bold text-muted-foreground/60 uppercase flex items-center justify-end gap-1 whitespace-nowrap">
+                                              {item.quantity} x {currentPrice.price.toLocaleString()}
+                                            </div>
+                                          ) : (
+                                            <div className="text-xs font-bold text-muted-foreground/60 uppercase flex items-center justify-end gap-1 whitespace-nowrap">
+                                              {item.quantity} x {basePrice.toLocaleString()}
+                                            </div>
+                                          )}
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <div className="text-xl font-black text-primary tracking-tighter cursor-pointer hover:underline">
+                                                KES {total.toLocaleString()}
+                                              </div>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-56">
+                                              <div className="space-y-2">
+                                                <div className="text-sm font-semibold">Select Price Option</div>
+                                                {activePrices.map((price) => {
+                                                  const priceIsFlat = isFlatPriceTier(price, qty)
+                                                  const isInRange = isQuantityInPriceRange(price, qty)
+                                                  const priceTotal = priceIsFlat ? price.price : price.price * qty
+                                                  const isSelected = item.selected_price_id === price.id
+                                                  const isDisabled = !isInRange
+
+                                                  return (
+                                                    <button
+                                                      key={price.id}
+                                                      disabled={isDisabled}
+                                                      onClick={() => {
+                                                        const newTotal = priceIsFlat ? price.price : price.price * qty
+                                                        setCartItems(cartItems.map(ci =>
+                                                          ci.id === item.id
+                                                            ? { ...ci, base_price: price.price, price: newTotal, selected_price_id: price.id }
+                                                            : ci
+                                                        ))
+                                                      }}
+                                                      className={`w-full flex items-center justify-between p-2 rounded transition-colors text-left ${isSelected
+                                                          ? 'bg-primary/10 border border-primary'
+                                                          : isDisabled
+                                                            ? 'opacity-40 cursor-not-allowed'
+                                                            : 'hover:bg-muted'
+                                                        }`}
+                                                    >
+                                                      <div>
+                                                        <div className="font-medium">{price.label}</div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                          {priceIsFlat
+                                                            ? `Flat: KES ${price.price.toLocaleString()}`
+                                                            : `KES ${price.price} × ${qty}`}
+                                                        </div>
+                                                      </div>
+                                                      <div className="font-bold">KES {priceTotal.toLocaleString()}</div>
+                                                    </button>
+                                                  )
+                                                })}
+                                              </div>
+                                            </PopoverContent>
+                                          </Popover>
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                               </div>

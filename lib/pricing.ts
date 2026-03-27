@@ -1,79 +1,117 @@
-import { ItemPricing, QuantityDiscount } from "@/types/pricing";
+import { ItemPrice } from "@/types/pricing";
 
-interface CalculatePriceParams {
-    basePrice: number;
-    quantity: number;
-    pricingRules: ItemPricing[];
-    discountRules: QuantityDiscount[];
+export function getSelectedPrice(
+    prices: ItemPrice[],
+    selectedPriceId?: string
+): ItemPrice | undefined {
+    if (selectedPriceId) {
+        return prices.find(p => p.id === selectedPriceId && p.is_active);
+    }
+    
+    return prices.find(p => p.is_default && p.is_active);
 }
 
-interface PriceResult {
-    unitPrice: number;
-    totalPrice: number;
-    originalUnitPrice: number;
-    appliedOverride?: ItemPricing;
-    appliedDiscount?: QuantityDiscount;
-    isDiscounted: boolean;
-    isOverridden: boolean;
+export function getDefaultPrice(prices: ItemPrice[]): ItemPrice | undefined {
+    return prices.find(p => p.is_default && p.is_active);
 }
 
-export function calculateEffectivePrice({
-    basePrice,
-    quantity,
-    pricingRules,
-    discountRules,
-}: CalculatePriceParams): PriceResult {
-    let currentUnitPrice = basePrice;
-    let isOverridden = false;
-    let isDiscounted = false;
-    let appliedOverride: ItemPricing | undefined;
-    let appliedDiscount: QuantityDiscount | undefined;
+export function getActivePrices(prices: ItemPrice[]): ItemPrice[] {
+    return prices.filter(p => p.is_active).sort((a, b) => {
+        if (a.is_default && !b.is_default) return -1;
+        if (!a.is_default && b.is_default) return 1;
+        return (a.min_quantity ?? 1) - (b.min_quantity ?? 1);
+    });
+}
 
-    // 1. Apply Shop-Specific Overrides (ItemPricing)
-    // Find active overrides that match the quantity range
-    const validOverrides = pricingRules.filter(
-        (rule) =>
-            rule.is_active &&
-            (rule.min_quantity === null || rule.min_quantity === undefined || quantity >= rule.min_quantity) &&
-            (rule.max_quantity === null || rule.max_quantity === undefined || quantity <= rule.max_quantity)
+export function getApplicablePrice(
+    prices: ItemPrice[],
+    quantity: number
+): ItemPrice | undefined {
+    const activePrices = prices.filter(p => p.is_active);
+    
+    if (activePrices.length === 0) return undefined;
+    
+    // First, check if there's a flat price tier that exactly matches the quantity
+    // Flat price takes absolute precedence
+    const flatPrice = activePrices.find(p => 
+        p.min_quantity === p.max_quantity && p.min_quantity === quantity
     );
+    
+    if (flatPrice) {
+        return flatPrice;
+    }
+    
+    // Second, check if default price is applicable for this quantity
+    const defaultPrice = activePrices.find(p => p.is_default);
+    if (defaultPrice && isQuantityInPriceRange(defaultPrice, quantity)) {
+        return defaultPrice;
+    }
+    
+    // Third, check other non-default prices that match the quantity range
+    const otherMatchingPrice = activePrices.find(p => 
+        !p.is_default && isQuantityInPriceRange(p, quantity)
+    );
+    
+    if (otherMatchingPrice) {
+        return otherMatchingPrice;
+    }
+    
+    // Fall back to default price if available
+    return defaultPrice ?? activePrices[0];
+}
 
-    if (validOverrides.length > 0) {
-        // Sort by min_quantity descending to find the most specific rule (largest min_quantity)
-        const bestOverride = validOverrides.sort((a, b) => (b.min_quantity || 0) - (a.min_quantity || 0))[0];
-        currentUnitPrice = bestOverride.override_price;
-        isOverridden = true;
-        appliedOverride = bestOverride;
+export function getPriceQuantityLabel(price: ItemPrice): string {
+    const minQty = price.min_quantity ?? 1;
+    const maxQty = price.max_quantity;
+
+    if (maxQty === null || maxQty === undefined) {
+        return minQty === 1 ? "(1+)" : `(${minQty}+)`;
     }
 
-    // 2. Apply Quantity Discounts
-    // Find active discounts that match the quantity
-    const validDiscounts = discountRules.filter(
-        (rule) => rule.is_active && quantity >= rule.min_quantity
-    );
-
-    if (validDiscounts.length > 0) {
-        // Find the discount with the highest min_quantity
-        const bestDiscount = validDiscounts.sort((a, b) => b.min_quantity - a.min_quantity)[0];
-
-        if (bestDiscount.discount_percent) {
-            currentUnitPrice = currentUnitPrice * (1 - bestDiscount.discount_percent / 100);
-            isDiscounted = true;
-            appliedDiscount = bestDiscount;
-        } else if (bestDiscount.discount_amount) {
-            currentUnitPrice = Math.max(0, currentUnitPrice - bestDiscount.discount_amount);
-            isDiscounted = true;
-            appliedDiscount = bestDiscount;
-        }
+    if (minQty === maxQty) {
+        return `(${minQty})`;
     }
 
-    return {
-        unitPrice: currentUnitPrice,
-        totalPrice: currentUnitPrice * quantity,
-        originalUnitPrice: basePrice,
-        appliedOverride,
-        appliedDiscount,
-        isDiscounted,
-        isOverridden,
-    };
+    return `(${minQty}-${maxQty})`;
+}
+
+export function isFlatPriceTier(price: ItemPrice, quantity: number): boolean {
+    const minQty = price.min_quantity ?? 1;
+    const maxQty = price.max_quantity;
+
+    // Flat price if min = max = quantity (exact match)
+    if (maxQty !== null && maxQty !== undefined && maxQty === minQty && quantity === minQty) {
+        return true;
+    }
+    
+    return false;
+}
+
+export function isQuantityInPriceRange(price: ItemPrice, quantity: number): boolean {
+    const minQty = price.min_quantity ?? 1;
+    const maxQty = price.max_quantity;
+
+    // If no max quantity, it's a "minQty+" tier, so quantity >= minQty
+    if (maxQty === null || maxQty === undefined) {
+        return quantity >= minQty;
+    }
+
+    // If min = max, it's a flat price tier - only exact match works
+    if (maxQty === minQty) {
+        return quantity === minQty;
+    }
+
+    // Range tier: quantity must be within min-max range
+    return quantity >= minQty && quantity <= maxQty;
+}
+
+export function calculateTotalPrice(price: ItemPrice | undefined, quantity: number): number {
+    if (!price) return 0;
+    
+    // Check if this is a flat-price tier (exact quantity match)
+    if (isFlatPriceTier(price, quantity)) {
+        return price.price; // Flat price, not multiplied
+    }
+    
+    return price.price * quantity;
 }

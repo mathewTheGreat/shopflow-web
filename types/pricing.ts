@@ -1,6 +1,7 @@
 import { BaseEntity } from "./common";
 
-export interface ItemPricing extends BaseEntity {
+export interface ItemPricing {
+    id: string;
     item_id: string;
     shop_id: string;
     override_price: number;
@@ -8,6 +9,29 @@ export interface ItemPricing extends BaseEntity {
     max_quantity?: number | null;
     is_active: boolean;
     created_by: string;
+    created_at?: string;
+    _version?: number;
+    _last_modified_at?: string;
+    _is_pending?: boolean;
+    _synced_at?: string;
+}
+
+export interface ItemPrice {
+    id: string;
+    item_id: string;
+    shop_id: string;
+    label: string;
+    price: number;
+    min_quantity?: number | null;
+    max_quantity?: number | null;
+    is_default: boolean;
+    is_active: boolean;
+    created_at?: string;
+    created_by: string;
+    _version?: number;
+    _last_modified_at?: string;
+    _is_pending?: boolean;
+    _synced_at?: string;
 }
 
 export interface QuantityDiscount extends BaseEntity {

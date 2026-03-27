@@ -14,6 +14,7 @@ export interface Sale extends BaseEntity {
 export interface SaleItem extends BaseEntity {
     sale_id: string;
     item_id: string;
+    selected_price_id?: string | null;
     quantity: number;
     unit_price: number;
     total_price: number;

@@ -6,12 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Package, DollarSign, Percent, X, Loader2 } from "lucide-react"
+import { Package, DollarSign, X, Loader2 } from "lucide-react"
 import { Item, itemService } from "@/services/item.service"
 import { useAppStore } from "@/store/use-app-store"
 import { useQueryClient } from "@tanstack/react-query"
-import { PricingRulesTab } from "./PricingRulesTab"
-import { QuantityDiscountsTab } from "./QuantityDiscountsTab"
+import { ItemPricesTab } from "./ItemPricesTab"
 import { v4 as uuidv4 } from "uuid"
 import { Card, CardContent } from "../ui/card"
 
@@ -184,17 +183,7 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
                             >
                                 <div className="flex items-center gap-2">
                                     <DollarSign className="h-4 w-4" />
-                                    <span>Pricing Rules</span>
-                                </div>
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="discounts"
-                                disabled={isNewItem}
-                                className="relative h-14 rounded-none border-b-2 border-transparent px-4 pb-3 pt-3 font-medium text-muted-foreground hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <Percent className="h-4 w-4" />
-                                    <span>Quantity Discounts</span>
+                                    <span>Price Options</span>
                                 </div>
                             </TabsTrigger>
                         </TabsList>
@@ -343,27 +332,14 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
                             </div>
                         </TabsContent>
 
-                        {/* Pricing Rules Tab */}
+                        {/* Price Options Tab */}
                         <TabsContent value="pricing" className="p-6 md:p-8 lg:p-12 m-0">
                             <div className="max-w-5xl mx-auto">
                                 {currentItemId ? (
-                                    <PricingRulesTab itemId={currentItemId} itemName={formData.name} />
+                                    <ItemPricesTab itemId={currentItemId} itemName={formData.name} />
                                 ) : (
                                     <div className="text-center py-12 text-muted-foreground">
-                                        Save the item first to add pricing rules
-                                    </div>
-                                )}
-                            </div>
-                        </TabsContent>
-
-                        {/* Quantity Discounts Tab */}
-                        <TabsContent value="discounts" className="p-6 md:p-8 lg:p-12 m-0">
-                            <div className="max-w-5xl mx-auto">
-                                {currentItemId ? (
-                                    <QuantityDiscountsTab itemId={currentItemId} itemName={formData.name} />
-                                ) : (
-                                    <div className="text-center py-12 text-muted-foreground">
-                                        Save the item first to add quantity discounts
+                                        Save the item first to add price options
                                     </div>
                                 )}
                             </div>

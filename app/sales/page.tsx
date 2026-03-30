@@ -25,6 +25,7 @@ import {
   User,
   Package,
   Store,
+  CalendarDays,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -56,6 +57,7 @@ import { useStockLevelsByShop, useBulkUpdateStockLevels } from "@/hooks/use-stoc
 import { useCreateBulkTransactions } from "@/hooks/use-stock-transactions"
 import { FinancialBreakdownDialog } from "@/components/reports/FinancialBreakdownDialog"
 import { AddFloatDialog } from "@/components/shifts/AddFloatDialog"
+import { DailyReportDialog } from "@/components/reports/DailyReportDialog"
 
 type SaleCategory = "IMMEDIATE" | "CREDIT" | "PREPAID"
 type PaymentMethod = "CASH" | "MPESA" | "SPLIT"
@@ -82,6 +84,7 @@ export default function SalesPage() {
   const [showNetPositionDialog, setShowNetPositionDialog] = useState(false)
   const [showFinancialBreakdown, setShowFinancialBreakdown] = useState(false)
   const [showAddFloatDialog, setShowAddFloatDialog] = useState(false)
+  const [showDailyReportDialog, setShowDailyReportDialog] = useState(false)
 
   const [currentView, setCurrentView] = useState<"main" | "customers" | "payments">("main")
 
@@ -813,6 +816,21 @@ export default function SalesPage() {
                             </div>
                           </CardContent>
                         </Card>
+
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setShowDailyReportDialog(true)}
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <CalendarDays className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Daily Report</h3>
+                              <p className="text-sm text-muted-foreground">Complete daily summary report.</p>
+                            </div>
+                          </CardContent>
+                        </Card>
                       </div>
                     </TabsContent>
 
@@ -906,6 +924,11 @@ export default function SalesPage() {
                 onOpenChange={setShowAddFloatDialog}
                 activeShift={activeShift}
                 shopId={activeShop?.id}
+              />
+
+              <DailyReportDialog
+                open={showDailyReportDialog}
+                onOpenChange={setShowDailyReportDialog}
               />
             </div>
           </main >

@@ -34,6 +34,7 @@ import { SupplierManager } from "@/components/inventory/SupplierManager"
 import { StockTransactionsGrid } from "@/components/inventory/StockTransactionsGrid"
 import { SupplierDeliveryReportDialog } from "@/components/reports/SupplierDeliveryReportDialog"
 import { VarianceReportDialog } from "@/components/reports/VarianceReportDialog"
+import { ProductionReportDialog } from "@/components/reports/ProductionReportDialog"
 import { ProductionManager } from "@/components/production/ProductionManager"
 import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
@@ -49,6 +50,7 @@ export default function InventoryPage() {
     const [showStockTakeDialog, setShowStockTakeDialog] = useState(false)
     const [showSupplierReportDialog, setShowSupplierReportDialog] = useState(false)
     const [showVarianceReportDialog, setShowVarianceReportDialog] = useState(false)
+    const [showProductionReportDialog, setShowProductionReportDialog] = useState(false)
     const [selectedItem, setSelectedItem] = useState<Item | null>(null)
     const { items, isLoading, refetch } = useItems()
     const currency = useAppStore((state) => state.userCurrency) || "KES"
@@ -372,6 +374,21 @@ export default function InventoryPage() {
                                                         </div>
                                                     </CardContent>
                                                 </Card>
+
+                                                <Card
+                                                    className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                                                    onClick={() => setShowProductionReportDialog(true)}
+                                                >
+                                                    <CardContent className="p-6 flex items-start gap-4">
+                                                        <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                                            <Factory className="h-6 w-6 text-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-semibold text-lg mb-1">Production Report</h3>
+                                                            <p className="text-sm text-muted-foreground">Analyze production batches, efficiency and losses.</p>
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
                                             </div>
                                         ) : (
                                             <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg bg-muted/5">
@@ -486,6 +503,11 @@ export default function InventoryPage() {
                 <VarianceReportDialog
                     open={showVarianceReportDialog}
                     onOpenChange={setShowVarianceReportDialog}
+                />
+
+                <ProductionReportDialog
+                    open={showProductionReportDialog}
+                    onOpenChange={setShowProductionReportDialog}
                 />
             </div>
         </div>

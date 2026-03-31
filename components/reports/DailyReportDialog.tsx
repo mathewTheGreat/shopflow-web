@@ -324,6 +324,22 @@ function formatDailyReportHTML(
               <span class="calc-label">Balance c/f</span>
               <span class="calc-value" style="font-weight: bold;">${formatNumber(item.balanceCf)} ${item.unitOfMeasure}</span>
             </div>
+            ${item.totalVariance !== 0 || (item.varianceByShift && item.varianceByShift.length > 0) ? `
+            <div class="calc-item" style="background: #fff3cd; padding: 0.15cm; margin-top: 0.1cm; border-radius: 3px;">
+              <span class="calc-label" style="font-weight: bold; color: #856404;">Variance</span>
+              <span class="calc-value" style="font-weight: bold; color: ${item.totalVariance < 0 ? '#c62828' : '#2e7d32'};">${item.totalVariance > 0 ? '+' : ''}${formatNumber(item.totalVariance)} ${item.unitOfMeasure}</span>
+            </div>
+            ${item.varianceByShift && item.varianceByShift.length > 0 ? `
+            <div style="font-size: 8pt; margin-top: 0.1cm; padding-left: 0.2cm;">
+              ${item.varianceByShift.map(v => `
+                <div style="display: flex; justify-content: space-between; padding: 0.05cm 0; border-bottom: 1px dashed #eee;">
+                  <span>${v.cashierName}</span>
+                  <span style="color: ${v.variance < 0 ? '#c62828' : '#2e7d32'};">${v.variance > 0 ? '+' : ''}${formatNumber(v.variance)}</span>
+                </div>
+              `).join('')}
+            </div>
+            ` : ''}
+            ` : ''}
           </div>
       `
 
@@ -467,25 +483,6 @@ function formatDailyReportHTML(
     `
   }
 
-  // Staff Variance
-  if (report.staffVariance.length > 0) {
-    html += `
-      <div class="section-title">STAFF VARIANCE (SPILLAGE)</div>
-      <div class="variance-section">
-    `
-    for (const v of report.staffVariance) {
-      const varianceColor = v.variance < 0 ? '#c62828' : '#2e7d32'
-      const variancePrefix = v.variance > 0 ? '+' : ''
-      html += `
-        <div class="variance-item">
-          <span>${v.staffName} - ${v.item}</span>
-          <span style="color: ${varianceColor}; font-weight: bold;">${variancePrefix}${formatNumber(v.variance)}</span>
-        </div>
-      `
-    }
-    html += `</div>`
-  }
-
   // In-house items (Gas, Tokens, etc.)
   if (inHouseItems.length > 0) {
     html += `<div class="section-title">IN-HOUSE ITEMS</div>`
@@ -514,11 +511,30 @@ function formatDailyReportHTML(
               <span class="calc-label">Balance c/f</span>
               <span class="calc-value" style="font-weight: bold;">${formatNumber(item.balanceCf)} ${item.unitOfMeasure}</span>
             </div>
+            ${item.totalVariance !== 0 || (item.varianceByShift && item.varianceByShift.length > 0) ? `
+            <div class="calc-item" style="background: #fff3cd; padding: 0.15cm; margin-top: 0.1cm; border-radius: 3px;">
+              <span class="calc-label" style="font-weight: bold; color: #856404;">Variance</span>
+              <span class="calc-value" style="font-weight: bold; color: ${item.totalVariance < 0 ? '#c62828' : '#2e7d32'};">${item.totalVariance > 0 ? '+' : ''}${formatNumber(item.totalVariance)} ${item.unitOfMeasure}</span>
+            </div>
+            ${item.varianceByShift && item.varianceByShift.length > 0 ? `
+            <div style="font-size: 8pt; margin-top: 0.1cm; padding-left: 0.2cm;">
+              ${item.varianceByShift.map(v => `
+                <div style="display: flex; justify-content: space-between; padding: 0.05cm 0; border-bottom: 1px dashed #eee;">
+                  <span>${v.cashierName}</span>
+                  <span style="color: ${v.variance < 0 ? '#c62828' : '#2e7d32'};">${v.variance > 0 ? '+' : ''}${formatNumber(v.variance)}</span>
+                </div>
+              `).join('')}
+            </div>
+            ` : ''}
+            ` : ''}
           </div>
         </div>
       `
     }
   }
+
+  // Remove the old staff variance section at bottom since it's now in each item
+  // Staff Variance is now shown per item
 
   html += `
         <div class="footer">

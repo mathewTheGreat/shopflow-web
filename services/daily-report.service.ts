@@ -19,8 +19,15 @@ export interface DailyReportResponse {
     received: number
     sold: number
     productionOut: number
-    otherOut: number
+    productionIn: number
     balanceCf: number
+    totalVariance: number
+    varianceByShift: Array<{
+      shiftId: string
+      shiftName: string
+      cashierName: string
+      variance: number
+    }>
   }>
   
   production: Array<{

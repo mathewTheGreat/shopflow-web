@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { productionService } from "@/services/production.service"
-import { OpenBatchRequest, CloseBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse } from "@/types/production"
+import { OpenBatchRequest, CloseBatchRequest, CancelBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse } from "@/types/production"
 import { toast } from "sonner"
+import { useAppStore } from "@/store/use-app-store"
 
 export function useProductionBatches(
     shopId: string | undefined, 
@@ -67,10 +68,14 @@ export function useCloseProductionBatch() {
 
 export function useCancelProductionBatch() {
     const queryClient = useQueryClient()
+    const userInfo = useAppStore((state) => state.userInfo)
 
     return useMutation({
         mutationFn: async (id: string) => {
-            return productionService.cancelBatch(id)
+            if (!userInfo?.id) {
+                throw new Error("User not authenticated")
+            }
+            return productionService.cancelBatch(id, { cancelled_by: userInfo.id })
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["production-batches"] })

@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client"
-import { ProductionBatch, OpenBatchRequest, CloseBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse } from "@/types/production"
+import { ProductionBatch, OpenBatchRequest, CloseBatchRequest, CancelBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse, ProductionReportParams, ProductionReportData } from "@/types/production"
 
 export const productionService = {
     openBatch: (data: OpenBatchRequest) => {
@@ -29,7 +29,20 @@ export const productionService = {
         return apiClient.get<ProductionBatchesResponse>(`/api/production/shop/${shopId}${queryString ? `?${queryString}` : ""}`)
     },
 
-    cancelBatch: (id: string) => {
-        return apiClient.post<ProductionBatch>(`/api/production/${id}/cancel`, {})
+    cancelBatch: (id: string, data: CancelBatchRequest) => {
+        return apiClient.post<ProductionBatch>(`/api/production/${id}/cancel`, data)
+    },
+
+    getProductionReport: (shopId: string, params: ProductionReportParams = {}) => {
+        const queryParams = new URLSearchParams()
+        
+        if (params.date) queryParams.set("date", params.date)
+        if (params.start_date) queryParams.set("start_date", params.start_date)
+        if (params.end_date) queryParams.set("end_date", params.end_date)
+        if (params.status) queryParams.set("status", params.status)
+        if (params.process_type) queryParams.set("process_type", params.process_type)
+
+        const queryString = queryParams.toString()
+        return apiClient.get<ProductionReportData>(`/api/production/shop/${shopId}/report${queryString ? `?${queryString}` : ""}`)
     },
 }

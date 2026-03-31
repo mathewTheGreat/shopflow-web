@@ -86,3 +86,31 @@ export interface CloseBatchRequest {
         quantity: number
     }[]
 }
+
+export interface CancelBatchRequest {
+    cancelled_by: string
+}
+
+export interface ProductionReportParams {
+    date?: string
+    start_date?: string
+    end_date?: string
+    status?: ProductionBatchStatus
+    process_type?: ProductionProcessType
+}
+
+export interface ProductionReportSummary {
+    totalBatches: number
+    finalizedBatches: number
+    draftBatches: number
+    cancelledBatches: number
+    totalInputQuantity: number
+    totalOutputQuantity: number
+    totalLossQuantity: number
+    averageEfficiency: number
+}
+
+export interface ProductionReportData {
+    batches: ProductionBatch[]
+    summary: ProductionReportSummary
+}

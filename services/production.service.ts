@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client"
-import { ProductionBatch, OpenBatchRequest, CloseBatchRequest, CancelBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse, ProductionReportParams, ProductionReportData } from "@/types/production"
+import { ProductionBatch, OpenBatchRequest, CloseBatchRequest, CancelBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse, ProductionReportParams, ProductionReportData, AddOutputRequest, UpdateOutputRequest, DeleteOutputRequest } from "@/types/production"
 
 export const productionService = {
     openBatch: (data: OpenBatchRequest) => {
@@ -8,6 +8,18 @@ export const productionService = {
 
     closeBatch: (id: string, data: CloseBatchRequest) => {
         return apiClient.post<ProductionBatch>(`/api/production/${id}/close`, data)
+    },
+
+    addOutput: (id: string, data: AddOutputRequest) => {
+        return apiClient.post<ProductionBatch>(`/api/production/${id}/output`, data)
+    },
+
+    updateOutput: (batchId: string, outputId: string, data: UpdateOutputRequest & { shift_id: string; updated_by: string }) => {
+        return apiClient.put<ProductionBatch>(`/api/production/${batchId}/output/${outputId}`, data)
+    },
+
+    deleteOutput: (batchId: string, outputId: string, data: DeleteOutputRequest & { shift_id: string }) => {
+        return apiClient.delete<ProductionBatch>(`/api/production/${batchId}/output/${outputId}`, data)
     },
 
     getBatch: (id: string) => {

@@ -1,6 +1,6 @@
 export type ProductionProcessType = "PASTEURIZATION" | "OTHER"
 
-export type ProductionBatchStatus = "DRAFT" | "FINALIZED" | "CANCELLED"
+export type ProductionBatchStatus = "DRAFT" | "IN_PROGRESS" | "FINALIZED" | "CANCELLED"
 
 export type ProductionSortBy = "created_at" | "total_input_quantity" | "total_output_quantity" | "total_loss_quantity"
 export type ProductionSortOrder = "asc" | "desc"
@@ -81,7 +81,7 @@ export interface CloseBatchRequest {
     finalized_shift_id: string
     finalized_by: string
     notes?: string
-    outputs: {
+    outputs?: {
         item_id: string
         quantity: number
     }[]
@@ -89,6 +89,24 @@ export interface CloseBatchRequest {
 
 export interface CancelBatchRequest {
     cancelled_by: string
+}
+
+export interface AddOutputRequest {
+    shift_id: string
+    added_by: string
+    outputs: {
+        item_id: string
+        quantity: number
+    }[]
+}
+
+export interface UpdateOutputRequest {
+    item_id: string
+    quantity: number
+}
+
+export interface DeleteOutputRequest {
+    deleted_by: string
 }
 
 export interface ProductionReportParams {
@@ -102,6 +120,7 @@ export interface ProductionReportParams {
 export interface ProductionReportSummary {
     totalBatches: number
     finalizedBatches: number
+    inProgressBatches: number
     draftBatches: number
     cancelledBatches: number
     totalInputQuantity: number

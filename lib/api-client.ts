@@ -73,5 +73,12 @@ export const apiClient = {
             body: JSON.stringify(data),
         });
     },
-    delete: <T>(url: string, options?: FetchOptions) => fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, { ...options, method: "DELETE" }),
+    delete: <T>(url: string, data?: unknown, options?: FetchOptions) => {
+        console.log(`[API Client] DELETE ${url}`, data);
+        return fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
+            ...options,
+            method: "DELETE",
+            body: data ? JSON.stringify(data) : undefined,
+        });
+    },
 }

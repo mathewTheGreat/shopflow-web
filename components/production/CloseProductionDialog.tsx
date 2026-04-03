@@ -1,22 +1,13 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Plus, Trash2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useCloseProductionBatch } from "@/hooks/use-production"
-import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
 import { ProductionBatch } from "@/types/production"
-import { v4 as uuidv4 } from "uuid"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 import {
     Dialog,
     DialogContent,
@@ -33,11 +24,6 @@ interface CloseProductionDialogProps {
     onSuccess?: () => void
 }
 
-interface OutputItem {
-    item_id: string
-    quantity: string
-}
-
 export function CloseProductionDialog({
     open,
     onOpenChange,
@@ -46,93 +32,39 @@ export function CloseProductionDialog({
 }: CloseProductionDialogProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const { mutateAsync: closeBatch } = useCloseProductionBatch()
-    const { items, isLoading: itemsLoading } = useItems()
     const userInfo = useAppStore((state) => state.userInfo)
-    const activeShop = useAppStore((state) => state.activeShop)
     const activeShift = useAppStore((state) => state.activeShift)
 
     const [notes, setNotes] = useState("")
-    const [outputs, setOutputs] = useState<OutputItem[]>([
-        { item_id: "", quantity: "" },
-    ])
 
     useEffect(() => {
-        if (open) {
-            setNotes(batch?.notes || "")
-            setOutputs([{ item_id: "", quantity: "" }])
+        if (open && batch) {
+            setNotes(batch.notes || "")
         }
     }, [open, batch])
 
     const totalInputQuantity = batch?.total_input_quantity || 0
-
-    const totalOutputQuantity = useMemo(() => {
-        return outputs
-            .filter((o) => o.quantity && parseFloat(o.quantity) > 0)
-            .reduce((sum, o) => sum + parseFloat(o.quantity), 0)
-    }, [outputs])
-
+    const totalOutputQuantity = batch?.total_output_quantity || 0
     const lossQuantity = totalInputQuantity - totalOutputQuantity
-
-    const handleAddOutput = () => {
-        setOutputs([...outputs, { item_id: "", quantity: "" }])
-    }
-
-    const handleRemoveOutput = (index: number) => {
-        if (outputs.length > 1) {
-            setOutputs(outputs.filter((_, i) => i !== index))
-        }
-    }
-
-    const handleOutputChange = (index: number, field: keyof OutputItem, value: string) => {
-        const newOutputs = [...outputs]
-        newOutputs[index] = { ...newOutputs[index], [field]: value }
-        setOutputs(newOutputs)
-    }
-
-    const validateForm = () => {
-        if (!activeShift) {
-            alert("You need an open shift to close production")
-            return false
-        }
-
-        const validOutputs = outputs.filter(
-            (output) => output.item_id && output.quantity && parseFloat(output.quantity) > 0
-        )
-
-        if (validOutputs.length === 0) {
-            alert("Please add at least one output item")
-            return false
-        }
-
-        return true
-    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (!validateForm() || !batch || !activeShift || !userInfo) return
+        if (!batch || !activeShift || !userInfo) return
 
         setIsSubmitting(true)
 
         try {
-            const validOutputs = outputs.filter(
-                (output) => output.item_id && output.quantity && parseFloat(output.quantity) > 0
-            )
-
             const payload = {
                 id: batch.id,
                 data: {
                     finalized_shift_id: activeShift.id,
                     finalized_by: userInfo.id,
                     notes: notes || batch.notes,
-                    outputs: validOutputs.map((output) => ({
-                        item_id: output.item_id,
-                        quantity: parseFloat(output.quantity),
-                    })),
+                    outputs: [],
                 },
             }
 
-            console.log("Closing production batch:", payload)
             await closeBatch(payload)
 
             onOpenChange(false)
@@ -152,7 +84,9 @@ export function CloseProductionDialog({
                 <DialogHeader>
                     <DialogTitle>Close Production Batch</DialogTitle>
                     <DialogDescription>
-                        Add output products and finalize this production batch.
+                        {batch.status === 'IN_PROGRESS'
+                            ? "This batch has partial outputs. You can close to finalize."
+                            : "Finalize this production batch."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -181,74 +115,6 @@ export function CloseProductionDialog({
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                         />
-                    </div>
-
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <Label>Output Items</Label>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleAddOutput}
-                            >
-                                <Plus className="h-4 w-4 mr-1" />
-                                Add Output
-                            </Button>
-                        </div>
-
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                            {outputs.map((output, index) => (
-                                <div key={index} className="flex gap-2 items-start">
-                                    <div className="flex-1">
-                                        <Select
-                                            value={output.item_id}
-                                            onValueChange={(value) =>
-                                                handleOutputChange(index, "item_id", value)
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select item" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {itemsLoading ? (
-                                                    <div className="p-2 text-sm text-muted-foreground">
-                                                        Loading items...
-                                                    </div>
-                                                ) : (
-                                                    items.map((item) => (
-                                                        <SelectItem key={item.id} value={item.id}>
-                                                            {item.name}
-                                                        </SelectItem>
-                                                    ))
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="w-24">
-                                        <Input
-                                            type="number"
-                                            placeholder="Qty"
-                                            value={output.quantity}
-                                            onChange={(e) =>
-                                                handleOutputChange(index, "quantity", e.target.value)
-                                            }
-                                            min="0"
-                                            step="0.01"
-                                        />
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => handleRemoveOutput(index)}
-                                        disabled={outputs.length === 1}
-                                    >
-                                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
                     </div>
 
                     {lossQuantity > 0 && (

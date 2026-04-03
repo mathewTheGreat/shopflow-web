@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label"
 import { useAppStore } from "@/store/use-app-store"
 import { saleService } from "@/services/sale.service"
 import { userService } from "@/services/user.service"
+import { shiftService } from "@/services/shift.service"
 import { useCustomersByShop } from "@/hooks/use-customers"
 import { useItems } from "@/hooks/use-items"
 import { useShops } from "@/hooks/use-shops"
@@ -49,6 +50,7 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
     const [selectedCashierId, setSelectedCashierId] = useState<string>("all")
     const [selectedSaleCategory, setSelectedSaleCategory] = useState<string>("all")
     const [selectedItemId, setSelectedItemId] = useState<string>("all")
+    const [selectedShiftId, setSelectedShiftId] = useState<string>("all")
     const [isGenerating, setIsGenerating] = useState(false)
 
     // Sync with active shop when dialog opens
@@ -72,6 +74,12 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
         enabled: !!selectedShopId && open,
     })
 
+    const { data: shifts = [], isLoading: isLoadingShifts } = useQuery({
+        queryKey: ["shifts", selectedShopId, startDate, endDate, selectedCashierId],
+        queryFn: () => shiftService.getShiftsByShopAndDate(selectedShopId, startDate, endDate, selectedCashierId === "all" ? undefined : selectedCashierId),
+        enabled: !!selectedShopId && !!startDate && open,
+    })
+
     const handleGenerateReport = async (action: 'preview' | 'excel' | 'pdf') => {
         if (!selectedShopId) {
             toast.error("Please select a shop")
@@ -87,7 +95,8 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                 cashierId: selectedCashierId,
                 customerId: selectedCustomerId,
                 saleCategory: selectedSaleCategory,
-                itemId: selectedItemId
+                itemId: selectedItemId,
+                shiftId: selectedShiftId === "all" ? undefined : selectedShiftId
             })
 
             const shopName = shops.find(s => s.id === selectedShopId)?.name || activeShop?.name || "Unknown Shop"
@@ -98,6 +107,8 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                 : (selectedStaff?.name || selectedStaff?.email || (selectedCashierId === userInfo?.id ? (userInfo?.name || userInfo?.email) : null) || "User")
             const categoryName = selectedSaleCategory === "all" ? "All Categories" : selectedSaleCategory
             const itemName = selectedItemId === "all" ? "All Items" : items.find(i => i.id === selectedItemId)?.name || "Unknown Item"
+            const selectedShift = shifts.find(s => s.id === selectedShiftId)
+            const shiftName = selectedShiftId === "all" ? "All Shifts" : (selectedShift?.name || `Shift ${selectedShiftId.slice(0, 8)}`)
 
             if (action === 'excel') {
                 await exportSalesToExcelWeb(
@@ -110,6 +121,7 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                     categoryName,
                     cashierName,
                     itemName,
+                    shiftName,
                     `Sales_Report_${startDate}_${endDate}.xlsx`
                 )
                 toast.success("Excel report exported")
@@ -124,7 +136,8 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                     customerName,
                     categoryName,
                     cashierName,
-                    itemName
+                    itemName,
+                    shiftName
                 )
 
                 const printWindow = window.open('', '_blank')
@@ -157,7 +170,10 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                             <Input
                                 type="date"
                                 value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
+                                onChange={(e) => {
+                                    setStartDate(e.target.value)
+                                    setSelectedShiftId("all")
+                                }}
                             />
                         </div>
                         <div className="space-y-2">
@@ -165,7 +181,10 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                             <Input
                                 type="date"
                                 value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
+                                onChange={(e) => {
+                                    setEndDate(e.target.value)
+                                    setSelectedShiftId("all")
+                                }}
                             />
                         </div>
                     </div>
@@ -174,7 +193,10 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                         <Label>Shop</Label>
                         <Select
                             value={selectedShopId}
-                            onValueChange={setSelectedShopId}
+                            onValueChange={(value) => {
+                                setSelectedShopId(value)
+                                setSelectedShiftId("all")
+                            }}
                             disabled={!isManager}
                         >
                             <SelectTrigger>
@@ -194,7 +216,10 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                         <Label>Cashier</Label>
                         <Select
                             value={selectedCashierId}
-                            onValueChange={setSelectedCashierId}
+                            onValueChange={(value) => {
+                                setSelectedCashierId(value)
+                                setSelectedShiftId("all")
+                            }}
                             disabled={!isManager}
                         >
                             <SelectTrigger>
@@ -207,6 +232,30 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
                                         {s.name || s.email || (s.id === userInfo?.id ? (userInfo?.name || userInfo?.email) : null) || "User"}
                                     </SelectItem>
                                 ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Shift</Label>
+                        <Select
+                            value={selectedShiftId}
+                            onValueChange={setSelectedShiftId}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder={isLoadingShifts ? "Loading..." : "Select shift"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Shifts</SelectItem>
+                                {shifts.length === 0 && !isLoadingShifts ? (
+                                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No shifts found for selected filters</div>
+                                ) : (
+                                    shifts.map((shift) => (
+                                        <SelectItem key={shift.id} value={shift.id}>
+                                            {shift.name} ({new Date(shift.start_time).toLocaleDateString()})
+                                        </SelectItem>
+                                    ))
+                                )}
                             </SelectContent>
                         </Select>
                     </div>
@@ -309,7 +358,8 @@ function formatSalesReportHTML(
     customerFilter: string,
     categoryFilter: string,
     cashierFilter: string,
-    itemFilter: string
+    itemFilter: string,
+    shiftFilter: string
 ) {
     const totalAmount = sales.reduce((sum, sale) => sum + sale.total_amount, 0);
     const totalItems = sales.reduce((sum, sale) => sum + sale.saleItems.reduce((is, item) => is + item.quantity, 0), 0);
@@ -385,6 +435,7 @@ function formatSalesReportHTML(
             <div><strong>Customer:</strong> ${customerFilter}</div>
             <div><strong>Category:</strong> ${categoryFilter}</div>
             <div><strong>Item:</strong> ${itemFilter}</div>
+            <div><strong>Shift:</strong> ${shiftFilter}</div>
         </div>
 
         <!-- Top summary: transaction count, items, total revenue only -->
@@ -480,6 +531,7 @@ const exportSalesToExcelWeb = async (
     categoryFilter: string,
     cashierFilter: string,
     itemFilter: string,
+    shiftFilter: string,
     fileName: string
 ): Promise<void> => {
     const workbook = XLSX.utils.book_new();
@@ -506,6 +558,7 @@ const exportSalesToExcelWeb = async (
         ['Category:', categoryFilter],
         ['Cashier:', cashierFilter],
         ['Item:', itemFilter],
+        ['Shift:', shiftFilter],
         [],
         ['Metrics'],
         ['Total Transactions:', sales.length],

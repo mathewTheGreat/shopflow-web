@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { productionService } from "@/services/production.service"
-import { OpenBatchRequest, CloseBatchRequest, CancelBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse } from "@/types/production"
+import { OpenBatchRequest, CloseBatchRequest, CancelBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse, AddOutputRequest, UpdateOutputRequest, DeleteOutputRequest } from "@/types/production"
 import { toast } from "sonner"
 import { useAppStore } from "@/store/use-app-store"
 
@@ -84,6 +84,60 @@ export function useCancelProductionBatch() {
         },
         onError: (error: Error) => {
             toast.error(`Failed to cancel batch: ${error.message}`)
+        },
+    })
+}
+
+export function useAddProductionOutput() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: AddOutputRequest }) => {
+            return productionService.addOutput(id, data)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["production-batches"] })
+            queryClient.invalidateQueries({ queryKey: ["production-batch"] })
+            toast.success("Output added successfully")
+        },
+        onError: (error: Error) => {
+            toast.error(`Failed to add output: ${error.message}`)
+        },
+    })
+}
+
+export function useUpdateProductionOutput() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async ({ batchId, outputId, data }: { batchId: string; outputId: string; data: UpdateOutputRequest & { shift_id: string; updated_by: string } }) => {
+            return productionService.updateOutput(batchId, outputId, data)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["production-batches"] })
+            queryClient.invalidateQueries({ queryKey: ["production-batch"] })
+            toast.success("Output updated successfully")
+        },
+        onError: (error: Error) => {
+            toast.error(`Failed to update output: ${error.message}`)
+        },
+    })
+}
+
+export function useDeleteProductionOutput() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async ({ batchId, outputId, data }: { batchId: string; outputId: string; data: DeleteOutputRequest & { shift_id: string } }) => {
+            return productionService.deleteOutput(batchId, outputId, data)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["production-batches"] })
+            queryClient.invalidateQueries({ queryKey: ["production-batch"] })
+            toast.success("Output deleted successfully")
+        },
+        onError: (error: Error) => {
+            toast.error(`Failed to delete output: ${error.message}`)
         },
     })
 }

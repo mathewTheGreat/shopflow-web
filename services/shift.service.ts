@@ -34,8 +34,12 @@ export const shiftService = {
         apiClient.patch<Shift>(`/api/shifts/${id}`, { is_closed: true, end_time: new Date().toISOString(), _last_modified_at: new Date().toISOString() }),
 
     // Reporting
-    getShiftsByShopAndDate: (shopId: string, date: string) =>
-        apiClient.get<Shift[]>(`/api/shifts/shop/${shopId}?date=${date}`),
+    getShiftsByShopAndDate: (shopId: string, date: string, endDate?: string, cashierId?: string) => {
+        const params = new URLSearchParams({ date });
+        if (endDate) params.append('endDate', endDate);
+        if (cashierId) params.append('cashierId', cashierId);
+        return apiClient.get<Shift[]>(`/api/shifts/shop/${shopId}?${params.toString()}`);
+    },
 
     getShiftPerformanceReport: (shiftId: string) =>
         apiClient.get<any>(`/api/shift-reconciliation/shift/${shiftId}/performance-report`),

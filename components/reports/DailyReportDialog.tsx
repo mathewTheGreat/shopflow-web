@@ -363,7 +363,7 @@ function formatDailyReportHTML(
           for (const price of salesForItem.prices) {
             html += `
               <div class="price-item">
-                <span>@ ${formatCurrency(price.price)}: ${formatNumber(price.quantity)} ${item.unitOfMeasure}</span>
+                <span>${price.label}: ${formatNumber(price.quantity)} ${item.unitOfMeasure}</span>
                 <span>${formatCurrency(price.total)}</span>
               </div>
             `
@@ -603,7 +603,7 @@ async function exportDailyReportToExcel(
     data.push([sale.item, sale.totalQuantity, sale.totalAmount])
     if (sale.prices.length > 1) {
       for (const price of sale.prices) {
-        data.push([`  @ ${price.price}`, price.quantity, price.total])
+        data.push([`  ${price.label}`, price.quantity, price.total])
       }
     }
   }

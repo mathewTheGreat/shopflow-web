@@ -186,7 +186,7 @@ export default function SalesPage() {
       }
 
       setCartItems(
-        cartItems.map((ci) => (ci.id === item.id ? { ...ci, quantity: newQty, price: newTotalPrice, selected_price_id: priceId } : ci))
+        cartItems.map((ci) => (ci.id === item.id ? { ...ci, quantity: newQty, price: newTotalPrice, unit_price: ci.unit_price, selected_price_id: priceId } : ci))
       )
     } else {
       const qty = 1
@@ -206,6 +206,7 @@ export default function SalesPage() {
         name: item.name,
         base_price: basePrice,
         price: finalTotalPrice,
+        unit_price: applicablePrice?.price || basePrice,
         quantity: 1,
         original_item: item,
         selected_price_id: priceId
@@ -441,8 +442,8 @@ export default function SalesPage() {
         id: uuidv4(),
         item_id: item.id,
         quantity: parseFloat(item.quantity) || 0,
-        unit_price: item.price,
-        total_price: item.price * (parseFloat(item.quantity) || 0),
+        unit_price: item.price / (parseFloat(item.quantity) || 1),
+        total_price: item.price,
         created_by: userInfo?.id || "system",
       })),
       payments: payments.map((p) => ({

@@ -21,6 +21,8 @@ interface CloseShiftDialogProps {
     setMpesaAmount: (value: string) => void
     onSubmit: () => void
     isLoading?: boolean
+    expectedCash?: number
+    expectedMpesa?: number
 }
 
 export function CloseShiftDialog({
@@ -32,6 +34,8 @@ export function CloseShiftDialog({
     setMpesaAmount,
     onSubmit,
     isLoading,
+    expectedCash = 0,
+    expectedMpesa = 0,
 }: CloseShiftDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -43,6 +47,21 @@ export function CloseShiftDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
+                    {(expectedCash > 0 || expectedMpesa > 0) && (
+                        <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md p-3">
+                            <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">Expected Amounts</p>
+                            <div className="flex justify-between gap-4 text-sm">
+                                <div>
+                                    <span className="text-green-600 dark:text-green-400">Cash: </span>
+                                    <span className="font-medium">KES {expectedCash.toLocaleString()}</span>
+                                </div>
+                                <div>
+                                    <span className="text-green-600 dark:text-green-400">M-Pesa: </span>
+                                    <span className="font-medium">KES {expectedMpesa.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div className="space-y-2">
                         <Label htmlFor="cash">Final Cash Balance (KES)</Label>
                         <Input

@@ -52,6 +52,9 @@ export interface DailyReportResponse {
       total: number
     }>
     totalQuantity: number
+    totalImmediateQuantity: number
+    totalPrepaidQuantity: number
+    totalCreditQuantity: number
     totalAmount: number
   }>
   

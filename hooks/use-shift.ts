@@ -17,6 +17,12 @@ export function useShift() {
         enabled: !!userInfo?.id && !!activeShop?.id,
     })
 
+    const { data: expectedFinancials } = useQuery({
+        queryKey: ["expected-financials", currentShift?.id],
+        queryFn: () => shiftService.getExpectedFinancials(currentShift!.id),
+        enabled: !!currentShift?.id,
+    })
+
     // Sync with store when data changes
     useEffect(() => {
         if (currentShift !== undefined) {
@@ -102,5 +108,6 @@ export function useShift() {
         isOpening: openShiftMutation.isPending,
         closeShift: closeShiftMutation.mutateAsync,
         isClosing: closeShiftMutation.isPending,
+        expectedFinancials,
     }
 }

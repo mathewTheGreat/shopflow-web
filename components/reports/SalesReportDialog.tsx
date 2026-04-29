@@ -361,14 +361,24 @@ function formatSalesReportHTML(
     itemFilter: string,
     shiftFilter: string
 ) {
-    const totalAmount = sales.reduce((sum, sale) => sum + sale.total_amount, 0);
+    const isItemFiltered = itemFilter !== "All Items";
+
+    const getFilteredTotal = (sale: SaleReport) => {
+        if (isItemFiltered) {
+            return sale.saleItems.reduce((sum, item) => sum + item.total_price, 0);
+        }
+        return sale.total_amount;
+    };
+
+    const totalAmount = sales.reduce((sum, sale) => sum + getFilteredTotal(sale), 0);
     const totalItems = sales.reduce((sum, sale) => sum + sale.saleItems.reduce((is, item) => is + item.quantity, 0), 0);
 
     const paymentTotals: Record<string, number> = {};
     sales.forEach(sale => {
+        const ratio = isItemFiltered ? (sale.total_amount > 0 ? getFilteredTotal(sale) / sale.total_amount : 0) : 1;
         sale.salePayments.forEach(payment => {
             const method = payment.payment_method;
-            paymentTotals[method] = (paymentTotals[method] || 0) + payment.amount;
+            paymentTotals[method] = (paymentTotals[method] || 0) + payment.amount * ratio;
         });
     });
 
@@ -381,7 +391,8 @@ function formatSalesReportHTML(
 
     const formatTime = (dateStr: string) => {
         return new Date(dateStr).toLocaleString('en-US', {
-            month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true
+            month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true,
+            timeZone: 'UTC'
         });
     };
 
@@ -472,16 +483,18 @@ function formatSalesReportHTML(
           </thead>
           <tbody>
             ${sales.length > 0 ? sales.map(sale => {
-        // Calculate payment amounts per method for this sale
+        const saleTotal = getFilteredTotal(sale);
+        const ratio = isItemFiltered ? (sale.total_amount > 0 ? saleTotal / sale.total_amount : 0) : 1;
+
         const cashAmount = sale.salePayments
             .filter(p => p.payment_method === 'CASH')
-            .reduce((sum, p) => sum + p.amount, 0);
+            .reduce((sum, p) => sum + p.amount * ratio, 0);
         const mpesaAmount = sale.salePayments
             .filter(p => p.payment_method === 'MPESA')
-            .reduce((sum, p) => sum + p.amount, 0);
+            .reduce((sum, p) => sum + p.amount * ratio, 0);
         const otherAmount = sale.salePayments
             .filter(p => p.payment_method !== 'CASH' && p.payment_method !== 'MPESA')
-            .reduce((sum, p) => sum + p.amount, 0);
+            .reduce((sum, p) => sum + p.amount * ratio, 0);
 
         return `
               <tr>
@@ -497,7 +510,7 @@ function formatSalesReportHTML(
                 <td class="text-right">${cashAmount ? cashAmount.toLocaleString() : '-'}</td>
                 <td class="text-right">${mpesaAmount ? mpesaAmount.toLocaleString() : '-'}</td>
                 <td class="text-right">${otherAmount ? otherAmount.toLocaleString() : '-'}</td>
-                <td class="text-right font-bold">${sale.total_amount.toLocaleString()}</td>
+                <td class="text-right font-bold">${saleTotal.toLocaleString()}</td>
               </tr>
             `}).join('') : '<tr><td colspan="9" style="text-align:center; padding: 20px;">No sales found for the selected period.</td></tr>'}
           </tbody>
@@ -536,11 +549,21 @@ const exportSalesToExcelWeb = async (
 ): Promise<void> => {
     const workbook = XLSX.utils.book_new();
 
+    const isItemFiltered = itemFilter !== "All Items";
+
+    const getFilteredTotal = (sale: SaleReport) => {
+        if (isItemFiltered) {
+            return sale.saleItems.reduce((sum, item) => sum + item.total_price, 0);
+        }
+        return sale.total_amount;
+    };
+
     const paymentTotals: Record<string, number> = {};
     sales.forEach(sale => {
+        const ratio = isItemFiltered ? (sale.total_amount > 0 ? getFilteredTotal(sale) / sale.total_amount : 0) : 1;
         sale.salePayments.forEach(payment => {
             const method = payment.payment_method;
-            paymentTotals[method] = (paymentTotals[method] || 0) + payment.amount;
+            paymentTotals[method] = (paymentTotals[method] || 0) + payment.amount * ratio;
         });
     });
 
@@ -562,7 +585,7 @@ const exportSalesToExcelWeb = async (
         [],
         ['Metrics'],
         ['Total Transactions:', sales.length],
-        ['Total Revenue:', sales.reduce((sum, s) => sum + s.total_amount, 0)],
+        ['Total Revenue:', sales.reduce((sum, s) => sum + getFilteredTotal(s), 0)],
         ...Object.entries(paymentTotals).map(([method, amount]) => [`${method} Total:`, amount]),
         ['Total Items Sold:', sales.reduce((sum, s) => sum + s.saleItems.reduce((is, item) => is + item.quantity, 0), 0)],
     ];
@@ -576,22 +599,26 @@ const exportSalesToExcelWeb = async (
 
     sales.forEach(sale => {
         const date = new Date(sale.sale_date);
+        const saleTotal = getFilteredTotal(sale);
         const paymentMethods = sale.salePayments.length > 0
             ? sale.salePayments.map(p => p.payment_method).join(', ')
             : (sale.sale_category === 'CREDIT' ? 'Account Credit' : (sale.sale_category === 'PREPAID' ? 'Account Prepaid' : '-'));
 
         salesData.push([
-            date.toLocaleDateString(),
-            date.toLocaleTimeString(),
+            date.toLocaleDateString('en-US', { timeZone: 'UTC' }),
+            date.toLocaleTimeString('en-US', { timeZone: 'UTC' }),
             sale.id,
             sale.customer?.name || 'Walk-in',
             sale.sale_category,
             sale.createdBy?.name || sale.createdBy?.email || 'User',
             sale.saleItems.map(i => `${i.quantity}x ${i.item.name}`).join(', '),
             sale.salePayments.length > 0
-                ? sale.salePayments.map(p => `${p.payment_method} (${p.amount})`).join(', ')
+                ? sale.salePayments.map(p => {
+                    const ratio = isItemFiltered ? (sale.total_amount > 0 ? saleTotal / sale.total_amount : 0) : 1;
+                    return `${p.payment_method} (${(p.amount * ratio).toFixed(2)})`;
+                }).join(', ')
                 : (sale.sale_category === 'CREDIT' ? 'Account Credit' : (sale.sale_category === 'PREPAID' ? 'Account Prepaid' : '-')),
-            sale.total_amount
+            saleTotal
         ]);
     });
 
@@ -608,7 +635,7 @@ const exportSalesToExcelWeb = async (
         sale.saleItems.forEach(item => {
             itemsData.push([
                 sale.id,
-                new Date(sale.sale_date).toLocaleDateString(),
+                new Date(sale.sale_date).toLocaleDateString('en-US', { timeZone: 'UTC' }),
                 item.item.name,
                 item.quantity,
                 item.unit_price,

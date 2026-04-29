@@ -353,7 +353,19 @@ function formatDailyReportHTML(
               <span class="calc-value">${formatNumber(salesForItem.totalQuantity)} ${item.unitOfMeasure}</span>
             </div>
             <div class="calc-item">
-              <span class="calc-label">Total Amount</span>
+              <span class="calc-label">Regular</span>
+              <span class="calc-value">${formatNumber(salesForItem.totalImmediateQuantity)} ${item.unitOfMeasure}</span>
+            </div>
+            <div class="calc-item">
+              <span class="calc-label">Prepaid</span>
+              <span class="calc-value">${formatNumber(salesForItem.totalPrepaidQuantity)} ${item.unitOfMeasure}</span>
+            </div>
+            <div class="calc-item">
+              <span class="calc-label">Credit</span>
+              <span class="calc-value">${formatNumber(salesForItem.totalCreditQuantity)} ${item.unitOfMeasure}</span>
+            </div>
+            <div class="calc-item">
+              <span class="calc-label">Sales Amount</span>
               <span class="calc-value" style="font-weight: bold;">${formatCurrency(salesForItem.totalAmount)}</span>
             </div>
         `
@@ -598,12 +610,12 @@ async function exportDailyReportToExcel(
 
   // Sales
   data.push(['SALES'])
-  data.push(['Item', 'Quantity', 'Amount'])
+  data.push(['Item', 'Total Sold', 'Regular', 'Prepaid', 'Credit', 'Amount'])
   for (const sale of report.sales) {
-    data.push([sale.item, sale.totalQuantity, sale.totalAmount])
+    data.push([sale.item, sale.totalQuantity, sale.totalImmediateQuantity, sale.totalPrepaidQuantity, sale.totalCreditQuantity, sale.totalAmount])
     if (sale.prices.length > 1) {
       for (const price of sale.prices) {
-        data.push([`  ${price.label}`, price.quantity, price.total])
+        data.push([`  ${price.label}`, price.quantity, '', '', '', price.total])
       }
     }
   }

@@ -61,7 +61,7 @@ export default function DashboardPage() {
   const router = useRouter()
 
   const { activeShop, userInfo } = useAppStore()
-  const { currentShift, isLoading: isLoadingShift, openShift, closeShift, isOpening, isClosing } = useShift()
+  const { currentShift, isLoading: isLoadingShift, openShift, closeShift, isOpening, isClosing, expectedFinancials } = useShift()
   const { sales, expenses, isLoading: isLoadingStats, isManager, currency } = useDashboardStats()
   const { items = [], isLoading: isLoadingItems } = useItems()
   const { data: stockLevels = [], isLoading: isLoadingStock } = useStockLevelsByShop(activeShop?.id || "")
@@ -398,6 +398,8 @@ export default function DashboardPage() {
             setMpesaAmount={setMpesaAmount}
             onSubmit={handleCloseShiftSubmit}
             isLoading={isClosing}
+            expectedCash={expectedFinancials?.totalExpectedCash ?? 0}
+            expectedMpesa={expectedFinancials?.totalExpectedMpesa ?? 0}
           />
         )}
 

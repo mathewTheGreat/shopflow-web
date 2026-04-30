@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client"
 import { Shift, ShiftCashMovement, ShiftReconciliation } from "@/types/shift"
+import { FinancialSummaryReport } from "@/types/financial-report"
 
 export const shiftService = {
     // Current shift status
@@ -72,4 +73,16 @@ export const shiftService = {
 
     deleteFloatTransaction: (floatTransactionId: string) =>
         apiClient.delete<any>(`/api/shifts/float/transaction/${floatTransactionId}`),
+
+    getFinancialSummaryReport: (params: { shopId: string; startDate: string; endDate: string; cashierId?: string }) => {
+        const queryParams = new URLSearchParams({
+            shopId: params.shopId,
+            startDate: params.startDate,
+            endDate: params.endDate
+        });
+        if (params.cashierId) {
+            queryParams.append("cashierId", params.cashierId);
+        }
+        return apiClient.get<FinancialSummaryReport>(`/api/shift-reconciliation/financial-summary-report?${queryParams.toString()}`);
+    },
 }

@@ -177,11 +177,13 @@ export function DailyReportDialog({ open, onOpenChange }: DailyReportDialogProps
 }
 
 function formatCurrency(amount: number) {
-  return `KES ${amount.toLocaleString()}`
+  const value = amount ?? 0
+  return `KES ${value.toLocaleString()}`
 }
 
 function formatNumber(num: number) {
-  return num.toLocaleString()
+  const value = num ?? 0
+  return value.toLocaleString()
 }
 
 function formatDate(dateStr: string) {

@@ -377,10 +377,10 @@ function formatVarianceSummaryHTML(
     if (stockTakes.length > 0) {
         const topVariances = [...stockTakes]
             .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance))
-            .slice(0, 10);
+            ;
 
         html += `
-            <div class="section-title">Top 10 Largest Variances</div>
+            <div class="section-title">Largest Variances</div>
             <table>
                 <thead>
                     <tr>
@@ -499,10 +499,10 @@ const exportVarianceSummaryToExcel = async (
     if (stockTakes.length > 0) {
         const topVariances = [...stockTakes]
             .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance))
-            .slice(0, 20);
+            ;
 
         const topData: any[][] = [
-            ['TOP 20 LARGEST VARIANCES'],
+            ['LARGEST VARIANCES'],
             [],
             ['Rank', 'Date/Time', 'Cashier', 'Item Name', 'Expected', 'Counted', 'Variance', 'Variance %']
         ];

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import * as XLSX from "xlsx"
 import {
     Dialog,
@@ -17,6 +17,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAppStore } from "@/store/use-app-store"
@@ -25,7 +26,7 @@ import { userService } from "@/services/user.service"
 import { useQuery } from "@tanstack/react-query"
 import { Loader2, FileSpreadsheet, FileText, Printer, TrendingUp, TrendingDown, CheckCircle, XCircle } from "lucide-react"
 import { toast } from "sonner"
-import { VarianceSummaryReport, VarianceSummaryExcelReport } from "@/types/stock-report"
+import { VarianceSummaryExcelReport } from "@/types/stock-report"
 
 interface VarianceSummaryReportDialogProps {
     open: boolean
@@ -46,6 +47,7 @@ export function VarianceSummaryReportDialog({ open, onOpenChange }: VarianceSumm
     })
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
     const [selectedCashierId, setSelectedCashierId] = useState<string>("all")
+    const [groupByItem, setGroupByItem] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
 
     const { data: staff = [], isLoading: isLoadingStaff } = useQuery({
@@ -62,7 +64,7 @@ export function VarianceSummaryReportDialog({ open, onOpenChange }: VarianceSumm
 
         setIsGenerating(true)
         try {
-            const reportData = await stockTakeService.getVarianceSummaryReport({
+            const data = await stockTakeService.getVarianceSummaryReport({
                 shopId: activeShopId,
                 startDate,
                 endDate,
@@ -76,24 +78,26 @@ export function VarianceSummaryReportDialog({ open, onOpenChange }: VarianceSumm
             if (action === 'excel') {
                 await exportVarianceSummaryToExcel(
                     {
-                        reportData,
+                        reportData: data,
                         shopName: activeShop?.name || "Unknown Shop",
                         userName: userInfo?.name || "User",
                         startDate,
                         endDate,
                         cashierFilter: cashierName
                     },
-                    `Variance_Summary_Report_${startDate}_${endDate}.xlsx`
+                    `Variance_Summary_Report_${startDate}_${endDate}.xlsx`,
+                    groupByItem
                 )
                 toast.success("Excel report exported")
             } else {
                 const html = formatVarianceSummaryHTML(
-                    reportData,
+                    data,
                     activeShop?.name || "Unknown Shop",
                     userInfo?.name || "User",
                     startDate,
                     endDate,
-                    cashierName
+                    cashierName,
+                    groupByItem
                 )
 
                 const printWindow = window.open('', '_blank')
@@ -114,7 +118,8 @@ export function VarianceSummaryReportDialog({ open, onOpenChange }: VarianceSumm
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px]">
+                <DialogContent className="sm:max-w-[500px]">
+
                 <DialogHeader>
                     <DialogTitle>Variance Summary Report</DialogTitle>
                 </DialogHeader>
@@ -167,6 +172,11 @@ export function VarianceSummaryReportDialog({ open, onOpenChange }: VarianceSumm
                             <p className="text-xs text-muted-foreground">Only managers can filter by specific cashiers.</p>
                         )}
                     </div>
+
+                    <div className="flex items-center gap-2">
+                        <Checkbox id="groupByItem" checked={groupByItem} onCheckedChange={(v) => setGroupByItem(v === true)} />
+                        <Label htmlFor="groupByItem" className="text-sm font-normal">Group by item name</Label>
+                    </div>
                 </div>
 
                 <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -201,7 +211,7 @@ export function VarianceSummaryReportDialog({ open, onOpenChange }: VarianceSumm
                     </div>
                 </DialogFooter>
                 <div className="text-xs text-muted-foreground text-center px-4">
-                    View stock variance summaries by cashier over a date range.
+                    Configure filters above then preview or export the variance summary report.
                 </div>
             </DialogContent>
         </Dialog>
@@ -214,7 +224,8 @@ function formatVarianceSummaryHTML(
     userName: string,
     startDate: string,
     endDate: string,
-    cashierFilter: string
+    cashierFilter: string,
+    groupByItem: boolean = false
 ) {
     if (!reportData?.summary) {
         return "<div class='report-error'>No variance data available.</div>";
@@ -373,48 +384,95 @@ function formatVarianceSummaryHTML(
         });
     }
 
-    // Top Variances
+    // Variance Records
     if (stockTakes.length > 0) {
-        const topVariances = [...stockTakes]
-            .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance))
-            ;
-
-        html += `
-            <div class="section-title">Largest Variances</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date/Time</th>
-                        <th>Cashier</th>
-                        <th>Item</th>
-                        <th class="text-right">Expected</th>
-                        <th class="text-right">Counted</th>
-                        <th class="text-right">Variance</th>
-                        <th>Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        topVariances.forEach(item => {
-            const varianceClass = item.variance > 0 ? 'positive' : item.variance < 0 ? 'negative' : 'neutral';
-            html += `
-                <tr>
-                    <td>${formatTime(item.created_at)}</td>
-                    <td>${item.cashierName}</td>
-                    <td>${item.item_name}</td>
-                    <td class="text-right">${item.expected_qty}</td>
-                    <td class="text-right">${item.counted_qty}</td>
-                    <td class="text-right ${varianceClass}">${item.variance > 0 ? '+' : ''}${item.variance}</td>
-                    <td>${item.notes || '-'}</td>
-                </tr>
-            `;
+        const sorted = [...stockTakes].sort((a, b) => {
+            const da = new Date(a.created_at || 0).getTime()
+            const db = new Date(b.created_at || 0).getTime()
+            return da - db
         });
 
         html += `
-                </tbody>
-            </table>
+            <div class="section-title">${groupByItem ? "Variance Records by Item" : "Variance Records (by Date)"}</div>
         `;
+
+        if (groupByItem) {
+            const groups = new Map<string, typeof stockTakes>()
+            sorted.forEach(item => {
+                const list = groups.get(item.item_name) || []
+                list.push(item)
+                groups.set(item.item_name, list)
+            })
+            html += `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>Cashier</th>
+                            <th>Item</th>
+                            <th class="text-right">Expected</th>
+                            <th class="text-right">Counted</th>
+                            <th class="text-right">Variance</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            groups.forEach((items, itemName) => {
+                items.forEach((item, idx) => {
+                    const varianceClass = item.variance > 0 ? 'positive' : item.variance < 0 ? 'negative' : 'neutral';
+                    html += `
+                        <tr>
+                            <td>${formatTime(item.created_at)}</td>
+                            <td>${item.cashierName}</td>
+                            <td>${idx === 0 ? '<strong>' + itemName + '</strong>' : item.item_name}</td>
+                            <td class="text-right">${item.expected_qty}</td>
+                            <td class="text-right">${item.counted_qty}</td>
+                            <td class="text-right ${varianceClass}">${item.variance > 0 ? '+' : ''}${item.variance}</td>
+                            <td>${item.notes || '-'}</td>
+                        </tr>
+                    `;
+                });
+            });
+            html += `
+                    </tbody>
+                </table>
+            `;
+        } else {
+            html += `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>Cashier</th>
+                            <th>Item</th>
+                            <th class="text-right">Expected</th>
+                            <th class="text-right">Counted</th>
+                            <th class="text-right">Variance</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            sorted.forEach(item => {
+                const varianceClass = item.variance > 0 ? 'positive' : item.variance < 0 ? 'negative' : 'neutral';
+                html += `
+                    <tr>
+                        <td>${formatTime(item.created_at)}</td>
+                        <td>${item.cashierName}</td>
+                        <td>${item.item_name}</td>
+                        <td class="text-right">${item.expected_qty}</td>
+                        <td class="text-right">${item.counted_qty}</td>
+                        <td class="text-right ${varianceClass}">${item.variance > 0 ? '+' : ''}${item.variance}</td>
+                        <td>${item.notes || '-'}</td>
+                    </tr>
+                `;
+            });
+            html += `
+                    </tbody>
+                </table>
+            `;
+        }
     }
 
     // Footer
@@ -432,7 +490,8 @@ function formatVarianceSummaryHTML(
 
 const exportVarianceSummaryToExcel = async (
     report: VarianceSummaryExcelReport,
-    fileName: string
+    fileName: string,
+    groupByItem: boolean = false
 ): Promise<void> => {
     if (!report?.reportData) {
         throw new Error('No variance data available');
@@ -495,35 +554,62 @@ const exportVarianceSummaryToExcel = async (
         XLSX.utils.book_append_sheet(workbook, cashierWs, 'By Cashier');
     }
 
-    // ==================== TOP VARIANCES SHEET ====================
+    // ==================== VARIANCE RECORDS SHEET ====================
     if (stockTakes.length > 0) {
-        const topVariances = [...stockTakes]
-            .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance))
-            ;
-
-        const topData: any[][] = [
-            ['LARGEST VARIANCES'],
-            [],
-            ['Rank', 'Date/Time', 'Cashier', 'Item Name', 'Expected', 'Counted', 'Variance', 'Variance %']
-        ];
-
-        topVariances.forEach((item, index) => {
-            const variancePct = item.expected_qty !== 0 ? ((item.variance / item.expected_qty) * 100).toFixed(1) : '0.0';
-            topData.push([
-                index + 1,
-                new Date(item.created_at).toLocaleString(),
-                item.cashierName,
-                item.item_name,
-                item.expected_qty,
-                item.counted_qty,
-                item.variance,
-                `${variancePct}%`
-            ]);
+        const sorted = [...stockTakes].sort((a, b) => {
+            const da = new Date(a.created_at || 0).getTime()
+            const db = new Date(b.created_at || 0).getTime()
+            return da - db
         });
 
+        const topData: any[][] = [
+            [groupByItem ? 'VARIANCE RECORDS (by Item)' : 'VARIANCE RECORDS (by Date)'],
+            [],
+            ['Date/Time', 'Cashier', 'Item Name', 'Expected', 'Counted', 'Variance', 'Variance %', 'Notes']
+        ];
+
+        if (groupByItem) {
+            const groups = new Map<string, typeof sorted>()
+            sorted.forEach(item => {
+                const list = groups.get(item.item_name) || []
+                list.push(item)
+                groups.set(item.item_name, list)
+            })
+            groups.forEach((items, itemName) => {
+                topData.push([`--- ${itemName} ---`, '', '', '', '', '', '', ''])
+                items.forEach(item => {
+                    const variancePct = item.expected_qty !== 0 ? ((item.variance / item.expected_qty) * 100).toFixed(1) : '0.0';
+                    topData.push([
+                        new Date(item.created_at).toLocaleString(),
+                        item.cashierName,
+                        item.item_name,
+                        item.expected_qty,
+                        item.counted_qty,
+                        item.variance,
+                        `${variancePct}%`,
+                        item.notes || ''
+                    ]);
+                })
+            })
+        } else {
+            sorted.forEach((item, index) => {
+                const variancePct = item.expected_qty !== 0 ? ((item.variance / item.expected_qty) * 100).toFixed(1) : '0.0';
+                topData.push([
+                    new Date(item.created_at).toLocaleString(),
+                    item.cashierName,
+                    item.item_name,
+                    item.expected_qty,
+                    item.counted_qty,
+                    item.variance,
+                    `${variancePct}%`,
+                    item.notes || ''
+                ]);
+            });
+        }
+
         const topWs = XLSX.utils.aoa_to_sheet(topData);
-        topWs['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }];
-        XLSX.utils.book_append_sheet(workbook, topWs, 'Top Variances');
+        topWs['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 20 }];
+        XLSX.utils.book_append_sheet(workbook, topWs, 'Variance Records');
     }
 
     XLSX.writeFile(workbook, fileName);

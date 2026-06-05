@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Loader2, ChevronRight, Check, X, ArrowLeft, AlertTriangle, DollarSign, Package, Search } from "lucide-react"
+import { Loader2, ChevronRight, Check, X, AlertTriangle, DollarSign, Package, Plus, ChevronsUpDown, CheckIcon } from "lucide-react"
+import { toast } from "sonner"
 import { useAppStore } from "@/store/use-app-store"
 import { useApprovals } from "@/hooks/use-approvals"
 import { Button } from "@/components/ui/button"
@@ -18,10 +19,25 @@ import {
     SheetTrigger,
 } from "@/components/ui/sheet"
 import { AppSidebar } from "@/components/app-sidebar"
-import { Shift } from "@/types/shift"
+import { Shift, ShiftCashMovement, ShiftReconciliation } from "@/types/shift"
 import { StockTake } from "@/types/inventory"
 import { stockTakeService } from "@/services/stock-take.service"
 import { itemService, Item } from "@/services/item.service"
+import { shiftService } from "@/services/shift.service"
+import {
+    Command,
+    CommandInput,
+    CommandList,
+    CommandEmpty,
+    CommandGroup,
+    CommandItem,
+} from "@/components/ui/command"
+import {
+    Popover,
+    PopoverTrigger,
+    PopoverContent,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 function formatDateTime(isoString?: string | null) {
     if (!isoString) return ""
@@ -187,13 +203,29 @@ function AmendShiftForm({
 }) {
     const [cash, setCash] = useState("")
     const [mpesa, setMpesa] = useState("")
-    const [stockSearch, setStockSearch] = useState("")
-    const [selected, setSelected] = useState<Set<string>>(new Set())
-    const [corrections, setCorrections] = useState<Record<string, string>>({})
+    const [startingCash, setStartingCash] = useState("")
+    const [startingMpesa, setStartingMpesa] = useState("")
+    const [isSavingStartingFloats, setIsSavingStartingFloats] = useState(false)
+    const [comboboxOpen, setComboboxOpen] = useState(false)
+    const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+    const [editValue, setEditValue] = useState("")
+    const [pendingCorrections, setPendingCorrections] = useState<Map<string, { name: string; correctedQty: number }>>(new Map())
 
     const { data: stockTakes, isLoading: isLoadingStockTakes } = useQuery({
         queryKey: ["stock-takes", shift.id],
         queryFn: () => stockTakeService.getStockTakesByShift(shift.id),
+        enabled: !!shift.id,
+    })
+
+    const { data: cashMovements, refetch: refetchCashMovements } = useQuery({
+        queryKey: ["cash-movements", shift.id],
+        queryFn: () => shiftService.getShiftCashMovements(shift.id),
+        enabled: !!shift.id,
+    })
+
+    const { data: reconciliation } = useQuery({
+        queryKey: ["reconciliation", shift.id],
+        queryFn: () => shiftService.getShiftReconciliation(shift.id),
         enabled: !!shift.id,
     })
 
@@ -211,61 +243,112 @@ function AmendShiftForm({
         return map
     }, [allItems])
 
-    const filteredStockTakes = useMemo(() => {
-        if (!stockTakes) return []
-        if (!stockSearch.trim()) return stockTakes
-        const lower = stockSearch.toLowerCase()
-        return stockTakes.filter((st) => {
-            const name = itemMap.get(st.item_id)?.name?.toLowerCase() || st.item_id
-            return name.includes(lower)
-        })
-    }, [stockTakes, stockSearch, itemMap])
+    const selectedStockTake = useMemo(() => {
+        if (!selectedItemId || !stockTakes) return null
+        return stockTakes.find((st) => st.item_id === selectedItemId) ?? null
+    }, [selectedItemId, stockTakes])
 
-    function toggleSelect(itemId: string) {
-        setSelected((prev) => {
-            const next = new Set(prev)
-            if (next.has(itemId)) {
-                next.delete(itemId)
-                setCorrections((c) => {
-                    const copy = { ...c }
-                    delete copy[itemId]
-                    return copy
-                })
-            } else {
-                next.add(itemId)
-                const st = stockTakes?.find((s) => s.item_id === itemId)
-                if (st) {
-                    setCorrections((c) => ({ ...c, [itemId]: String(st.counted_qty) }))
-                }
+    const startingFloats = useMemo(() => {
+        if (!cashMovements) return { cash: null as ShiftCashMovement | null, mpesa: null as ShiftCashMovement | null }
+        const cashFloat = cashMovements
+            .filter(m => m.type === "FLOAT_IN" && m.payment_method === "CASH")
+            .sort((a, b) => ((a.created_at) || "").localeCompare((b.created_at) || ""))[0]
+        const mpesaFloat = cashMovements
+            .filter(m => m.type === "FLOAT_IN" && m.payment_method === "MPESA")
+            .sort((a, b) => ((a.created_at) || "").localeCompare((b.created_at) || ""))[0]
+        return { cash: cashFloat ?? null, mpesa: mpesaFloat ?? null }
+    }, [cashMovements])
+
+    useEffect(() => {
+        if (startingFloats.cash && !startingCash) {
+            setStartingCash(String(startingFloats.cash.amount))
+        }
+        if (startingFloats.mpesa && !startingMpesa) {
+            setStartingMpesa(String(startingFloats.mpesa.amount))
+        }
+    }, [startingFloats.cash?.id, startingFloats.mpesa?.id])
+
+    useEffect(() => {
+        if (reconciliation) {
+            if (reconciliation.actual_cash_amount != null && !cash) {
+                setCash(String(reconciliation.actual_cash_amount))
             }
+            if (reconciliation.actual_mpesa_amount != null && !mpesa) {
+                setMpesa(String(reconciliation.actual_mpesa_amount))
+            }
+        }
+    }, [reconciliation?.id])
+
+    function handleAddCorrection() {
+        if (!selectedItemId || !editValue.trim()) return
+        const corrected = parseFloat(editValue)
+        if (isNaN(corrected)) return
+        const name = itemMap.get(selectedItemId)?.name || selectedItemId.slice(0, 8)
+        setPendingCorrections((prev) => {
+            const next = new Map(prev)
+            next.set(selectedItemId, { name, correctedQty: corrected })
+            return next
+        })
+        setSelectedItemId(null)
+        setEditValue("")
+    }
+
+    function handleRemovePending(itemId: string) {
+        setPendingCorrections((prev) => {
+            const next = new Map(prev)
+            next.delete(itemId)
             return next
         })
     }
 
     function handleSaveStockCorrections() {
-        const entries = Array.from(selected)
-            .map((itemId) => {
-                const val = corrections[itemId]
-                if (!val || val.trim() === "") return null
-                const corrected = parseFloat(val)
-                if (isNaN(corrected)) return null
+        const entries = Array.from(pendingCorrections.entries())
+            .map(([itemId, { correctedQty }]) => {
                 const original = stockTakes?.find((st) => st.item_id === itemId)
                 return {
                     item_id: itemId,
                     shop_id: shift.shop_id,
                     shift_id: shift.id,
                     expected_qty: original?.expected_qty ?? 0,
-                    counted_qty: corrected,
-                    variance: corrected - (original?.expected_qty ?? 0),
+                    counted_qty: correctedQty,
+                    variance: correctedQty - (original?.expected_qty ?? 0),
                     notes: original?.notes,
                     is_adjusted: false,
-                }
+                } as Partial<StockTake>
             })
-            .filter(Boolean) as Partial<StockTake>[]
 
         if (entries.length === 0) return
-        console.log("[AmendShiftForm] Saving stock corrections:", JSON.stringify(entries))
         onAmendStockTakes(entries)
+    }
+
+    async function handleSaveStartingFloats() {
+        const updates: { id: string; amount: number }[] = []
+
+        if (startingCash.trim()) {
+            const val = parseFloat(startingCash)
+            if (!isNaN(val) && startingFloats.cash && val !== startingFloats.cash.amount) {
+                updates.push({ id: startingFloats.cash.id, amount: val })
+            }
+        }
+        if (startingMpesa.trim()) {
+            const val = parseFloat(startingMpesa)
+            if (!isNaN(val) && startingFloats.mpesa && val !== startingFloats.mpesa.amount) {
+                updates.push({ id: startingFloats.mpesa.id, amount: val })
+            }
+        }
+
+        if (updates.length === 0) return
+
+        setIsSavingStartingFloats(true)
+        try {
+            await Promise.all(updates.map(u => shiftService.updateCashMovement(u.id, { amount: u.amount })))
+            toast.success("Starting amounts saved")
+            refetchCashMovements()
+        } catch {
+            toast.error("Failed to save starting amounts")
+        } finally {
+            setIsSavingStartingFloats(false)
+        }
     }
 
     return (
@@ -284,6 +367,54 @@ function AmendShiftForm({
                     <p><strong>Started:</strong> {formatDateTime(shift.start_time)}</p>
                     <p><strong>Ended:</strong> {formatDateTime(shift.end_time)}</p>
                     <p><strong>Duration:</strong> {formatDuration(shift.start_time, shift.end_time)}</p>
+                </div>
+
+                <div className="border-t pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <DollarSign className="h-4 w-4 text-primary" />
+                        <h4 className="font-bold text-sm">Starting Amounts</h4>
+                    </div>
+                    {!cashMovements ? (
+                        <div className="flex items-center justify-center py-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label htmlFor="starting-cash">Starting Cash (KES)</Label>
+                                    <Input
+                                        id="starting-cash"
+                                        type="number"
+                                        value={startingCash}
+                                        onChange={(e) => setStartingCash(e.target.value)}
+                                        placeholder="0.00"
+                                        step="any"
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="starting-mpesa">Starting M-Pesa (KES)</Label>
+                                    <Input
+                                        id="starting-mpesa"
+                                        type="number"
+                                        value={startingMpesa}
+                                        onChange={(e) => setStartingMpesa(e.target.value)}
+                                        placeholder="0.00"
+                                        step="any"
+                                    />
+                                </div>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-1"
+                                onClick={handleSaveStartingFloats}
+                                disabled={isSavingStartingFloats || (!startingCash.trim() && !startingMpesa.trim())}
+                            >
+                                {isSavingStartingFloats ? "Saving..." : "Save Starting Amounts"}
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="border-t pt-4">
@@ -342,92 +473,157 @@ function AmendShiftForm({
                     ) : !stockTakes?.length ? (
                         <p className="text-xs text-muted-foreground">No stock takes recorded for this shift.</p>
                     ) : (
-                        <div className="space-y-2">
-                            <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    value={stockSearch}
-                                    onChange={(e) => setStockSearch(e.target.value)}
-                                    placeholder="Search items..."
-                                    className="pl-8 h-9 text-sm"
-                                />
-                            </div>
-
-                            <div className="max-h-72 overflow-y-auto border rounded-md">
-                                <table className="w-full text-xs">
-                                    <thead className="bg-muted/30 sticky top-0">
-                                        <tr className="text-left text-muted-foreground">
-                                            <th className="p-2 w-8"></th>
-                                            <th className="p-2">Item</th>
-                                            <th className="p-2 text-right">Expected</th>
-                                            <th className="p-2 text-right">Counted</th>
-                                            <th className="p-2 text-right">Variance</th>
-                                            <th className="p-2 text-right" colSpan={selected.size > 0 ? 1 : 0}>Corrected</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredStockTakes.length === 0 && stockSearch.trim() && (
-                                            <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No items match your search</td></tr>
-                                        )}
-                                        {filteredStockTakes.map((st) => {
-                                            const itemName = itemMap.get(st.item_id)?.name || st.item_id.slice(0, 8)
-                                            const isSelected = selected.has(st.item_id)
-                                            const correctedVal = corrections[st.item_id] ?? ""
-                                            const variance = st.counted_qty - st.expected_qty
-                                            return (
-                                                <tr
-                                                    key={st.item_id}
-                                                    className={`border-t border-border/50 cursor-pointer hover:bg-muted/20 ${isSelected ? "bg-primary/5" : ""}`}
-                                                    onClick={() => toggleSelect(st.item_id)}
-                                                >
-                                                    <td className="p-2 text-center">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={() => toggleSelect(st.item_id)}
-                                                            className="accent-primary"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2 font-medium truncate max-w-[120px]">{itemName}</td>
-                                                    <td className="p-2 text-right">{st.expected_qty}</td>
-                                                    <td className="p-2 text-right">{st.counted_qty}</td>
-                                                    <td className={`p-2 text-right font-medium ${variance === 0 ? "" : variance > 0 ? "text-green-600" : "text-red-600"}`}>
-                                                        {variance > 0 ? "+" : ""}{variance}
-                                                    </td>
-                                                    <td className="p-2 text-right">
-                                                        {isSelected && (
-                                                            <Input
-                                                                type="number"
-                                                                value={correctedVal}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                onChange={(e) =>
-                                                                    setCorrections((prev) => ({
-                                                                        ...prev,
-                                                                        [st.item_id]: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="w-20 h-7 text-xs text-right inline-block"
-                                                                step="any"
+                        <div className="space-y-3">
+                            <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={comboboxOpen}
+                                        className="w-full justify-between text-sm font-normal"
+                                    >
+                                        {selectedItemId
+                                            ? (itemMap.get(selectedItemId)?.name || selectedItemId.slice(0, 8))
+                                            : "Select an item..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="Search items..." />
+                                        <CommandList>
+                                            <CommandEmpty>No item found.</CommandEmpty>
+                                            <CommandGroup>
+                                                {stockTakes.map((st) => {
+                                                    const name = itemMap.get(st.item_id)?.name || st.item_id.slice(0, 8)
+                                                    return (
+                                                        <CommandItem
+                                                            key={st.item_id}
+                                                            value={name}
+                                                            onSelect={() => {
+                                                                setSelectedItemId(st.item_id)
+                                                                setEditValue(String(st.counted_qty))
+                                                                setComboboxOpen(false)
+                                                            }}
+                                                        >
+                                                            <CheckIcon
+                                                                className={cn(
+                                                                    "mr-2 h-4 w-4",
+                                                                    selectedItemId === st.item_id ? "opacity-100" : "opacity-0"
+                                                                )}
                                                             />
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                            {name}
+                                                        </CommandItem>
+                                                    )
+                                                })}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+
+                            {selectedStockTake && (
+                                <div className="border rounded-md p-3 space-y-3 bg-muted/10">
+                                    <div className="flex items-center justify-between">
+                                        <p className="font-semibold text-sm">
+                                            {itemMap.get(selectedStockTake.item_id)?.name || selectedStockTake.item_id.slice(0, 8)}
+                                        </p>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0"
+                                            onClick={() => {
+                                                setSelectedItemId(null)
+                                                setEditValue("")
+                                            }}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-2 text-center">
+                                        <div className="bg-background rounded p-2">
+                                            <p className="text-xs text-muted-foreground">Expected</p>
+                                            <p className="text-lg font-bold">{selectedStockTake.expected_qty}</p>
+                                        </div>
+                                        <div className="bg-background rounded p-2">
+                                            <p className="text-xs text-muted-foreground">Counted</p>
+                                            <p className="text-lg font-bold">{selectedStockTake.counted_qty}</p>
+                                        </div>
+                                        <div className="bg-background rounded p-2">
+                                            <p className="text-xs text-muted-foreground">Variance</p>
+                                            <p className={`text-lg font-bold ${(selectedStockTake.counted_qty - selectedStockTake.expected_qty) === 0 ? "" : (selectedStockTake.counted_qty - selectedStockTake.expected_qty) > 0 ? "text-green-600" : "text-red-600"}`}>
+                                                {(() => {
+                                                    const v = selectedStockTake.counted_qty - selectedStockTake.expected_qty
+                                                    return v > 0 ? `+${v}` : v
+                                                })()}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-end gap-2">
+                                        <div className="flex-1">
+                                            <Label htmlFor="corrected-qty" className="text-xs">Corrected Quantity</Label>
+                                            <Input
+                                                id="corrected-qty"
+                                                type="number"
+                                                value={editValue}
+                                                onChange={(e) => setEditValue(e.target.value)}
+                                                className="h-9 text-sm"
+                                                step="any"
+                                            />
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={handleAddCorrection}
+                                            disabled={!editValue.trim() || isNaN(parseFloat(editValue))}
+                                        >
+                                            <Plus className="h-4 w-4 mr-1" />
+                                            Add
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {pendingCorrections.size > 0 && (
+                                <div className="border rounded-md p-3 space-y-2">
+                                    <p className="text-xs font-semibold text-muted-foreground">
+                                        Pending Corrections ({pendingCorrections.size})
+                                    </p>
+                                    <div className="space-y-1">
+                                        {Array.from(pendingCorrections.entries()).map(([itemId, { name, correctedQty }]) => (
+                                            <div key={itemId} className="flex items-center justify-between text-sm bg-background rounded px-2 py-1">
+                                                <span className="truncate">{name}</span>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="font-mono text-xs text-muted-foreground">→ {correctedQty}</span>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-5 w-5 p-0"
+                                                        onClick={() => handleRemovePending(itemId)}
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <Button
                                 size="sm"
                                 variant="outline"
                                 className="w-full"
-                                onClick={handleSaveStockCorrections}
-                                disabled={isAmendingStockTakes || selected.size === 0}
+                                onClick={() => {
+                                    handleSaveStockCorrections()
+                                    setPendingCorrections(new Map())
+                                }}
+                                disabled={isAmendingStockTakes || pendingCorrections.size === 0}
                             >
                                 {isAmendingStockTakes
                                     ? "Saving..."
-                                    : `Save Corrections${selected.size > 0 ? ` (${selected.size})` : ""}`}
+                                    : `Save Corrections${pendingCorrections.size > 0 ? ` (${pendingCorrections.size})` : ""}`}
                             </Button>
                         </div>
                     )}

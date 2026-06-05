@@ -104,4 +104,10 @@ export const shiftService = {
 
     amendReconciliation: (shiftId: string, data: { actual_cash_amount?: number; actual_mpesa_amount?: number }) =>
         apiClient.patch<any>(`/api/shift-reconciliation/shift/${shiftId}/amend`, data),
+
+    getShiftCashMovements: (shiftId: string) =>
+        apiClient.get<ShiftCashMovement[]>(`/api/shift-cash-movements/shift/${shiftId}`),
+
+    updateCashMovement: (id: string, data: { amount: number }) =>
+        apiClient.patch<any>(`/api/shift-cash-movements/${id}`, data),
 }

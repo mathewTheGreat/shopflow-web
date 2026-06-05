@@ -272,6 +272,8 @@ function formatFinancialSummaryHTML(
         tr:nth-child(even) { background: #f8f9fa; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
+        .badge-reconciled { display: inline-block; padding: 0.05cm 0.15cm; border-radius: 2px; font-size: 6.5pt; font-weight: bold; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .badge-pending { display: inline-block; padding: 0.05cm 0.15cm; border-radius: 2px; font-size: 6.5pt; font-weight: bold; background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
         .footer { text-align: center; margin-top: 0.3cm; padding-top: 0.15cm; border-top: 1px solid #ddd; color: #666; font-style: italic; font-size: 6.5pt; page-break-before: avoid; }
         .cashier-section { background: #e8f5e8; border: 1px solid #4caf50; border-radius: 3px; padding: 0.2cm; margin: 0.2cm 0; page-break-inside: avoid; }
         .cashier-name { font-weight: bold; color: #1b5e20; margin-bottom: 0.15cm; font-size: 9pt; }
@@ -402,7 +404,7 @@ function formatFinancialSummaryHTML(
                     <td class="text-right">KES ${fmt(s.expectedMpesa)}</td>
                     <td class="text-right">KES ${fmt(s.actualMpesa)}</td>
                     <td class="text-right ${s.mpesaVariance >= 0 ? 'positive' : 'negative'}">KES ${fmt(s.mpesaVariance)}</td>
-                    <td class="text-center">${s.status}</td>
+                    <td class="text-center"><span class="${s.status === 'RECONCILED' ? 'badge-reconciled' : 'badge-pending'}">${s.status}</span></td>
                 </tr>
             `;
         });

@@ -95,6 +95,8 @@ export function FinancialBreakdownDialog({ open, onOpenChange }: FinancialBreakd
         shiftDate: date,
         shiftName: shiftName,
         shiftId: selectedShiftId,
+        closing_status: selectedShift?.closing_status,
+        rejection_reason: selectedShift?.rejection_reason,
         breakdown: breakdown,
         reconciliation: reconciliation
       }
@@ -207,6 +209,8 @@ export function formatFinancialBreakdownHTML(report: any) {
 
   const b = report.breakdown;
   const r = report.reconciliation;
+  const closing_status = report.closing_status;
+  const rejection_reason = report.rejection_reason;
 
   const totalExpectedCash = b.totalExpectedCash;
   const totalExpectedMpesa = b.totalExpectedMpesa;
@@ -271,6 +275,10 @@ export function formatFinancialBreakdownHTML(report: any) {
   .negative { color: #dc3545; font-weight: bold; }
   
   .reconciliation-box { border: 1px solid #4caf50; background: #e8f5e8; padding: 0.2cm; border-radius: 4px; }
+  .badge-approved { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 8pt; font-weight: bold; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+  .badge-pending-approval { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 8pt; font-weight: bold; background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+  .badge-rejected { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 8pt; font-weight: bold; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  .badge-open { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 8pt; font-weight: bold; background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
   .summary-section { border: 1px solid #2196f3; background: #e3f2fd; padding: 0.2cm; border-radius: 4px; }
   .footer { text-align: center; margin-top: 0.5cm; padding-top: 0.2cm; border-top: 1px solid #eee; color: #888; font-size: 7.5pt; font-style: italic; }
 </style>
@@ -394,11 +402,10 @@ export function formatFinancialBreakdownHTML(report: any) {
 
   <div class="section-title">Reconciliation Status</div>
   <div class="reconciliation-box">
-    Status: <strong style="color:${r?.status === "RECONCILED" ? "#28a745" : "#ffc107"};">
-      ${r?.status || "PENDING"}
-    </strong><br>
-    Reconciled By: ${r?.reconciled_by || "Not reconciled"}<br>
-    Reconciliation Date: ${r?.reconciliation_date ? new Date(r.reconciliation_date).toLocaleString() : "Not reconciled"}<br>
+    Reconciliation Status: <span class="${r?.status === "RECONCILED" ? "badge-approved" : "badge-pending-approval"}">${r?.status || "PENDING"}</span><br>
+    Shift Status: <span class="${closing_status === 'APPROVED' ? 'badge-approved' : closing_status === 'PENDING_APPROVAL' ? 'badge-pending-approval' : rejection_reason ? 'badge-rejected' : 'badge-open'}">${closing_status === 'APPROVED' ? 'Approved' : closing_status === 'PENDING_APPROVAL' ? 'Pending Approval' : rejection_reason ? 'Rejected' : 'Open'}</span><br>
+    Reconciled By: ${r?.reconciled_by_name || r?.reconciled_by || "Not reconciled"}<br>
+    Reconciliation Date: ${r?.reconciliation_date ? new Date(r.reconciliation_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : "Not reconciled"}<br>
     ${r?.notes ? `Notes: ${r.notes}` : ""}
   </div>
 
@@ -488,11 +495,11 @@ async function exportFinancialBreakdownToExcel(report: any): Promise<void> {
 
     data.push(['RECONCILIATION STATUS']);
     data.push(['Status', r.status]);
-    data.push(['Reconciled By', r.reconciled_by || 'Not reconciled']);
+    data.push(['Reconciled By', r.reconciled_by_name || r.reconciled_by || 'Not reconciled']);
     data.push([
       'Reconciliation Date',
       r.reconciliation_date
-        ? new Date(r.reconciliation_date).toLocaleString()
+        ? new Date(r.reconciliation_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
         : 'Not reconciled'
     ]);
     data.push(['Notes', r.notes || 'No notes']);

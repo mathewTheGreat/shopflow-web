@@ -166,8 +166,8 @@ function ManagerApprovalView({
                 </button>
                 {expanded && (
                     <div className="mt-3 pt-3 border-t text-sm space-y-1 text-muted-foreground">
-                        <p><strong>Shift ID:</strong> {shift.id}</p>
-                        <p><strong>Manager/Cashier ID:</strong> {shift.manager_id}</p>
+                        <p><strong>Shift:</strong> {shift.name}</p>
+                        <p><strong>Cashier:</strong> {shift.manager_name || shift.manager_id.slice(0, 8)}</p>
                     </div>
                 )}
             </CardContent>

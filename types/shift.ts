@@ -25,6 +25,7 @@ export interface ShiftReconciliation extends BaseEntity {
     expected_mpesa_movements: number;
     status: 'PENDING' | 'RECONCILED';
     reconciled_by?: string | null;
+    reconciled_by_name?: string | null;
     reconciliation_date?: string | null;
     notes?: string | null;
     created_by: string;

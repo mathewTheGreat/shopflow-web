@@ -39,7 +39,7 @@ export function useShift() {
                 shop_id: activeShop.id,
                 manager_id: userInfo.id,
                 start_time: new Date().toISOString(),
-                end_time: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+                end_time: new Date().toISOString(),
                 is_closed: false,
             })
 
@@ -81,20 +81,33 @@ export function useShift() {
         mutationFn: async (data: { cashAmount: number; mpesaAmount: number }) => {
             if (!currentShift || !userInfo) throw new Error("No active shift found")
 
-            await shiftService.createReconciliation({
-                shift_id: currentShift.id,
-                actual_cash_amount: data.cashAmount,
-                actual_mpesa_amount: data.mpesaAmount,
-                status: 'PENDING',
-                created_by: userInfo.id
-            })
+            let existingRecon: any = null
+            try {
+                existingRecon = await shiftService.getShiftReconciliation(currentShift.id)
+            } catch {
+                // No existing reconciliation, will create one
+            }
+            if (existingRecon) {
+                await shiftService.amendReconciliation(currentShift.id, {
+                    actual_cash_amount: data.cashAmount,
+                    actual_mpesa_amount: data.mpesaAmount,
+                })
+            } else {
+                await shiftService.createReconciliation({
+                    shift_id: currentShift.id,
+                    actual_cash_amount: data.cashAmount,
+                    actual_mpesa_amount: data.mpesaAmount,
+                    status: 'PENDING',
+                    created_by: userInfo.id
+                })
+            }
 
-            return await shiftService.closeShiftRecord(currentShift.id)
+            return await shiftService.submitForApproval(currentShift.id)
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["current-shift"] })
             setActiveShift(null)
-            toast.success("Shift closed successfully. Reconciliation initiated.")
+            toast.success("Shift submitted for manager approval.")
         },
         onError: (error: Error) => {
             toast.error(`Failed to close shift: ${error.message}`)

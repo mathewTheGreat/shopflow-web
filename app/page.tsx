@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { apiClient } from "@/lib/api-client"
 import { shiftService } from "@/services/shift.service"
+import { stockTakeService } from "@/services/stock-take.service"
 import { toast } from "sonner"
 import {
   Menu,
@@ -69,6 +70,7 @@ export default function DashboardPage() {
   const [showOpenDialog, setShowOpenDialog] = useState(false)
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [showNoStockTakeWarning, setShowNoStockTakeWarning] = useState(false)
   const [itemSearchQuery, setItemSearchQuery] = useState("")
 
   // Amounts for dialogs
@@ -77,6 +79,8 @@ export default function DashboardPage() {
 
   const shiftOpen = !!(currentShift && !currentShift.is_closed)
   const isCashier = activeShop?.role === "Cashier"
+  const closingStatus = currentShift?.closing_status
+  const rejectionReason = currentShift?.rejection_reason
 
   // Create highly efficient lookup map for stock levels
   const stockLevelMap = useMemo(() => {
@@ -140,9 +144,22 @@ export default function DashboardPage() {
     }
   }
 
-  const handleCloseShiftClick = () => {
+  const handleCloseShiftClick = async () => {
     setCashAmount("0")
     setMpesaAmount("0")
+
+    if (currentShift?.id) {
+      try {
+        const stockTakes = await stockTakeService.getStockTakesByShift(currentShift.id)
+        if (!stockTakes || stockTakes.length === 0) {
+          setShowNoStockTakeWarning(true)
+          return
+        }
+      } catch {
+        // If the check fails, proceed anyway
+      }
+    }
+
     setShowCloseDialog(true)
   }
 
@@ -333,6 +350,8 @@ export default function DashboardPage() {
                   startTime={currentShift?.start_time}
                   onOpenShift={handleOpenShiftClick}
                   onCloseShift={handleCloseShiftClick}
+                  closingStatus={closingStatus}
+                  rejectionReason={rejectionReason}
                 />
               </div>
 
@@ -410,6 +429,34 @@ export default function DashboardPage() {
             cashAmount={cashAmount}
             mpesaAmount={mpesaAmount}
           />
+        )}
+
+        {showNoStockTakeWarning && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-md p-6 mx-4">
+              <div className="flex items-center gap-3 mb-4">
+                <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0" />
+                <h3 className="text-lg font-bold">No Stock Take Recorded</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                You haven&apos;t recorded any stock take for this shift. Are you sure you want to close it without one?
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowNoStockTakeWarning(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setShowNoStockTakeWarning(false)
+                    setShowCloseDialog(true)
+                  }}
+                >
+                  Close Anyway
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

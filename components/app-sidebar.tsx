@@ -14,6 +14,7 @@ import {
     Sun,
     RefreshCw,
     LogOut,
+    ClipboardCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -40,6 +41,7 @@ export function AppSidebar({ className }: { className?: string }) {
         { label: "Inventory", icon: Package, href: "/inventory" },
         { label: "Shop", icon: Store, href: "/shop" },
         { label: "Settings", icon: Settings, href: "/settings" },
+        { label: "Approvals", icon: ClipboardCheck, href: "/approvals" },
     ]
 
     return (

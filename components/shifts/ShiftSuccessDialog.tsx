@@ -29,8 +29,7 @@ export function ShiftSuccessDialog({
                     <DialogTitle className="text-xl">Success</DialogTitle>
                 </DialogHeader>
                 <div className="text-base leading-relaxed py-4">
-                    Shift successfully closed with KES {cashAmount} cash and KES {mpesaAmount} MPESA. Reconciliation
-                    initiated.
+                    Shift submitted for manager approval with KES {cashAmount} cash and KES {mpesaAmount} MPESA. You will be notified once the manager reviews it.
                 </div>
                 <DialogFooter>
                     <Button onClick={() => onOpenChange(false)} className="w-full bg-primary hover:bg-primary/90">

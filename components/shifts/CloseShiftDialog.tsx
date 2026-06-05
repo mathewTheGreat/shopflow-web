@@ -88,7 +88,7 @@ export function CloseShiftDialog({
                         Cancel
                     </Button>
                     <Button onClick={onSubmit} disabled={isLoading} className="bg-primary hover:bg-primary/90">
-                        {isLoading ? "Closing..." : "Confirm & Close"}
+                        {isLoading ? "Submitting..." : "Submit for Approval"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -85,4 +85,23 @@ export const shiftService = {
         }
         return apiClient.get<FinancialSummaryReport>(`/api/shift-reconciliation/financial-summary-report?${queryParams.toString()}`);
     },
+
+    // Approval workflow
+    submitForApproval: (id: string) =>
+        apiClient.post<any>(`/api/shifts/${id}/submit-for-approval`),
+
+    approveShift: (id: string, userId: string) =>
+        apiClient.post<any>(`/api/shifts/${id}/approve`, { userId }),
+
+    rejectShift: (id: string, reason: string, userId: string) =>
+        apiClient.post<any>(`/api/shifts/${id}/reject`, { reason, userId }),
+
+    getPendingApprovalShifts: (shopId: string) =>
+        apiClient.get<Shift[]>(`/api/shifts/pending-approval/list?shopId=${shopId}`),
+
+    getRejectedShifts: (shopId: string, userId: string) =>
+        apiClient.get<Shift[]>(`/api/shifts/rejected/list?shopId=${shopId}&userId=${userId}`),
+
+    amendReconciliation: (shiftId: string, data: { actual_cash_amount?: number; actual_mpesa_amount?: number }) =>
+        apiClient.patch<any>(`/api/shift-reconciliation/shift/${shiftId}/amend`, data),
 }

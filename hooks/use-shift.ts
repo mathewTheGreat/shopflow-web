@@ -39,7 +39,7 @@ export function useShift() {
                 shop_id: activeShop.id,
                 manager_id: userInfo.id,
                 start_time: new Date().toISOString(),
-                end_time: new Date().toISOString(),
+                end_time: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
                 is_closed: false,
             })
 

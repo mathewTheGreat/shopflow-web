@@ -1222,7 +1222,7 @@ export default function SalesPage() {
 
                     {/* Right Column: Cart & Summary (4 cols) */}
                     <div className="lg:col-span-4 space-y-6">
-                      <Card className="flex flex-col h-[calc(100vh-16rem)] shadow-lg border-primary/20 bg-card/50 backdrop-blur-sm">
+                      <Card className="flex flex-col h-auto lg:h-[calc(100vh-16rem)] shadow-lg border-primary/20 bg-card/50 backdrop-blur-sm">
                         <CardContent className="p-6 flex flex-col h-full">
                           <div className="flex items-center justify-between mb-6">
                             <h3 className="text-2xl font-black flex items-center gap-2">
@@ -1243,7 +1243,7 @@ export default function SalesPage() {
                           </div>
 
                           {/* Cart Item List */}
-                          <div className="flex-1 overflow-y-auto min-h-0 -mx-2 px-2 space-y-4">
+                          <div className="flex-1 overflow-y-auto min-h-[250px] lg:min-h-0 max-h-[50vh] lg:max-h-none -mx-2 px-2 space-y-3 lg:space-y-4 py-2">
                             {cartItems.length === 0 ? (
                               <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
                                 <ShoppingCart className="h-16 w-16 mb-4" />
@@ -1251,9 +1251,9 @@ export default function SalesPage() {
                                 <p className="text-sm">Add items from the catalog on the left to start a sale</p>
                               </div>
                             ) : cartItems.map((item) => (
-                              <div key={item.id} className="p-4 rounded-2xl border border-border bg-card group shadow-sm">
-                                <div className="flex items-center justify-between mb-3">
-                                  <span className="font-bold text-lg line-clamp-1">{item.name}</span>
+                              <div key={item.id} className="p-4 lg:p-4 rounded-2xl border border-border bg-card group shadow-sm">
+                                <div className="flex items-center justify-between mb-2 lg:mb-3">
+                                  <span className="font-bold text-base lg:text-lg line-clamp-1">{item.name}</span>
                                   <Button
                                     variant="ghost"
                                     size="icon"

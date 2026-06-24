@@ -61,6 +61,8 @@ function formatDuration(start?: string, end?: string) {
     return `${hours}h ${minutes}m`
 }
 
+type RejectionReason = { type: string; message: string; record_id?: string };
+
 function RejectDialog({
     open,
     onClose,
@@ -69,26 +71,48 @@ function RejectDialog({
 }: {
     open: boolean
     onClose: () => void
-    onConfirm: (reason: string) => void
+    onConfirm: (reasons: RejectionReason[]) => void
     isLoading: boolean
 }) {
     const [reason, setReason] = useState("")
+    const [selectedType, setSelectedType] = useState("GENERAL")
 
     if (!open) return null
+
+    const reasonTypes = [
+        { value: "CASH_MISMATCH", label: "Cash count mismatch" },
+        { value: "MPESA_MISMATCH", label: "M-Pesa count mismatch" },
+        { value: "STOCK_TAKE_MISSING", label: "Stock take missing" },
+        { value: "SALE_DISCREPANCY", label: "Sale discrepancy" },
+        { value: "EXPENSE_MISSING", label: "Expense missing or incorrect" },
+        { value: "FLOAT_INCORRECT", label: "Float amount incorrect" },
+        { value: "GENERAL", label: "General issue" },
+    ]
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-card rounded-xl shadow-2xl w-full max-w-md p-6 mx-4">
                 <h3 className="text-lg font-bold mb-2">Reject Shift</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                    Provide a reason for rejection. The cashier will see this when amending.
+                    Select a rejection type and provide details. The cashier will see this when amending.
                 </p>
-                <Label htmlFor="reject-reason">Reason</Label>
+                <Label htmlFor="reject-type">Issue Type</Label>
+                <select
+                    id="reject-type"
+                    value={selectedType}
+                    onChange={(e) => setSelectedType(e.target.value)}
+                    className="w-full mt-1 mb-3 rounded-md border bg-input px-3 py-2 text-sm"
+                >
+                    {reasonTypes.map((rt) => (
+                        <option key={rt.value} value={rt.value}>{rt.label}</option>
+                    ))}
+                </select>
+                <Label htmlFor="reject-reason">Details</Label>
                 <Textarea
                     id="reject-reason"
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="e.g. Cash count mismatch, missing stock take..."
+                    placeholder="Describe the specific issue..."
                     className="mt-1 mb-4"
                     rows={3}
                 />
@@ -96,7 +120,7 @@ function RejectDialog({
                     <Button variant="ghost" onClick={onClose} disabled={isLoading}>Cancel</Button>
                     <Button
                         variant="destructive"
-                        onClick={() => onConfirm(reason)}
+                        onClick={() => onConfirm([{ type: selectedType, message: reason }])}
                         disabled={!reason.trim() || isLoading}
                     >
                         {isLoading ? "Rejecting..." : "Reject"}
@@ -116,7 +140,7 @@ function ManagerApprovalView({
 }: {
     shift: Shift
     onApprove: () => void
-    onReject: (reason: string) => void
+    onReject: (rejectionReasons: Array<{ type: string; message: string; record_id?: string }>) => void
     isApproving: boolean
     isRejecting: boolean
 }) {
@@ -174,8 +198,8 @@ function ManagerApprovalView({
             <RejectDialog
                 open={showReject}
                 onClose={() => setShowReject(false)}
-                onConfirm={(reason) => {
-                    onReject(reason)
+                onConfirm={(reasons) => {
+                    onReject(reasons)
                     setShowReject(false)
                 }}
                 isLoading={isRejecting}
@@ -358,7 +382,11 @@ function AmendShiftForm({
                     <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
                     <div>
                         <p className="font-bold text-sm">Shift Rejected</p>
-                        <p className="text-xs text-muted-foreground">{shift.rejection_reason}</p>
+                        {shift.rejection_reasons?.map((r, i) => (
+                            <p key={i} className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium capitalize">{r.type.replace('_', ' ').toLowerCase()}:</span> {r.message}
+                            </p>
+                        ))}
                     </div>
                 </div>
 

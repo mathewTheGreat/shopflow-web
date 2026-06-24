@@ -116,7 +116,7 @@ export function VarianceReportDialog({ open, onOpenChange }: VarianceReportDialo
             ...reportData,
             shiftManager: selectedShift?.manager_name || userInfo?.name || "User",
             shiftClosingStatus: selectedShift?.closing_status,
-            shiftRejectionReason: selectedShift?.rejection_reason
+            shiftRejectionReasons: selectedShift?.rejection_reasons,
           } as any,
           activeShop?.name || "Unknown Shop",
           userInfo?.name || "User",

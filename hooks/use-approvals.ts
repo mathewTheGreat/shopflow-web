@@ -3,7 +3,7 @@ import { shiftService } from "@/services/shift.service"
 import { stockTakeService } from "@/services/stock-take.service"
 import { toast } from "sonner"
 import { useAppStore } from "@/store/use-app-store"
-import { Shift } from "@/types/shift"
+import { Shift, SaleCorrection, ExpenseCorrection, CustomerPaymentCorrection, StockTakeCorrection } from "@/types/shift"
 import { StockTake } from "@/types/inventory"
 
 export function useApprovals() {
@@ -43,8 +43,8 @@ export function useApprovals() {
     })
 
     const rejectMutation = useMutation({
-        mutationFn: ({ shiftId, reason }: { shiftId: string; reason: string }) =>
-            shiftService.rejectShift(shiftId, reason, userInfo!.id),
+        mutationFn: ({ shiftId, rejectionReasons }: { shiftId: string; rejectionReasons: Array<{ type: string; message: string; record_id?: string }> }) =>
+            shiftService.rejectShift(shiftId, rejectionReasons, userInfo!.id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["pending-approvals"] })
             queryClient.invalidateQueries({ queryKey: ["rejected-shifts"] })

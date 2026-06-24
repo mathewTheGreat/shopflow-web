@@ -10,11 +10,11 @@ interface ShiftStatusCardProps {
     startTime?: string
     onOpenShift: () => void
     onCloseShift: () => void
-    closingStatus?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED'
-    rejectionReason?: string | null
+    closingStatus?: 'OPEN' | 'PENDING_APPROVAL' | 'AMENDMENT_REQUESTED' | 'APPROVED'
+    rejectionReasons?: Array<{ type: string; message: string; record_id?: string }> | null
 }
 
-export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShift, closingStatus, rejectionReason }: ShiftStatusCardProps) {
+export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShift, closingStatus, rejectionReasons }: ShiftStatusCardProps) {
     const formatDateTime = (isoString?: string) => {
         if (!isoString) return ""
         return new Date(isoString).toLocaleString('en-US', {
@@ -27,10 +27,10 @@ export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShif
         })
     }
 
-    const isRejected = closingStatus === 'OPEN' && rejectionReason
+    const isAmendmentRequested = closingStatus === 'AMENDMENT_REQUESTED'
     const isPendingApproval = closingStatus === 'PENDING_APPROVAL'
     const isApproved = closingStatus === 'APPROVED'
-    const isActive = shiftOpen && !isRejected
+    const isActive = shiftOpen && !isAmendmentRequested
 
     if (isPendingApproval) {
         return (
@@ -73,7 +73,7 @@ export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShif
         )
     }
 
-    if (isRejected) {
+    if (isAmendmentRequested) {
         return (
             <Card className="bg-card border-none shadow-sm w-full">
                 <CardContent className="p-6 md:p-10 lg:p-12">
@@ -83,11 +83,15 @@ export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShif
                     </div>
                     <div className="flex items-center gap-2 mb-1">
                         <AlertTriangle className="h-5 w-5 md:h-8 md:w-8 text-red-500" />
-                        <span className="text-lg md:text-3xl font-black text-red-500 uppercase tracking-tight">REJECTED</span>
+                        <span className="text-lg md:text-3xl font-black text-red-500 uppercase tracking-tight">AMENDMENT REQUESTED</span>
                     </div>
                     <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-md p-3 my-3">
-                        <p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wider mb-1">Reason</p>
-                        <p className="text-sm text-red-600 dark:text-red-400">{rejectionReason}</p>
+                        <p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wider mb-1">Issues</p>
+                        {rejectionReasons?.map((r, i) => (
+                            <p key={i} className="text-sm text-red-600 dark:text-red-400 mt-1">
+                                <span className="font-medium">{r.type.replace(/_/g, ' ').toLowerCase()}:</span> {r.message}
+                            </p>
+                        ))}
                     </div>
                     {startTime && (
                         <p className="text-xs text-muted-foreground mb-4">Started: {formatDateTime(startTime)}</p>

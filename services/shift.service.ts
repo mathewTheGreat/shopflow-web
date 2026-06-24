@@ -93,8 +93,8 @@ export const shiftService = {
     approveShift: (id: string, userId: string) =>
         apiClient.post<any>(`/api/shifts/${id}/approve`, { userId }),
 
-    rejectShift: (id: string, reason: string, userId: string) =>
-        apiClient.post<any>(`/api/shifts/${id}/reject`, { reason, userId }),
+    rejectShift: (id: string, rejectionReasons: Array<{ type: string; message: string; record_id?: string }>, userId: string) =>
+        apiClient.post<any>(`/api/shifts/${id}/reject`, { rejectionReasons, userId }),
 
     getPendingApprovalShifts: (shopId: string) =>
         apiClient.get<Shift[]>(`/api/shifts/pending-approval/list?shopId=${shopId}`),
@@ -110,4 +110,35 @@ export const shiftService = {
 
     updateCashMovement: (id: string, data: { amount: number }) =>
         apiClient.patch<any>(`/api/shift-cash-movements/${id}`, data),
+
+    // Corrections
+    createSaleCorrection: (data: Partial<SaleCorrection>) =>
+        apiClient.post<any>('/api/corrections/sales', data),
+
+    getSaleCorrections: (shiftId: string, amendmentAttempt?: number) => {
+        const params = new URLSearchParams({ shiftId });
+        if (amendmentAttempt) params.append('amendmentAttempt', String(amendmentAttempt));
+        return apiClient.get<SaleCorrection[]>(`/api/corrections/sales/shift/${shiftId}?${params.toString()}`);
+    },
+
+    createExpenseCorrection: (data: Partial<ExpenseCorrection>) =>
+        apiClient.post<any>('/api/corrections/expenses', data),
+
+    getExpenseCorrections: (shiftId: string, amendmentAttempt?: number) =>
+        apiClient.get<ExpenseCorrection[]>(`/api/corrections/expenses/shift/${shiftId}?amendmentAttempt=${amendmentAttempt ?? ''}`),
+
+    createCustomerPaymentCorrection: (data: Partial<CustomerPaymentCorrection>) =>
+        apiClient.post<any>('/api/corrections/customer-payments', data),
+
+    getCustomerPaymentCorrections: (shiftId: string, amendmentAttempt?: number) =>
+        apiClient.get<CustomerPaymentCorrection[]>(`/api/corrections/customer-payments/shift/${shiftId}?amendmentAttempt=${amendmentAttempt ?? ''}`),
+
+    createStockTakeCorrection: (data: Partial<StockTakeCorrection>) =>
+        apiClient.post<any>('/api/corrections/stock-takes', data),
+
+    createBulkStockTakeCorrections: (data: Partial<StockTakeCorrection>[]) =>
+        apiClient.post<any>('/api/corrections/stock-takes/bulk', { corrections: data }),
+
+    getStockTakeCorrections: (shiftId: string, amendmentAttempt?: number) =>
+        apiClient.get<StockTakeCorrection[]>(`/api/corrections/stock-takes/shift/${shiftId}?amendmentAttempt=${amendmentAttempt ?? ''}`),
 }

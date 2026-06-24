@@ -7,16 +7,18 @@ export interface Shift extends BaseEntity {
     start_time: string;
     end_time: string;
     is_closed: boolean;
-    closing_status?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED';
+    closing_status?: 'OPEN' | 'PENDING_APPROVAL' | 'AMENDMENT_REQUESTED' | 'APPROVED';
     submitted_for_approval_at?: string | null;
     approved_by?: string | null;
     approved_at?: string | null;
-    rejection_reason?: string | null;
+    rejection_reasons?: Array<{ type: string; message: string; record_id?: string }> | null;
+    amendment_count?: number;
     manager_name?: string;
 }
 
 export interface ShiftReconciliation extends BaseEntity {
     shift_id: string;
+    amendment_attempt: number;
     expected_cash_sales: number;
     expected_mpesa_sales: number;
     actual_cash_amount: number;
@@ -28,6 +30,61 @@ export interface ShiftReconciliation extends BaseEntity {
     reconciled_by_name?: string | null;
     reconciliation_date?: string | null;
     notes?: string | null;
+    created_by: string;
+}
+
+export interface SaleCorrection {
+    id: string;
+    shift_id: string;
+    sale_id: string;
+    amendment_attempt: number;
+    correction_type: 'REVERSE' | 'ADJUST_AMOUNT' | 'ADJUST_ITEMS';
+    reason: string;
+    original_amount: number;
+    corrected_amount?: number;
+    corrected_items?: Array<{ item_id: string; quantity: number; unit_price: number }>;
+    created_at: string;
+    created_by: string;
+}
+
+export interface ExpenseCorrection {
+    id: string;
+    shift_id: string;
+    expense_id?: string;
+    amendment_attempt: number;
+    correction_type: 'REVERSE' | 'ADJUST_AMOUNT' | 'REVERSE_AND_READD';
+    reason: string;
+    original_amount: number;
+    corrected_amount?: number;
+    corrected_description?: string;
+    created_at: string;
+    created_by: string;
+}
+
+export interface CustomerPaymentCorrection {
+    id: string;
+    shift_id: string;
+    transaction_id: string;
+    amendment_attempt: number;
+    correction_type: 'REVERSE' | 'ADJUST_AMOUNT' | 'REALLOCATE';
+    reason: string;
+    original_amount: number;
+    corrected_amount?: number;
+    reallocated_to_sale_id?: string;
+    created_at: string;
+    created_by: string;
+}
+
+export interface StockTakeCorrection {
+    id: string;
+    shift_id: string;
+    stock_take_id: string;
+    item_id: string;
+    amendment_attempt: number;
+    original_counted_qty: number;
+    corrected_counted_qty: number;
+    reason: string;
+    created_at: string;
     created_by: string;
 }
 

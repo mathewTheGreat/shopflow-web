@@ -80,7 +80,7 @@ export default function DashboardPage() {
   const shiftOpen = !!(currentShift && !currentShift.is_closed)
   const isCashier = activeShop?.role === "Cashier"
   const closingStatus = currentShift?.closing_status
-  const rejectionReason = currentShift?.rejection_reason
+  const rejectionReasons = currentShift?.rejection_reasons
 
   // Create highly efficient lookup map for stock levels
   const stockLevelMap = useMemo(() => {
@@ -351,7 +351,7 @@ export default function DashboardPage() {
                   onOpenShift={handleOpenShiftClick}
                   onCloseShift={handleCloseShiftClick}
                   closingStatus={closingStatus}
-                  rejectionReason={rejectionReason}
+                  rejectionReasons={rejectionReasons}
                 />
               </div>
 

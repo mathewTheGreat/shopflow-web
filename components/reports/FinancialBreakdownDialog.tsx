@@ -96,7 +96,7 @@ export function FinancialBreakdownDialog({ open, onOpenChange }: FinancialBreakd
         shiftName: shiftName,
         shiftId: selectedShiftId,
         closing_status: selectedShift?.closing_status,
-        rejection_reason: selectedShift?.rejection_reason,
+        rejection_reasons: selectedShift?.rejection_reasons,
         breakdown: breakdown,
         reconciliation: reconciliation
       }
@@ -210,7 +210,7 @@ export function formatFinancialBreakdownHTML(report: any) {
   const b = report.breakdown;
   const r = report.reconciliation;
   const closing_status = report.closing_status;
-  const rejection_reason = report.rejection_reason;
+  const rejection_reasons = report.rejection_reasons;
 
   const totalExpectedCash = b.totalExpectedCash;
   const totalExpectedMpesa = b.totalExpectedMpesa;
@@ -403,7 +403,7 @@ export function formatFinancialBreakdownHTML(report: any) {
   <div class="section-title">Reconciliation Status</div>
   <div class="reconciliation-box">
     Reconciliation Status: <span class="${r?.status === "RECONCILED" ? "badge-approved" : "badge-pending-approval"}">${r?.status || "PENDING"}</span><br>
-    Shift Status: <span class="${closing_status === 'APPROVED' ? 'badge-approved' : closing_status === 'PENDING_APPROVAL' ? 'badge-pending-approval' : rejection_reason ? 'badge-rejected' : 'badge-open'}">${closing_status === 'APPROVED' ? 'Approved' : closing_status === 'PENDING_APPROVAL' ? 'Pending Approval' : rejection_reason ? 'Rejected' : 'Open'}</span><br>
+    Shift Status: <span class="${closing_status === 'APPROVED' ? 'badge-approved' : closing_status === 'PENDING_APPROVAL' ? 'badge-pending-approval' : rejection_reasons ? 'badge-rejected' : 'badge-open'}">${closing_status === 'APPROVED' ? 'Approved' : closing_status === 'PENDING_APPROVAL' ? 'Pending Approval' : rejection_reasons ? 'Amendment Requested' : 'Open'}</span><br>
     Reconciled By: ${r?.reconciled_by_name || r?.reconciled_by || "Not reconciled"}<br>
     Reconciliation Date: ${r?.reconciliation_date ? new Date(r.reconciliation_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : "Not reconciled"}<br>
     ${r?.notes ? `Notes: ${r.notes}` : ""}

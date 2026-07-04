@@ -3,14 +3,13 @@
 import { Calendar, Lock, LockOpen, AlertTriangle, Clock, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import Link from "next/link"
 
 interface ShiftStatusCardProps {
     shiftOpen: boolean
     startTime?: string
     onOpenShift: () => void
     onCloseShift: () => void
-    closingStatus?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED'
+    closingStatus?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
     rejectionReason?: string | null
 }
 
@@ -27,7 +26,7 @@ export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShif
         })
     }
 
-    const isRejected = closingStatus === 'OPEN' && rejectionReason
+    const isRejected = closingStatus === 'REJECTED'
     const isPendingApproval = closingStatus === 'PENDING_APPROVAL'
     const isApproved = closingStatus === 'APPROVED'
     const isActive = shiftOpen && !isRejected
@@ -92,12 +91,10 @@ export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShif
                     {startTime && (
                         <p className="text-xs text-muted-foreground mb-4">Started: {formatDateTime(startTime)}</p>
                     )}
-                    <Link href="/approvals">
-                        <Button className="w-full bg-primary hover:bg-primary/90 text-white h-12 md:h-16 lg:h-20 rounded-xl font-bold text-base md:text-xl transition-all duration-300">
-                            <LockOpen className="mr-2 h-5 w-5 md:h-7 md:w-7 fill-current" />
-                            Amend & Resubmit
-                        </Button>
-                    </Link>
+                    <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 my-3">
+                        <p className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider mb-1">Correction Mode</p>
+                        <p className="text-sm text-blue-600 dark:text-blue-400">Entries you record here will be attributed to this shift as corrections.</p>
+                    </div>
                 </CardContent>
             </Card>
         )

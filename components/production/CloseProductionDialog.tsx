@@ -125,7 +125,7 @@ export function CloseProductionDialog({
 
                     {!activeShift && (
                         <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                            You need an open shift to close production.
+                            You need an active shift to close production.
                         </div>
                     )}
 

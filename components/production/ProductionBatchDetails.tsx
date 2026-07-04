@@ -225,7 +225,7 @@ export function ProductionBatchDetails({
                         <Button
                             variant="outline"
                             onClick={() => setShowAddOutput(true)}
-                            disabled={!activeShift || isAddingOutput}
+                            disabled={isAddingOutput}
                         >
                             <Plus className="h-4 w-4 mr-2" />
                             Add Output
@@ -454,7 +454,7 @@ export function ProductionBatchDetails({
                             <Button variant="ghost" onClick={() => setShowAddOutput(false)}>
                                 Cancel
                             </Button>
-                            <Button onClick={handleAddOutput} disabled={isAddingOutput || !activeShift}>
+                            <Button onClick={handleAddOutput} disabled={isAddingOutput}>
                                 {isAddingOutput ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Output"}
                             </Button>
                         </div>

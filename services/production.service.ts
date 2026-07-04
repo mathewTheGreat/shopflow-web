@@ -3,23 +3,23 @@ import { ProductionBatch, OpenBatchRequest, CloseBatchRequest, CancelBatchReques
 
 export const productionService = {
     openBatch: (data: OpenBatchRequest) => {
-        return apiClient.post<ProductionBatch>("/api/production/open", data)
+        return apiClient.post<ProductionBatch>("/api/production/open-v2", data)
     },
 
     closeBatch: (id: string, data: CloseBatchRequest) => {
-        return apiClient.post<ProductionBatch>(`/api/production/${id}/close`, data)
+        return apiClient.post<ProductionBatch>(`/api/production/${id}/close-v2`, data)
     },
 
     addOutput: (id: string, data: AddOutputRequest) => {
-        return apiClient.post<ProductionBatch>(`/api/production/${id}/output`, data)
+        return apiClient.post<ProductionBatch>(`/api/production/${id}/output-v2`, data)
     },
 
     updateOutput: (batchId: string, outputId: string, data: UpdateOutputRequest & { shift_id: string; updated_by: string }) => {
-        return apiClient.put<ProductionBatch>(`/api/production/${batchId}/output/${outputId}`, data)
+        return apiClient.put<ProductionBatch>(`/api/production/${batchId}/output-v2/${outputId}`, data)
     },
 
     deleteOutput: (batchId: string, outputId: string, data: DeleteOutputRequest & { shift_id: string }) => {
-        return apiClient.delete<ProductionBatch>(`/api/production/${batchId}/output/${outputId}`, data)
+        return apiClient.delete<ProductionBatch>(`/api/production/${batchId}/output-v2/${outputId}`, data)
     },
 
     getBatch: (id: string) => {
@@ -42,7 +42,7 @@ export const productionService = {
     },
 
     cancelBatch: (id: string, data: CancelBatchRequest) => {
-        return apiClient.post<ProductionBatch>(`/api/production/${id}/cancel`, data)
+        return apiClient.post<ProductionBatch>(`/api/production/${id}/cancel-v2`, data)
     },
 
     getProductionReport: (shopId: string, params: ProductionReportParams = {}) => {

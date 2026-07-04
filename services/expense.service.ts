@@ -18,7 +18,7 @@ export const expenseService = {
     },
 
     createExpense: (data: Partial<Expense>) => {
-        return apiClient.post<Expense>("/api/expenses", data)
+        return apiClient.post<Expense>("/api/expenses/v2", data)
     },
 
     getExpensesByShop: (shopId: string, limit = 50) => {

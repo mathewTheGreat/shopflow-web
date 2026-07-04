@@ -5,7 +5,7 @@ import { FinancialSummaryReport } from "@/types/financial-report"
 export const shiftService = {
     // Current shift status
     getCurrentShift: (userId: string, shopId: string) =>
-        apiClient.get<Shift | null>(`/api/shifts/current?userId=${userId}&shopId=${shopId}`),
+        apiClient.get<Shift | null>(`/api/shifts/current-v2?userId=${userId}&shopId=${shopId}`),
 
     // Step 1 & 2: Create and Float
     createShift: (data: Partial<Shift>) => apiClient.post<Shift>("/api/shifts", data),
@@ -13,7 +13,7 @@ export const shiftService = {
     recordCashMovement: (data: Partial<ShiftCashMovement>) => {
         try {
             console.log(data)
-            return apiClient.post<ShiftCashMovement>("/api/shift-cash-movements", data)
+            return apiClient.post<ShiftCashMovement>("/api/shift-cash-movements/v2", data)
         } catch (error) {
             console.log(error)
         }
@@ -86,7 +86,27 @@ export const shiftService = {
         return apiClient.get<FinancialSummaryReport>(`/api/shift-reconciliation/financial-summary-report?${queryParams.toString()}`);
     },
 
-    // Approval workflow
+    // V2: Immutable approval
+    submitForApprovalV2: (id: string, userId: string) =>
+        apiClient.post<any>(`/api/shifts/${id}/submit-for-approval-v2`, { userId }),
+
+    approveShiftV2: (id: string, userId: string) =>
+        apiClient.post<any>(`/api/shifts/${id}/approve-v2`, { userId }),
+
+    rejectShiftV2: (id: string, reason: string, userId: string) =>
+        apiClient.post<any>(`/api/shifts/${id}/reject-v2`, { reason, userId }),
+
+    approveRejectedShiftV2: (id: string, userId: string) =>
+        apiClient.post<any>(`/api/shifts/${id}/approve-rejected-v2`, { userId }),
+
+    getRejectedShiftsV2: (shopId: string) =>
+        apiClient.get<Shift[]>(`/api/shifts/v2/rejected/list?shopId=${shopId}`),
+
+    // Approval events
+    getApprovalEvents: (shiftId: string) =>
+        apiClient.get<any[]>(`/api/shifts/${shiftId}/approval-events`),
+
+    // Legacy approval workflow (backward compatible)
     submitForApproval: (id: string) =>
         apiClient.post<any>(`/api/shifts/${id}/submit-for-approval`),
 

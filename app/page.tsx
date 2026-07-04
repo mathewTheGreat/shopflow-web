@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
+import { useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api-client"
 import { shiftService } from "@/services/shift.service"
 import { stockTakeService } from "@/services/stock-take.service"
@@ -57,9 +58,14 @@ const ShiftSuccessDialog = dynamic(() => import("@/components/shifts/ShiftSucces
   ssr: false
 })
 
+const CorrectReconciliationDialog = dynamic(() => import("@/components/shifts/CorrectReconciliationDialog").then(mod => mod.CorrectReconciliationDialog), {
+  ssr: false
+})
+
 export default function DashboardPage() {
   const { user, isLoaded } = useUser()
   const router = useRouter()
+  const queryClient = useQueryClient()
 
   const { activeShop, userInfo } = useAppStore()
   const { currentShift, isLoading: isLoadingShift, openShift, closeShift, isOpening, isClosing, expectedFinancials } = useShift()
@@ -71,6 +77,7 @@ export default function DashboardPage() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [showNoStockTakeWarning, setShowNoStockTakeWarning] = useState(false)
+  const [showCorrectReconciliation, setShowCorrectReconciliation] = useState(false)
   const [itemSearchQuery, setItemSearchQuery] = useState("")
 
   // Amounts for dialogs
@@ -81,6 +88,7 @@ export default function DashboardPage() {
   const isCashier = activeShop?.role === "Cashier"
   const closingStatus = currentShift?.closing_status
   const rejectionReason = currentShift?.rejection_reason
+  const isRejected = closingStatus === 'REJECTED'
 
   // Create highly efficient lookup map for stock levels
   const stockLevelMap = useMemo(() => {
@@ -117,6 +125,11 @@ export default function DashboardPage() {
       return
     }
 
+    if (isRejected) {
+      toast.error("Complete corrections for the rejected shift before opening a new one.")
+      return
+    }
+
     try {
       const activeShift = await shiftService.getActiveShift(activeShop.id)
       if (activeShift) {
@@ -145,6 +158,11 @@ export default function DashboardPage() {
   }
 
   const handleCloseShiftClick = async () => {
+    if (isRejected) {
+      toast.error("This shift is already closed and rejected. Record corrections instead.")
+      return
+    }
+
     setCashAmount("0")
     setMpesaAmount("0")
 
@@ -353,6 +371,18 @@ export default function DashboardPage() {
                   closingStatus={closingStatus}
                   rejectionReason={rejectionReason}
                 />
+                {isRejected && currentShift?.id && (
+                  <div className="mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCorrectReconciliation(true)}
+                      className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                    >
+                      Correct Cash Counts
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Stat Cards - Side by Side */}
@@ -428,6 +458,17 @@ export default function DashboardPage() {
             onOpenChange={setShowSuccessDialog}
             cashAmount={cashAmount}
             mpesaAmount={mpesaAmount}
+          />
+        )}
+
+        {showCorrectReconciliation && currentShift?.id && (
+          <CorrectReconciliationDialog
+            open={showCorrectReconciliation}
+            onOpenChange={setShowCorrectReconciliation}
+            shiftId={currentShift.id}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["current-shift"] })
+            }}
           />
         )}
 

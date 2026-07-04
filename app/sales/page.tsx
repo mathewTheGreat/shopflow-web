@@ -459,58 +459,57 @@ export default function SalesPage() {
     try {
       await completeSale(payload)
 
-      // Inventory Integration: Prepare and execute updates
-      try {
-        const stockTransactions = []
-        const stockLevelUpdates = []
-        const timestamp = new Date().toISOString()
+      // Inventory Integration: Stock already accounted for by stock take in correction mode
+      if (activeShift?.closing_status !== 'REJECTED') {
+        try {
+          const stockTransactions = []
+          const stockLevelUpdates = []
+          const timestamp = new Date().toISOString()
 
-        for (const cartItem of finalItems) {
-          const soldQty = parseFloat(cartItem.quantity) || 0
-          if (soldQty <= 0) continue
+          for (const cartItem of finalItems) {
+            const soldQty = parseFloat(cartItem.quantity) || 0
+            if (soldQty <= 0) continue
 
-          // 1. Prepare Stock Transaction (OUT for SALE)
-          stockTransactions.push({
-            id: uuidv4(),
-            type: "OUT",
-            item_id: cartItem.id,
-            shop_id: activeShop.id,
-            quantity: soldQty,
-            reason: "ADJUSTMENT",
-            notes: `Sale Transaction #${payload.sale.id.slice(0, 8)}`,
-            reference_id: payload.sale.id,
-            shift_id: activeShift.id,
-            created_by: userInfo?.id || "system",
-            created_at: timestamp
-          })
+            stockTransactions.push({
+              id: uuidv4(),
+              type: "OUT",
+              item_id: cartItem.id,
+              shop_id: activeShop.id,
+              quantity: soldQty,
+              reason: "ADJUSTMENT",
+              notes: `Sale Transaction #${payload.sale.id.slice(0, 8)}`,
+              reference_id: payload.sale.id,
+              shift_id: activeShift.id,
+              created_by: userInfo?.id || "system",
+              created_at: timestamp
+            })
 
-          // 2. Prepare Stock Level Update
-          const currentLevel = stockLevels.find(l => l.item_id === cartItem.id)
-          const newQty = (currentLevel?.quantity || 0) - soldQty
+            const currentLevel = stockLevels.find(l => l.item_id === cartItem.id)
+            const newQty = (currentLevel?.quantity || 0) - soldQty
 
-          stockLevelUpdates.push({
-            item_id: cartItem.id,
-            shop_id: activeShop.id,
-            quantity: newQty,
-            last_updated: timestamp
-          })
+            stockLevelUpdates.push({
+              item_id: cartItem.id,
+              shop_id: activeShop.id,
+              quantity: newQty,
+              last_updated: timestamp
+            })
+          }
+
+          if (stockTransactions.length > 0) {
+            console.log("[SalesPage] Recording inventory changes:", {
+              transactions: stockTransactions.length,
+              updates: stockLevelUpdates.length
+            })
+
+            await Promise.all([
+              createBulkTransactions(stockTransactions),
+              bulkUpdateLevels(stockLevelUpdates)
+            ])
+          }
+        } catch (inventoryError) {
+          console.error("Sale recorded but inventory update failed:", inventoryError)
+          toast.error("Sale completed but inventory levels might be inaccurate. Please check.")
         }
-
-        if (stockTransactions.length > 0) {
-          console.log("[SalesPage] Recording inventory changes:", {
-            transactions: stockTransactions.length,
-            updates: stockLevelUpdates.length
-          })
-
-          // Execute concurrently
-          await Promise.all([
-            createBulkTransactions(stockTransactions),
-            bulkUpdateLevels(stockLevelUpdates)
-          ])
-        }
-      } catch (inventoryError) {
-        console.error("Sale recorded but inventory update failed:", inventoryError)
-        toast.error("Sale completed but inventory levels might be inaccurate. Please check.")
       }
 
       setCartItems([])

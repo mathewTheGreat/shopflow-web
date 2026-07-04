@@ -7,7 +7,7 @@ export interface Shift extends BaseEntity {
     start_time: string;
     end_time: string;
     is_closed: boolean;
-    closing_status?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED';
+    closing_status?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
     submitted_for_approval_at?: string | null;
     approved_by?: string | null;
     approved_at?: string | null;

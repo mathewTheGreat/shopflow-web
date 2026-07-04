@@ -17,7 +17,7 @@ export const saleService = {
     },
 
     completeSale: (data: any) => {
-        return apiClient.post("/api/sales/complete", data)
+        return apiClient.post("/api/sales/complete-v2", data)
     },
 
     getSales: (shopId: string, limit = 50) => {

@@ -1,10 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { shiftService } from "@/services/shift.service"
-import { stockTakeService } from "@/services/stock-take.service"
 import { toast } from "sonner"
 import { useAppStore } from "@/store/use-app-store"
 import { Shift } from "@/types/shift"
-import { StockTake } from "@/types/inventory"
 
 export function useApprovals() {
     const queryClient = useQueryClient()
@@ -19,35 +17,33 @@ export function useApprovals() {
     })
 
     const { data: rejectedShifts, isLoading: isLoadingRejected } = useQuery<Shift[]>({
-        queryKey: ["rejected-shifts", activeShop?.id],
-        queryFn: () => shiftService.getRejectedShifts(activeShop!.id, userInfo!.id),
-        enabled: !!activeShop?.id && !!userInfo?.id,
+        queryKey: ["rejected-shifts-v2", activeShop?.id],
+        queryFn: () => shiftService.getRejectedShiftsV2(activeShop!.id),
+        enabled: !!activeShop?.id,
     })
 
-    const approveMutation = useMutation({
+    // V2: Immutable approval mutations
+    const approveV2Mutation = useMutation({
         mutationFn: (shiftId: string) => {
-            console.log(`[approveMutation] calling approveShift shiftId=${shiftId}, userId=${userInfo?.id}`)
-            return shiftService.approveShift(shiftId, userInfo!.id)
+            return shiftService.approveShiftV2(shiftId, userInfo!.id)
         },
         onSuccess: () => {
-            console.log(`[approveMutation] SUCCESS, invalidating queries`)
             queryClient.invalidateQueries({ queryKey: ["pending-approvals"] })
-            queryClient.invalidateQueries({ queryKey: ["rejected-shifts"] })
+            queryClient.invalidateQueries({ queryKey: ["rejected-shifts-v2"] })
             queryClient.invalidateQueries({ queryKey: ["current-shift"] })
             toast.success("Shift approved successfully")
         },
         onError: (error: Error) => {
-            console.error(`[approveMutation] Error:`, error)
             toast.error(`Failed to approve shift: ${error.message}`)
         },
     })
 
-    const rejectMutation = useMutation({
+    const rejectV2Mutation = useMutation({
         mutationFn: ({ shiftId, reason }: { shiftId: string; reason: string }) =>
-            shiftService.rejectShift(shiftId, reason, userInfo!.id),
+            shiftService.rejectShiftV2(shiftId, reason, userInfo!.id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["pending-approvals"] })
-            queryClient.invalidateQueries({ queryKey: ["rejected-shifts"] })
+            queryClient.invalidateQueries({ queryKey: ["rejected-shifts-v2"] })
             toast.success("Shift rejected")
         },
         onError: (error: Error) => {
@@ -55,67 +51,52 @@ export function useApprovals() {
         },
     })
 
-    const submitForApprovalMutation = useMutation({
+    const submitForApprovalV2Mutation = useMutation({
         mutationFn: (shiftId: string) => {
-            console.log(`[submitForApproval] shiftId=${shiftId}`)
-            return shiftService.submitForApproval(shiftId)
+            return shiftService.submitForApprovalV2(shiftId, userInfo!.id)
         },
         onSuccess: () => {
-            console.log(`[submitForApproval] SUCCESS`)
-            queryClient.invalidateQueries({ queryKey: ["rejected-shifts"] })
+            queryClient.invalidateQueries({ queryKey: ["rejected-shifts-v2"] })
             queryClient.invalidateQueries({ queryKey: ["current-shift"] })
             toast.success("Shift submitted for approval")
         },
         onError: (error: Error) => {
-            console.error(`[submitForApproval] Error:`, error)
             toast.error(`Failed to submit shift: ${error.message}`)
         },
     })
 
-    const amendReconciliationMutation = useMutation({
-        mutationFn: ({ shiftId, actual_cash_amount, actual_mpesa_amount }: { shiftId: string; actual_cash_amount?: number; actual_mpesa_amount?: number }) =>
-            shiftService.amendReconciliation(shiftId, { actual_cash_amount, actual_mpesa_amount }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["rejected-shifts"] })
-            toast.success("Reconciliation updated")
-        },
-        onError: (error: Error) => {
-            toast.error(`Failed to update reconciliation: ${error.message}`)
-        },
-    })
-
-    const amendStockTakesMutation = useMutation({
-        mutationFn: (data: Partial<StockTake>[]) => {
-            console.log(`[amendStockTakes] saving ${data.length} corrections:`, JSON.stringify(data))
-            return stockTakeService.createBulkStockTakes(data)
+    const approveRejectedShiftV2Mutation = useMutation({
+        mutationFn: (shiftId: string) => {
+            return shiftService.approveRejectedShiftV2(shiftId, userInfo!.id)
         },
         onSuccess: () => {
-            console.log(`[amendStockTakes] SUCCESS`)
-            queryClient.invalidateQueries({ queryKey: ["stock-takes"] })
-            queryClient.invalidateQueries({ queryKey: ["rejected-shifts"] })
-            toast.success("Stock take corrections saved")
+            queryClient.invalidateQueries({ queryKey: ["rejected-shifts-v2"] })
+            queryClient.invalidateQueries({ queryKey: ["pending-approvals"] })
+            queryClient.invalidateQueries({ queryKey: ["current-shift"] })
+            toast.success("Rejected shift approved successfully")
         },
         onError: (error: Error) => {
-            console.error(`[amendStockTakes] Error:`, error)
-            toast.error(`Failed to save stock take corrections: ${error.message}`)
+            toast.error(`Failed to approve rejected shift: ${error.message}`)
         },
     })
 
     return {
+        // Data
         pendingApprovals,
         isLoadingPending,
         rejectedShifts,
         isLoadingRejected,
         isManager,
-        approve: approveMutation.mutateAsync,
-        isApproving: approveMutation.isPending,
-        reject: rejectMutation.mutateAsync,
-        isRejecting: rejectMutation.isPending,
-        submitForApproval: submitForApprovalMutation.mutateAsync,
-        isSubmitting: submitForApprovalMutation.isPending,
-        amendReconciliation: amendReconciliationMutation.mutateAsync,
-        isAmending: amendReconciliationMutation.isPending,
-        amendStockTakes: amendStockTakesMutation.mutateAsync,
-        isAmendingStockTakes: amendStockTakesMutation.isPending,
+
+        // V2: Immutable approval
+        approveV2: approveV2Mutation.mutateAsync,
+        isApprovingV2: approveV2Mutation.isPending,
+        rejectV2: rejectV2Mutation.mutateAsync,
+        isRejectingV2: rejectV2Mutation.isPending,
+        submitForApprovalV2: submitForApprovalV2Mutation.mutateAsync,
+        isSubmittingV2: submitForApprovalV2Mutation.isPending,
+
+        approveRejectedShiftV2: approveRejectedShiftV2Mutation.mutateAsync,
+        isApprovingRejectedShiftV2: approveRejectedShiftV2Mutation.isPending,
     }
 }

@@ -9,7 +9,6 @@ import { X, Loader2, ClipboardList, Check, AlertCircle } from "lucide-react"
 import { useItems } from "@/hooks/use-items"
 import { useStockLevelsByShop, useBulkUpdateStockLevels } from "@/hooks/use-stock-levels"
 import { useCreateBulkStockTakes } from "@/hooks/use-stock-takes"
-import { useCreateBulkTransactions } from "@/hooks/use-stock-transactions"
 import { useAppStore } from "@/store/use-app-store"
 import { Card, CardContent } from "../ui/card"
 import { v4 as uuidv4 } from "uuid"
@@ -42,7 +41,6 @@ export function StockTakeDialog({ open, onOpenChange, onSuccess }: StockTakeDial
     // Mutations
     const { mutateAsync: createBulkStockTakes } = useCreateBulkStockTakes()
     const { mutateAsync: bulkUpdateLevels } = useBulkUpdateStockLevels()
-    const { mutateAsync: createBulkTransactions } = useCreateBulkTransactions()
 
     // Form state: { [itemId: string]: ItemCount }
     const [formData, setFormData] = useState<Record<string, ItemCount>>({})
@@ -103,7 +101,6 @@ export function StockTakeDialog({ open, onOpenChange, onSuccess }: StockTakeDial
         try {
             const stockTakes = []
             const adjustments = []
-            const transactions = []
 
             for (const item of items) {
                 const countData = formData[item.id]
@@ -130,34 +127,17 @@ export function StockTakeDialog({ open, onOpenChange, onSuccess }: StockTakeDial
                     adjustments.push({
                         item_id: item.id,
                         shop_id: activeShop.id,
-                        quantity: countedQty, // Sets exact quantity as per requirement
+                        quantity: countedQty,
                         last_updated: timestamp
-                    })
-
-                    transactions.push({
-                        id: uuidv4(),
-                        type: "ADJUSTMENT",
-                        item_id: item.id,
-                        shop_id: activeShop.id,
-                        quantity: variance, // Usually transactions record the delta
-                        reason: "ADJUSTMENT",
-                        notes: countData.notes || `Stock Take Adjustment (Variance: ${variance})`,
-                        shift_id: activeShift.id,
-                        created_by: userInfo?.id || "system",
-                        created_at: timestamp
                     })
                 }
             }
 
-            // Execute all in "quasi-batch" (sequential for now as they are independent mutations but ideally should be atomic)
-            console.log("[StockTakeDialog] Submitting stock takes:", stockTakes);
             await createBulkStockTakes(stockTakes)
 
             if (adjustments.length > 0) {
                 console.log("[StockTakeDialog] Submitting level adjustments:", adjustments);
                 await bulkUpdateLevels(adjustments)
-                console.log("[StockTakeDialog] Submitting adjustment transactions:", transactions);
-                await createBulkTransactions(transactions)
             }
 
             onOpenChange(false)

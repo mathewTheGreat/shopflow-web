@@ -15,7 +15,7 @@ export const stockTransactionService = {
         apiClient.get<StockTransaction>(`/api/stock/transactions/${id}`),
 
     createTransaction: (data: Partial<StockTransaction>) => {
-        return apiClient.post<StockTransaction>("/api/stock/transactions", data);
+        return apiClient.post<StockTransaction>("/api/stock/transactions/v2", data);
     },
 
     createBulkTransactions: (data: Partial<StockTransaction>[]) => {

@@ -41,8 +41,11 @@ export function AppSidebar({ className }: { className?: string }) {
         { label: "Inventory", icon: Package, href: "/inventory" },
         { label: "Shop", icon: Store, href: "/shop" },
         { label: "Settings", icon: Settings, href: "/settings" },
-        { label: "Approvals", icon: ClipboardCheck, href: "/approvals" },
     ]
+
+    if (isManager) {
+        navItems.push({ label: "Approvals", icon: ClipboardCheck, href: "/approvals" })
+    }
 
     return (
         <div className={cn("flex flex-col h-full bg-card text-card-foreground", className)}>

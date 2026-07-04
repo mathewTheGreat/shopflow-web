@@ -7,7 +7,7 @@ export const stockTakeService = {
         apiClient.post<StockTake>("/api/stock/takes", data),
 
     createBulkStockTakes: (data: Partial<StockTake>[]) =>
-        apiClient.post<StockTake[]>("/api/stock/takes/bulk", data),
+        apiClient.post<StockTake[]>("/api/stock/takes/bulk-v2", data),
 
     getStockTakesByShop: (shopId: string) =>
         apiClient.get<StockTake[]>(`/api/stock/takes/shop/${shopId}`),

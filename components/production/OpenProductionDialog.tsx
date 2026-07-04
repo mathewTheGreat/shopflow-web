@@ -82,7 +82,7 @@ export function OpenProductionDialog({ open, onOpenChange, onSuccess }: OpenProd
 
     const validateForm = () => {
         if (!activeShift) {
-            alert("You need an open shift to start production")
+            alert("You need an active shift to start production")
             return false
         }
 
@@ -247,7 +247,7 @@ export function OpenProductionDialog({ open, onOpenChange, onSuccess }: OpenProd
 
                     {!activeShift && (
                         <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                            You need an open shift to start production. Please open a shift first.
+                            You need an active shift to start production.
                         </div>
                     )}
 

@@ -24,7 +24,7 @@ export default function JoinBusinessPage() {
         const fetchShops = async () => {
             try {
                 setIsLoading(true)
-                const data = await apiClient.get<Shop[]>(`${process.env.NEXT_PUBLIC_API_URL}/api/shops`)
+                const data = await apiClient.get<Shop[]>(`/api/shops`)
                 setShops(data)
                 setError(null)
             } catch (err: any) {

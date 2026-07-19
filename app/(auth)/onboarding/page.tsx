@@ -21,11 +21,11 @@ export default function OnboardingPage() {
         const checkUser = async () => {
             try {
                 // Check if user exists in the database
-                const existingUser = await apiClient.get<any>(`${process.env.NEXT_PUBLIC_API_URL}/api/users/clerk/${user.id}`)
+                const existingUser = await apiClient.get<any>(`/api/users/clerk/${user.id}`)
                 setDbUser(existingUser)
 
                 // check if user has a shop assigned 
-                await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/shop-staff/users/${user.id}`)
+                await apiClient.get(`/api/shop-staff/user/${user.id}`)
 
                 router.push("/")
             } catch (error: any) {

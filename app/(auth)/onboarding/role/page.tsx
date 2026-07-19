@@ -83,7 +83,7 @@ export default function RoleSelectionPage() {
             // 1. Create User in Local DB if they don't exist yet
             if (!existingUserId) {
                 console.log("Creating new user in database...")
-                await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/users`, userEntity)
+                await apiClient.post(`/api/users`, userEntity)
             } else {
                 console.log("User already exists in database, skipping user creation.")
             }
@@ -91,12 +91,12 @@ export default function RoleSelectionPage() {
             // 2. Create Shop in Local DB if creating a new one
             if (type === 'create' && shopEntity) {
                 console.log("Creating new shop in database...")
-                await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/shops`, shopEntity)
+                await apiClient.post(`/api/shops`, shopEntity)
             }
 
             // 3. Create ShopStaff entry to link user and shop
             console.log("Creating shop staff assignment...")
-            await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/shop-staff`, shopStaffEntity)
+            await apiClient.post(`/api/shop-staff`, shopStaffEntity)
 
             toast.success("Setup complete!")
 

@@ -15,6 +15,7 @@ import {
     RefreshCw,
     LogOut,
     ClipboardCheck,
+    User as UserIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -27,6 +28,7 @@ export function AppSidebar({ className }: { className?: string }) {
     const pathname = usePathname()
     const { theme, setTheme } = useTheme()
     const activeShop = useAppStore((state) => state.activeShop)
+    const userInfo = useAppStore((state) => state.userInfo)
     const isManager = activeShop?.role === "Manager"
 
     const toggleDarkMode = () => {
@@ -88,6 +90,21 @@ export function AppSidebar({ className }: { className?: string }) {
 
                     {/* Import Outbox Button - Managers only */}
                     {isManager && <ImportOutboxButton />}
+
+                    {/* Current user - same geometry as the nav items above
+                        (nav buttons collapse to px-3 + 16px icons via the
+                        shared button styles, so this mirrors exactly that) */}
+                    <div className="flex items-center gap-4 px-3 py-2">
+                        <UserIcon className="h-4 w-4 text-primary shrink-0" />
+                        <p className="text-sm font-semibold truncate flex-1 min-w-0">
+                            {userInfo?.name || 'User'}
+                        </p>
+                        {activeShop?.role && (
+                            <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] font-black rounded uppercase tracking-tighter flex-shrink-0">
+                                {activeShop.role}
+                            </span>
+                        )}
+                    </div>
 
                     {/* Sign Out Button */}
                     <SignOutButton>

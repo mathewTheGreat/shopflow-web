@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api-client"
 import { ItemPricing } from "@/types/pricing"
 
 export interface CreateItemPricingInput {
+    id: string
     item_id: string
     shop_id: string
     override_price: number

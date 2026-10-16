@@ -3,16 +3,15 @@
 import { useState } from "react"
 import {
     ChevronLeft,
-    Plus,
-    Search,
-    Filter,
     ArrowDownLeft,
     ArrowUpRight,
     Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { useShopTransactions } from "@/hooks/use-customer-payments"
+import { useShopTransactions, useReverseCustomerTransaction } from "@/hooks/use-customer-payments"
+import { ListSearch } from "@/components/ui/list-search"
+import { ListPagination } from "@/components/ui/list-pagination"
+import { ReasonDialog } from "@/components/ui/reason-dialog"
 import { useAppStore } from "@/store/use-app-store"
 import { PaymentRecordDialog } from "./PaymentRecordDialog"
 import { cn } from "@/lib/utils"
@@ -23,16 +22,35 @@ interface CustomerPaymentsManagerProps {
 
 export function CustomerPaymentsManager({ onBack }: CustomerPaymentsManagerProps) {
     const activeShop = useAppStore((state) => state.activeShop)
+    const isManager = activeShop?.role === "Manager"
     const [searchQuery, setSearchQuery] = useState("")
     const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false)
     const [transactionType, setTransactionType] = useState<"CREDIT" | "DEBIT">("CREDIT")
 
-    const { data: transactions = [], isLoading } = useShopTransactions(activeShop?.id)
+    const [page, setPage] = useState(1)
+    const { transactions = [], pagination, isLoading } = useShopTransactions(activeShop?.id, {
+        search: searchQuery,
+        page,
+        limit: 20,
+    })
+    const { mutateAsync: reverseTransaction, isPending: isReversing } = useReverseCustomerTransaction()
 
-    const filteredTransactions = transactions.filter(t =>
-        t.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.notes?.toLowerCase().includes(searchQuery.toLowerCase())
+    const reversedIds = new Set(
+        transactions.filter(t => t.reversal_of).map(t => String(t.reversal_of))
     )
+
+    const filteredTransactions = transactions
+
+    const [reverseTarget, setReverseTarget] = useState<string | null>(null)
+
+    const handleReverse = async (id: string, reason: string) => {
+        try {
+            await reverseTransaction({ id, reason })
+            setReverseTarget(null)
+        } catch {
+            // toast handled in the mutation
+        }
+    }
 
     const handleRecordTransaction = (type: "CREDIT" | "DEBIT") => {
         setTransactionType(type)
@@ -74,21 +92,14 @@ export function CustomerPaymentsManager({ onBack }: CustomerPaymentsManagerProps
                         </Button>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                         <h2 className="text-xl font-semibold">Recent Transactions</h2>
-                        <div className="flex gap-2">
-                            <div className="relative w-[300px]">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search by customer or notes..."
-                                    className="pl-10 h-10 bg-card"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                            </div>
-                            <Button variant="outline" size="icon">
-                                <Filter className="h-4 w-4" />
-                            </Button>
+                        <div className="w-[300px]">
+                            <ListSearch
+                                placeholder="Search by customer or notes..."
+                                value={searchQuery}
+                                onChange={(v) => { setSearchQuery(v); setPage(1) }}
+                            />
                         </div>
                     </div>
 
@@ -136,6 +147,11 @@ export function CustomerPaymentsManager({ onBack }: CustomerPaymentsManagerProps
                                             )}>
                                                 {transaction.type}
                                             </span>
+                                            {(transaction.reversal_of || reversedIds.has(transaction.id)) && (
+                                                <span className="ml-1 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                                                    {transaction.reversal_of ? "Reversal" : "Reversed"}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="col-span-2 text-muted-foreground text-xs uppercase font-semibold">
                                             {transaction.payment_method}
@@ -155,9 +171,24 @@ export function CustomerPaymentsManager({ onBack }: CustomerPaymentsManagerProps
                                                 minute: 'numeric',
                                                 hour12: true
                                             })}
+                                            {isManager && !transaction.reversal_of && !reversedIds.has(transaction.id) && (
+                                                <div className="mt-1">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={isReversing}
+                                                        onClick={() => setReverseTarget(transaction.id)}
+                                                    >
+                                                        Reverse
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                            <div className="px-4">
+                                <ListPagination pagination={pagination} onPageChange={setPage} />
                             </div>
                         </div>
                     )}
@@ -168,6 +199,16 @@ export function CustomerPaymentsManager({ onBack }: CustomerPaymentsManagerProps
                 open={isPaymentFormOpen}
                 onOpenChange={setIsPaymentFormOpen}
                 defaultType={transactionType}
+            />
+
+            <ReasonDialog
+                open={reverseTarget !== null}
+                onOpenChange={(open) => { if (!open) setReverseTarget(null) }}
+                title="Reverse customer transaction"
+                description="The exact opposite entry will be recorded and linked to the original."
+                confirmLabel="Reverse Transaction"
+                isSubmitting={isReversing}
+                onSubmit={(reason) => { if (reverseTarget) handleReverse(reverseTarget, reason) }}
             />
         </div>
     )

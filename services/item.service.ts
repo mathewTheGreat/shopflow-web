@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client"
+import { buildListQuery, ListParams, PagedResult } from "@/types/list"
 
 export interface Item {
     id: string
@@ -14,8 +15,8 @@ export interface Item {
 }
 
 export const itemService = {
-    getAll: () => {
-        return apiClient.get<Item[]>("/api/items")
+    getAll: (params?: ListParams) => {
+        return apiClient.get<PagedResult<Item>>(`/api/items${buildListQuery(params)}`)
     },
 
     getById: (itemId: string) => {

@@ -16,6 +16,9 @@ import {
   Plus,
   Minus,
   Wallet,
+  Landmark,
+  ArrowRightLeft,
+  PiggyBank,
   CreditCard,
   Banknote,
   ShoppingCart,
@@ -35,6 +38,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { formatQty } from "@/lib/utils"
 import Link from "next/link"
 import { AppSidebar } from "@/components/app-sidebar"
 import { useItems } from "@/hooks/use-items"
@@ -44,7 +48,12 @@ import { useAppStore } from "@/store/use-app-store"
 import { v4 as uuidv4 } from "uuid"
 import { toast } from "sonner"
 import { ReceiptDialog } from "@/components/sales/receipt-dialog"
+import { ListSearch } from "@/components/ui/list-search"
+import { ListPagination } from "@/components/ui/list-pagination"
 import { useExpenses, useCreateExpense } from "@/hooks/use-expenses"
+import { saleService } from "@/services/sale.service"
+import { expenseService } from "@/services/expense.service"
+import { useQueryClient } from "@tanstack/react-query"
 import { CustomerManager } from "@/components/customers/CustomerManager"
 import { CustomerPaymentsManager } from "@/components/payments/CustomerPaymentsManager"
 import { ShiftPerformanceDialog } from "@/components/reports/ShiftPerformanceDialog"
@@ -55,8 +64,12 @@ import { useAllItemPrices } from "@/hooks/use-item-prices"
 import { getSelectedPrice, getActivePrices, getApplicablePrice, getPriceQuantityLabel, calculateTotalPrice, isFlatPriceTier, isQuantityInPriceRange } from "@/lib/pricing"
 import { useStockLevelsByShop, useBulkUpdateStockLevels } from "@/hooks/use-stock-levels"
 import { useCreateBulkTransactions } from "@/hooks/use-stock-transactions"
+import { useMoneyPosition } from "@/hooks/use-money-position"
 import { FinancialBreakdownDialog } from "@/components/reports/FinancialBreakdownDialog"
-import { AddFloatDialog } from "@/components/shifts/AddFloatDialog"
+import { BankDepositDialog } from "@/components/shifts/BankDepositDialog"
+import { CashMovementsDialog } from "@/components/shifts/CashMovementsDialog"
+import { CashRegisterDialog } from "@/components/shifts/CashRegisterDialog"
+import { ReasonDialog } from "@/components/ui/reason-dialog"
 import { DailyReportDialog } from "@/components/reports/DailyReportDialog"
 import { FinancialSummaryReportDialog } from "@/components/reports/FinancialSummaryReportDialog"
 
@@ -84,7 +97,9 @@ export default function SalesPage() {
   const [showSalesReportDialog, setShowSalesReportDialog] = useState(false)
   const [showNetPositionDialog, setShowNetPositionDialog] = useState(false)
   const [showFinancialBreakdown, setShowFinancialBreakdown] = useState(false)
-  const [showAddFloatDialog, setShowAddFloatDialog] = useState(false)
+  const [showDepositDialog, setShowDepositDialog] = useState(false)
+  const [showMovementsDialog, setShowMovementsDialog] = useState(false)
+  const [showRegisterDialog, setShowRegisterDialog] = useState(false)
   const [showDailyReportDialog, setShowDailyReportDialog] = useState(false)
   const [showFinancialSummaryDialog, setShowFinancialSummaryDialog] = useState(false)
 
@@ -94,17 +109,59 @@ export default function SalesPage() {
   const activeShop = useAppStore((state) => state.activeShop)
   const activeShift = useAppStore((state) => state.activeShift)
   const userInfo = useAppStore((state) => state.userInfo)
+  const queryClient = useQueryClient()
+  const isManager = activeShop?.role === "Manager"
+
+  const [saleReverseTarget, setSaleReverseTarget] = useState<string | null>(null)
+  const [expenseReverseTarget, setExpenseReverseTarget] = useState<string | null>(null)
+
+  const handleReverseSale = async (saleId: string, reason: string) => {
+    if (!userInfo?.id) return
+    try {
+      await saleService.reverseSale(saleId, reason)
+      setSaleReverseTarget(null)
+      queryClient.invalidateQueries({ queryKey: ["sales"] })
+      queryClient.invalidateQueries({ queryKey: ["sales-summary"] })
+      queryClient.invalidateQueries({ queryKey: ["items"] })
+      toast.success("Sale reversed")
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reverse sale")
+    }
+  }
+
+  const handleReverseExpense = async (expenseId: string, reason: string) => {
+    try {
+      await expenseService.reverseExpense(expenseId, reason)
+      setExpenseReverseTarget(null)
+      queryClient.invalidateQueries({ queryKey: ["expenses"] })
+      queryClient.invalidateQueries({ queryKey: ["expenses-summary"] })
+      toast.success("Expense reversed")
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reverse expense")
+    }
+  }
 
   // Data Fetching Hooks
   const { items, isLoading: itemsLoading } = useItems()
-  const { data: customers = [], isLoading: customersLoading } = useCustomersByShop(activeShop?.id)
-  const { data: sales, isLoading: salesLoading } = useSales(activeShop?.id)
-  const { data: expenses, isLoading: expensesLoading } = useExpenses(activeShop?.id)
+  const { customers, isLoading: customersLoading } = useCustomersByShop(activeShop?.id)
+  const [saleSearch, setSaleSearch] = useState("")
+  const [salePage, setSalePage] = useState(1)
+  const [expenseSearch, setExpenseSearch] = useState("")
+  const [expensePage, setExpensePage] = useState(1)
+  const { sales = [], pagination: salesPagination, isLoading: salesLoading } = useSales(
+    activeShop?.id,
+    { search: saleSearch, page: salePage, limit: 20 }
+  )
+  const { expenses = [], pagination: expensesPagination, isLoading: expensesLoading } = useExpenses(
+    activeShop?.id,
+    { search: expenseSearch, page: expensePage, limit: 20 }
+  )
   const { mutateAsync: completeSale, isPending: isSubmitting } = useCreateSale()
   const { mutateAsync: createExpense, isPending: isExpenseSubmitting } = useCreateExpense()
 
   // Stock Integration
   const { data: stockLevels = [] } = useStockLevelsByShop(activeShop?.id || "")
+  const { position: moneyPosition, isLoading: isLoadingPosition, refetch: refetchPosition } = useMoneyPosition(activeShop?.id)
   const { mutateAsync: bulkUpdateLevels } = useBulkUpdateStockLevels()
   const { mutateAsync: createBulkTransactions } = useCreateBulkTransactions()
 
@@ -459,58 +516,9 @@ export default function SalesPage() {
     try {
       await completeSale(payload)
 
-      // Inventory Integration: Stock already accounted for by stock take in correction mode
-      if (activeShift?.closing_status !== 'REJECTED') {
-        try {
-          const stockTransactions = []
-          const stockLevelUpdates = []
-          const timestamp = new Date().toISOString()
-
-          for (const cartItem of finalItems) {
-            const soldQty = parseFloat(cartItem.quantity) || 0
-            if (soldQty <= 0) continue
-
-            stockTransactions.push({
-              id: uuidv4(),
-              type: "OUT",
-              item_id: cartItem.id,
-              shop_id: activeShop.id,
-              quantity: soldQty,
-              reason: "ADJUSTMENT",
-              notes: `Sale Transaction #${payload.sale.id.slice(0, 8)}`,
-              reference_id: payload.sale.id,
-              shift_id: activeShift.id,
-              created_by: userInfo?.id || "system",
-              created_at: timestamp
-            })
-
-            const currentLevel = stockLevels.find(l => l.item_id === cartItem.id)
-            const newQty = (currentLevel?.quantity || 0) - soldQty
-
-            stockLevelUpdates.push({
-              item_id: cartItem.id,
-              shop_id: activeShop.id,
-              quantity: newQty,
-              last_updated: timestamp
-            })
-          }
-
-          if (stockTransactions.length > 0) {
-            console.log("[SalesPage] Recording inventory changes:", {
-              transactions: stockTransactions.length,
-              updates: stockLevelUpdates.length
-            })
-
-            await Promise.all([
-              createBulkTransactions(stockTransactions),
-              bulkUpdateLevels(stockLevelUpdates)
-            ])
-          }
-        } catch (inventoryError) {
-          console.error("Sale recorded but inventory update failed:", inventoryError)
-          toast.error("Sale completed but inventory levels might be inaccurate. Please check.")
-        }
-      }
+      // Inventory effects (OUT transactions + projection decrement) are posted
+      // server-side by the sale command. Rejected-shift sales intentionally
+      // carry no stock effect: the later stock take already accounts for them.
 
       setCartItems([])
       setSelectedCustomerId("")
@@ -636,20 +644,25 @@ export default function SalesPage() {
                         New Sale
                       </Button>
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <h2 className="text-xl font-semibold">Recent Sales</h2>
-                        <Button variant="outline" size="icon">
-                          <Filter className="h-4 w-4" />
-                        </Button>
+                        <div className="w-[260px]">
+                          <ListSearch
+                            placeholder="Search id, type, customer..."
+                            value={saleSearch}
+                            onChange={(v) => { setSaleSearch(v); setSalePage(1) }}
+                          />
+                        </div>
                       </div>
 
                       <div className="overflow-x-auto pb-4">
                         <div className="border rounded-lg min-w-[600px]">
-                          <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
+                          <div className="grid grid-cols-5 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
                             <div>Sale ID</div>
                             <div>Date</div>
                             <div>Type</div>
                             <div className="text-right">Amount</div>
+                            <div className="text-right">Actions</div>
                           </div>
                           <div className="divide-y">
                             {salesLoading ? (
@@ -660,7 +673,7 @@ export default function SalesPage() {
                               sales?.map((sale: any) => (
                                 <div
                                   key={sale.id}
-                                  className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm"
+                                  className="grid grid-cols-5 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm"
                                   onClick={() => setSelectedSaleId(sale.id)}
                                 >
                                   <div className="font-medium text-primary" title={sale.id}>#{sale.id.slice(0, 8)}</div>
@@ -679,11 +692,28 @@ export default function SalesPage() {
                                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary transition-colors">
                                       {sale.sale_category}
                                     </span>
+                                    {sale.status === 'VOIDED' && (
+                                      <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                                        Reversed
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-right font-bold">KES {sale.total_amount.toLocaleString()}</div>
+                                  <div className="text-right">
+                                    {isManager && sale.status !== 'VOIDED' && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => { e.stopPropagation(); setSaleReverseTarget(sale.id) }}
+                                      >
+                                        Reverse
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               )))}
                           </div>
+                          <ListPagination pagination={salesPagination} onPageChange={setSalePage} />
                         </div>
                       </div>
                     </TabsContent>
@@ -698,20 +728,25 @@ export default function SalesPage() {
                         Add Expense
                       </Button>
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <h2 className="text-xl font-semibold">Recent Expenses</h2>
-                        <Button variant="outline" size="icon">
-                          <Filter className="h-4 w-4" />
-                        </Button>
+                        <div className="w-[260px]">
+                          <ListSearch
+                            placeholder="Search category, description..."
+                            value={expenseSearch}
+                            onChange={(v) => { setExpenseSearch(v); setExpensePage(1) }}
+                          />
+                        </div>
                       </div>
 
                       <div className="overflow-x-auto pb-4">
                         <div className="border rounded-lg overflow-hidden min-w-[600px]">
-                          <div className="grid grid-cols-4 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
+                          <div className="grid grid-cols-5 p-4 border-b bg-muted/40 font-medium text-sm text-muted-foreground">
                             <div>Category</div>
                             <div>Description</div>
                             <div>Date</div>
                             <div className="text-right">Amount</div>
+                            <div className="text-right">Actions</div>
                           </div>
                           <div className="divide-y max-h-[500px] overflow-y-auto">
                             {expensesLoading ? (
@@ -731,11 +766,16 @@ export default function SalesPage() {
                               </div>
                             ) : (
                               expenses?.map((expense: any) => (
-                                <div key={expense.id} className="grid grid-cols-4 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm">
+                                <div key={expense.id} className="grid grid-cols-5 p-4 items-center hover:bg-muted/50 transition-colors cursor-pointer text-sm">
                                   <div className="font-medium text-primary">
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 uppercase">
                                       {expense.category}
                                     </span>
+                                    {expense.status === 'VOIDED' && (
+                                      <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 uppercase">
+                                        Reversed
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="truncate text-muted-foreground pr-4" title={expense.description || ""}>
                                     {expense.description || "No description"}
@@ -748,10 +788,22 @@ export default function SalesPage() {
                                     })}
                                   </div>
                                   <div className="text-right font-bold text-orange-600">KES {expense.amount.toLocaleString()}</div>
+                                  <div className="text-right">
+                                    {isManager && expense.status !== 'VOIDED' && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => { e.stopPropagation(); setExpenseReverseTarget(expense.id) }}
+                                      >
+                                        Reverse
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               ))
                             )}
                           </div>
+                          <ListPagination pagination={expensesPagination} onPageChange={setExpensePage} />
                         </div>
                       </div>
                     </TabsContent>
@@ -884,6 +936,59 @@ export default function SalesPage() {
                           </CardContent>
                         </Card>
 
+                        {/* Running shop position across all posted activity.
+                            Replaces float allocation: large expenses post
+                            directly; top-ups are PAY_IN movements. */}
+
+                        <Card
+                          className="border hover:border-primary/50 transition-colors group"
+                          onClick={() => refetchPosition()}
+                          title="Refresh running position"
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <Wallet className="h-6 w-6 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-lg mb-1">Shop Position</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Running money across all posted activity. Click to refresh.
+                              </p>
+                              <div className="flex gap-6 mt-3">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Cash</p>
+                                  <p className={`text-xl font-black tracking-tight ${moneyPosition.cash < 0 ? "text-destructive" : "text-foreground"}`}>
+                                    {isLoadingPosition ? "…" : `KES ${moneyPosition.cash.toLocaleString()}`}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">M-Pesa</p>
+                                  <p className={`text-xl font-black tracking-tight ${moneyPosition.mpesa < 0 ? "text-destructive" : "text-foreground"}`}>
+                                    {isLoadingPosition ? "…" : `KES ${moneyPosition.mpesa.toLocaleString()}`}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setShowDepositDialog(true)}
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <Landmark className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Bank Deposit</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Move drawer cash to the bank as a balanced transfer.
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
                         <Card
                           className={`border transition-colors cursor-pointer group ${activeShift
                             ? "hover:border-primary/50"
@@ -891,22 +996,39 @@ export default function SalesPage() {
                             }`}
                           onClick={() => {
                             if (activeShift) {
-                              setShowAddFloatDialog(true)
+                              setShowMovementsDialog(true)
                             } else {
-                              toast.error("You need an open shift to add float")
+                              toast.error("You need an open shift to view movements")
                             }
                           }}
                         >
                           <CardContent className="p-6 flex items-start gap-4">
                             <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                              <Wallet className="h-6 w-6 text-primary" />
+                              <ArrowRightLeft className="h-6 w-6 text-primary" />
                             </div>
                             <div>
-                              <h3 className="font-semibold text-lg mb-1">Add Float</h3>
+                              <h3 className="font-semibold text-lg mb-1">Cash Movements</h3>
                               <p className="text-sm text-muted-foreground">
                                 {activeShift
-                                  ? "Add float for large cash expenses."
-                                  : "Open a shift to add float."}
+                                  ? "Review and reverse this shift's cash ledger."
+                                  : "Open a shift to view movements."}
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setShowRegisterDialog(true)}
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <PiggyBank className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Cash Register</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Live drawer, safe, and bank balances with statements.
                               </p>
                             </div>
                           </CardContent>
@@ -936,11 +1058,40 @@ export default function SalesPage() {
                 onOpenChange={setShowFinancialBreakdown}
               />
 
-              <AddFloatDialog
-                open={showAddFloatDialog}
-                onOpenChange={setShowAddFloatDialog}
-                activeShift={activeShift}
+              <BankDepositDialog
+                open={showDepositDialog}
+                onOpenChange={setShowDepositDialog}
                 shopId={activeShop?.id}
+              />
+
+              <CashMovementsDialog
+                open={showMovementsDialog}
+                onOpenChange={setShowMovementsDialog}
+                shiftId={activeShift?.id}
+              />
+
+              <CashRegisterDialog
+                open={showRegisterDialog}
+                onOpenChange={setShowRegisterDialog}
+                shopId={activeShop?.id}
+              />
+
+              <ReasonDialog
+                open={saleReverseTarget !== null}
+                onOpenChange={(open) => { if (!open) setSaleReverseTarget(null) }}
+                title="Reverse sale"
+                description="Stock, tenders, and customer entries will be reversed as linked entries."
+                confirmLabel="Reverse Sale"
+                onSubmit={(reason) => { if (saleReverseTarget) handleReverseSale(saleReverseTarget, reason) }}
+              />
+
+              <ReasonDialog
+                open={expenseReverseTarget !== null}
+                onOpenChange={(open) => { if (!open) setExpenseReverseTarget(null) }}
+                title="Reverse expense"
+                description="The expense is voided and a compensating cash movement is recorded."
+                confirmLabel="Reverse Expense"
+                onSubmit={(reason) => { if (expenseReverseTarget) handleReverseExpense(expenseReverseTarget, reason) }}
               />
 
               <DailyReportDialog
@@ -1156,7 +1307,7 @@ export default function SalesPage() {
 
                                         return (
                                           <div className={`text-[10px] ${statusColor} px-1.5 py-0.5 rounded uppercase font-black tracking-tight`}>
-                                            Balance: {balance}
+                                            Balance: {formatQty(balance)}
                                           </div>
                                         );
                                       })()}
@@ -1301,7 +1452,7 @@ export default function SalesPage() {
                                         : null
 
                                       // Use manual selection if exists and is in range, otherwise use applicable price
-                                      let currentPrice: typeof applicablePrice | null = null
+                                      let currentPrice: (typeof activePrices)[number] | null = null
                                       let total = 0
 
                                       if (manualPrice) {

@@ -1,8 +1,9 @@
 import { apiClient } from "@/lib/api-client"
 import { Supplier } from "@/types/supplier"
+import { buildListQuery, ListParams, PagedResult } from "@/types/list"
 
 export const supplierService = {
-    getSuppliers: () => apiClient.get<Supplier[]>("/api/suppliers"),
+    getSuppliers: (params?: ListParams) => apiClient.get<PagedResult<Supplier>>(`/api/suppliers${buildListQuery(params)}`),
     getSupplier: (id: string) => apiClient.get<Supplier>(`/api/suppliers/${id}`),
     createSupplier: (data: Partial<Supplier>) => apiClient.post<Supplier>("/api/suppliers", data),
     updateSupplier: (id: string, data: Partial<Supplier>) => apiClient.put<Supplier>(`/api/suppliers/${id}`, data),

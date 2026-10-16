@@ -26,7 +26,7 @@ import { userService } from "@/services/user.service"
 import { useQuery } from "@tanstack/react-query"
 import { Loader2, FileSpreadsheet, FileText, Printer, TrendingUp, TrendingDown, CheckCircle, XCircle } from "lucide-react"
 import { toast } from "sonner"
-import { VarianceSummaryExcelReport } from "@/types/stock-report"
+import { VarianceSummaryExcelReport, VarianceSummaryReport } from "@/types/stock-report"
 
 interface VarianceSummaryReportDialogProps {
     open: boolean
@@ -419,11 +419,11 @@ function formatVarianceSummaryHTML(
                     <tbody>
             `;
             groups.forEach((items, itemName) => {
-                items.forEach((item, idx) => {
+                    items.forEach((item, idx) => {
                     const varianceClass = item.variance > 0 ? 'positive' : item.variance < 0 ? 'negative' : 'neutral';
                     html += `
                         <tr>
-                            <td>${formatTime(item.created_at)}</td>
+                            <td>${item.created_at ? formatTime(item.created_at) : '-'}</td>
                             <td>${item.cashierName}</td>
                             <td>${idx === 0 ? '<strong>' + itemName + '</strong>' : item.item_name}</td>
                             <td class="text-right">${item.expected_qty}</td>
@@ -458,7 +458,7 @@ function formatVarianceSummaryHTML(
                 const varianceClass = item.variance > 0 ? 'positive' : item.variance < 0 ? 'negative' : 'neutral';
                 html += `
                     <tr>
-                        <td>${formatTime(item.created_at)}</td>
+                        <td>${item.created_at ? formatTime(item.created_at) : '-'}</td>
                         <td>${item.cashierName}</td>
                         <td>${item.item_name}</td>
                         <td class="text-right">${item.expected_qty}</td>
@@ -580,7 +580,7 @@ const exportVarianceSummaryToExcel = async (
                 items.forEach(item => {
                     const variancePct = item.expected_qty !== 0 ? ((item.variance / item.expected_qty) * 100).toFixed(1) : '0.0';
                     topData.push([
-                        new Date(item.created_at).toLocaleString(),
+                        new Date(item.created_at || 0).toLocaleString(),
                         item.cashierName,
                         item.item_name,
                         item.expected_qty,
@@ -595,7 +595,7 @@ const exportVarianceSummaryToExcel = async (
             sorted.forEach((item, index) => {
                 const variancePct = item.expected_qty !== 0 ? ((item.variance / item.expected_qty) * 100).toFixed(1) : '0.0';
                 topData.push([
-                    new Date(item.created_at).toLocaleString(),
+                    new Date(item.created_at || 0).toLocaleString(),
                     item.cashierName,
                     item.item_name,
                     item.expected_qty,

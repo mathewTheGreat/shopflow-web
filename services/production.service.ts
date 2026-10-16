@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client"
-import { ProductionBatch, OpenBatchRequest, CloseBatchRequest, CancelBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse, ProductionReportParams, ProductionReportData, AddOutputRequest, UpdateOutputRequest, DeleteOutputRequest } from "@/types/production"
+import { ProductionBatch, OpenBatchRequest, CloseBatchRequest, CancelBatchRequest, ProductionBatchesQueryParams, ProductionBatchesResponse, ProductionReportParams, ProductionReportData, AddOutputRequest, UpdateOutputRequest, DeleteOutputRequest, AmendBatchRequest } from "@/types/production"
 
 export const productionService = {
     openBatch: (data: OpenBatchRequest) => {
@@ -43,6 +43,10 @@ export const productionService = {
 
     cancelBatch: (id: string, data: CancelBatchRequest) => {
         return apiClient.post<ProductionBatch>(`/api/production/${id}/cancel-v2`, data)
+    },
+
+    amendBatch: (id: string, data: AmendBatchRequest) => {
+        return apiClient.post<any>(`/api/production/${id}/amend`, data)
     },
 
     getProductionReport: (shopId: string, params: ProductionReportParams = {}) => {

@@ -10,4 +10,8 @@ export interface Expense extends BaseEntity {
     notes?: string | null;
     created_by: string;
     payment_method: 'CASH' | 'MPESA';
+    status?: 'POSTED' | 'VOIDED';
+    voided_at?: string | null;
+    voided_by?: string | null;
+    void_reason?: string | null;
 }

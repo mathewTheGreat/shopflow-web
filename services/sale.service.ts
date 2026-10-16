@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client"
+import { buildListQuery, ListParams, PagedResult } from "@/types/list"
 
 interface SalesSummaryResponse {
     totalAmount: number
@@ -20,16 +21,16 @@ export const saleService = {
         return apiClient.post("/api/sales/complete-v2", data)
     },
 
-    getSales: (shopId: string, limit = 50) => {
-        const params = new URLSearchParams({
-            limit: limit.toString()
-        })
-        return apiClient.get<any[]>(`/api/sales/shop/${shopId}?${params.toString()}`)
+    getSales: (shopId: string, params?: ListParams) => {
+        return apiClient.get<PagedResult<any>>(`/api/sales/shop/${shopId}${buildListQuery(params)}`)
     },
 
     getSaleReceipt: (saleId: string) => {
         return apiClient.get<any>(`/api/sales/${saleId}/receipt`)
     },
+
+    reverseSale: (saleId: string, reason: string) =>
+        apiClient.post<any>(`/api/sales/${saleId}/reverse`, { reason }),
 
     getSalesReport: (params: {
         shopId: string;

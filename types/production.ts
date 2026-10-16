@@ -43,6 +43,19 @@ export interface ProductionOutput {
     stock_transaction_id: string
 }
 
+export interface AmendBatchLine {
+    lineId?: string
+    item_id: string
+    quantity: number
+}
+
+export interface AmendBatchRequest {
+    inputs?: AmendBatchLine[]
+    outputs?: AmendBatchLine[]
+    reason: string
+    shift_id?: string
+}
+
 export interface ProductionBatch {
     id: string
     shop_id: string

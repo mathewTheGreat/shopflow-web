@@ -2,14 +2,26 @@ type FetchOptions = RequestInit & {
     headers?: Record<string, string>
 }
 
+let apiTokenGetter: (() => Promise<string | null>) | undefined
+
+export function setApiTokenGetter(getter: () => Promise<string | null>) {
+    apiTokenGetter = getter
+}
+
 async function fetcher<T>(url: string, options?: FetchOptions): Promise<T> {
+    const token = await apiTokenGetter?.()
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+        ...(options?.headers as Record<string, string> | undefined),
+    }
+    if (token && !headers.Authorization && !headers.authorization) {
+        headers.Authorization = `Bearer ${token}`
+    }
+
     const response = await fetch(url, {
         ...options,
-        headers: {
-            "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
-            ...options?.headers,
-        },
+        headers,
     })
 
     if (!response.ok) {
@@ -49,28 +61,28 @@ async function fetcher<T>(url: string, options?: FetchOptions): Promise<T> {
 
 export const apiClient = {
     get: <T>(url: string, options?: FetchOptions) => fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, { ...options, method: "GET" }),
-    post: <T>(url: string, data: unknown, options?: FetchOptions) => {
+    post: <T>(url: string, data?: unknown, options?: FetchOptions) => {
         console.log(`[API Client] POST ${url}`, data);
         return fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
             ...options,
             method: "POST",
-            body: JSON.stringify(data),
+            body: data === undefined ? undefined : JSON.stringify(data),
         });
     },
-    put: <T>(url: string, data: unknown, options?: FetchOptions) => {
+    put: <T>(url: string, data?: unknown, options?: FetchOptions) => {
         console.log(`[API Client] PUT ${url}`, data);
         return fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
             ...options,
             method: "PUT",
-            body: JSON.stringify(data),
+            body: data === undefined ? undefined : JSON.stringify(data),
         });
     },
-    patch: <T>(url: string, data: unknown, options?: FetchOptions) => {
+    patch: <T>(url: string, data?: unknown, options?: FetchOptions) => {
         console.log(`[API Client] PATCH ${url}`, data);
         return fetcher<T>(process.env.NEXT_PUBLIC_API_URL + url, {
             ...options,
             method: "PATCH",
-            body: JSON.stringify(data),
+            body: data === undefined ? undefined : JSON.stringify(data),
         });
     },
     delete: <T>(url: string, data?: unknown, options?: FetchOptions) => {

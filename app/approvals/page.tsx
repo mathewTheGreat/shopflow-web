@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/sheet"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Shift } from "@/types/shift"
+import { CorrectionsTab } from "@/components/shifts/CorrectionsTab"
+import { ListSearch } from "@/components/ui/list-search"
 
 function formatDateTime(isoString?: string | null) {
     if (!isoString) return ""
@@ -145,7 +147,7 @@ function ManagerApprovalView({
                 {expanded && (
                     <div className="mt-3 pt-3 border-t text-sm space-y-1 text-muted-foreground">
                         <p><strong>Shift:</strong> {shift.name}</p>
-                        <p><strong>Cashier:</strong> {shift.manager_name || shift.manager_id.slice(0, 8)}</p>
+                        <p><strong>Cashier:</strong> {shift.manager_name || "Unknown staff"}</p>
                     </div>
                 )}
             </CardContent>
@@ -220,7 +222,12 @@ export default function ApprovalsPage() {
         isApprovingRejectedShiftV2,
     } = useApprovals()
 
-    const [selectedTab, setSelectedTab] = useState<"pending" | "rejected">("pending")
+    const [selectedTab, setSelectedTab] = useState<"pending" | "rejected" | "corrections">("pending")
+    const [shiftSearch, setShiftSearch] = useState("")
+    const matchesShiftSearch = (shift: any) =>
+        !shiftSearch || shift.name?.toLowerCase().includes(shiftSearch.toLowerCase())
+    const visiblePending = (pendingApprovals || []).filter(matchesShiftSearch)
+    const visibleRejected = (rejectedShifts || []).filter(matchesShiftSearch)
 
     if (!isLoaded) {
         return (
@@ -274,19 +281,36 @@ export default function ApprovalsPage() {
                             >
                                 Rejected
                             </button>
+                            {isManager && (
+                                <button
+                                    onClick={() => setSelectedTab("corrections")}
+                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${selectedTab === "corrections" ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                                >
+                                    Corrections
+                                </button>
+                            )}
                         </div>
 
                         {selectedTab === "pending" && isManager && (
                             <div className="space-y-3">
-                                <h2 className="text-lg font-bold">Pending Approval</h2>
+                                <div className="flex items-center justify-between gap-3">
+                                    <h2 className="text-lg font-bold">Pending Approval</h2>
+                                    <div className="w-[220px]">
+                                        <ListSearch
+                                            placeholder="Search shifts..."
+                                            value={shiftSearch}
+                                            onChange={setShiftSearch}
+                                        />
+                                    </div>
+                                </div>
                                 {isLoadingPending ? (
                                     <div className="flex items-center justify-center py-12">
                                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                                     </div>
-                                ) : !pendingApprovals?.length ? (
+                                ) : !visiblePending?.length ? (
                                     <p className="text-sm text-muted-foreground text-center py-12">No shifts pending approval</p>
                                 ) : (
-                                    pendingApprovals.map((shift) => (
+                                    visiblePending.map((shift) => (
                                         <ManagerApprovalView
                                             key={shift.id}
                                             shift={shift}
@@ -319,18 +343,34 @@ export default function ApprovalsPage() {
 
                         {selectedTab === "rejected" && (
                             <div className="space-y-3">
-                                <h2 className="text-lg font-bold">Rejected Shifts</h2>
+                                <div className="flex items-center justify-between gap-3">
+                                    <h2 className="text-lg font-bold">Rejected Shifts</h2>
+                                    <div className="w-[220px]">
+                                        <ListSearch
+                                            placeholder="Search shifts..."
+                                            value={shiftSearch}
+                                            onChange={setShiftSearch}
+                                        />
+                                    </div>
+                                </div>
                                 {isLoadingRejected ? (
                                     <div className="flex items-center justify-center py-12">
                                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                                     </div>
-                                ) : !rejectedShifts?.length ? (
+                                ) : !visibleRejected?.length ? (
                                     <p className="text-sm text-muted-foreground text-center py-12">No rejected shifts</p>
                                 ) : (
-                                    rejectedShifts.map((shift) => (
+                                    visibleRejected.map((shift) => (
                                         <RejectedShiftCard key={shift.id} shift={shift} onApprove={isManager ? () => approveRejectedShiftV2(shift.id) : undefined} isApproving={isApprovingRejectedShiftV2} />
                                     ))
                                 )}
+                            </div>
+                        )}
+
+                        {selectedTab === "corrections" && isManager && (
+                            <div className="space-y-3">
+                                <h2 className="text-lg font-bold">Record Corrections</h2>
+                                <CorrectionsTab />
                             </div>
                         )}
                     </div>

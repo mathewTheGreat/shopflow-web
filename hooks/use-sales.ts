@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { saleService } from "@/services/sale.service"
+import { ListParams, PagedResult } from "@/types/list"
 import { toast } from "sonner"
 
 export function useCreateSale() {
@@ -20,15 +21,23 @@ export function useCreateSale() {
     })
 }
 
-export function useSales(shopId: string | undefined, limit = 50) {
-    return useQuery({
-        queryKey: ["sales", shopId, limit],
-        queryFn: () => {
-            if (!shopId) return []
-            return saleService.getSales(shopId, limit)
+export function useSales(shopId: string | undefined, params?: ListParams) {
+    const { data, isLoading, error, refetch } = useQuery({
+        queryKey: ["sales", shopId, params?.search ?? "", params?.page ?? 1, params?.limit ?? 50],
+        queryFn: (): Promise<PagedResult<any>> => {
+            if (!shopId) return Promise.resolve({ data: [], pagination: { page: 1, limit: 0, total: 0, total_pages: 1 } })
+            return saleService.getSales(shopId, params)
         },
         enabled: !!shopId,
     })
+
+    return {
+        sales: data?.data ?? [],
+        pagination: data?.pagination,
+        isLoading,
+        error,
+        refetch,
+    }
 }
 
 export function useSaleReceipt(saleId: string | null) {

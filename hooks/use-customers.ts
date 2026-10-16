@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { customerService } from "@/services/customer.service"
 import { Customer } from "@/types/customer"
+import { ListParams, PagedResult } from "@/types/list"
 import { toast } from "sonner"
 
 export function useCustomers() {
@@ -18,16 +19,24 @@ export function useCustomers() {
     }
 }
 
-export function useCustomersByShop(shopId: string | undefined) {
-    return useQuery({
-        queryKey: ["customers", "shop", shopId],
-        queryFn: () => {
-            if (!shopId) return []
-            return customerService.getByShop(shopId)
+export function useCustomersByShop(shopId: string | undefined, params?: ListParams) {
+    const { data, isLoading, error, refetch } = useQuery({
+        queryKey: ["customers", "shop", shopId, params?.search ?? "", params?.page ?? 0, params?.limit ?? 0],
+        queryFn: (): Promise<PagedResult<Customer>> => {
+            if (!shopId) return Promise.resolve({ data: [], pagination: { page: 1, limit: 0, total: 0, total_pages: 1 } })
+            return customerService.getByShop(shopId, params)
         },
         enabled: !!shopId,
         staleTime: 5 * 60 * 1000,
     })
+
+    return {
+        customers: data?.data ?? [],
+        pagination: data?.pagination,
+        isLoading,
+        error,
+        refetch,
+    }
 }
 
 export function useCustomerBalance(customerId: string) {

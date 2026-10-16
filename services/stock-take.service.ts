@@ -6,8 +6,8 @@ export const stockTakeService = {
     createStockTake: (data: Partial<StockTake>) =>
         apiClient.post<StockTake>("/api/stock/takes", data),
 
-    createBulkStockTakes: (data: Partial<StockTake>[]) =>
-        apiClient.post<StockTake[]>("/api/stock/takes/bulk-v2", data),
+    createBulkStockTakes: (data: Partial<StockTake>[], autoAdjust: boolean = true) =>
+        apiClient.post<StockTake[]>(`/api/stock/takes/bulk-v2${autoAdjust ? "" : "?autoAdjust=false"}`, data),
 
     getStockTakesByShop: (shopId: string) =>
         apiClient.get<StockTake[]>(`/api/stock/takes/shop/${shopId}`),

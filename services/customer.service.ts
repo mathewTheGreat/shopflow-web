@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client"
 import { Customer } from "@/types/customer"
+import { buildListQuery, ListParams, PagedResult } from "@/types/list"
 
 export const customerService = {
     getAll: () => {
@@ -22,8 +23,8 @@ export const customerService = {
         return apiClient.patch<Customer>(`/api/customers/${id}`, data)
     },
 
-    getByShop: (shopId: string) => {
-        return apiClient.get<Customer[]>(`/api/customers/shop/${shopId}`)
+    getByShop: (shopId: string, params?: ListParams) => {
+        return apiClient.get<PagedResult<Customer>>(`/api/customers/shop/${shopId}${buildListQuery(params)}`)
     },
 
     delete: (id: string) => {

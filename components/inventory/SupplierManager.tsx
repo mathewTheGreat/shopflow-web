@@ -4,27 +4,16 @@ import { useState } from "react"
 import {
     ChevronLeft,
     Plus,
-    Search,
-    MoreVertical,
     Edit,
     Trash2,
-    Phone,
-    Mail,
-    User,
     Loader2,
     Building2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { useSuppliers, useDeleteSupplier } from "@/hooks/use-supplier"
+import { ListSearch } from "@/components/ui/list-search"
+import { ListPagination } from "@/components/ui/list-pagination"
 import { Supplier } from "@/types/supplier"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
 import { SupplierFormDialog } from "./SupplierFormDialog"
 
 interface SupplierManagerProps {
@@ -36,14 +25,15 @@ export function SupplierManager({ onBack }: SupplierManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false)
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | undefined>()
 
-    const { data: suppliers = [], isLoading } = useSuppliers()
+    const [page, setPage] = useState(1)
+    const { suppliers = [], pagination, isLoading } = useSuppliers({
+        search: searchQuery,
+        page,
+        limit: 20,
+    })
     const { mutate: deleteSupplier } = useDeleteSupplier()
 
-    const filteredSuppliers = suppliers.filter(s =>
-        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.contact?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.phone?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const filteredSuppliers = suppliers
 
     const handleEdit = (supplier: Supplier) => {
         setSelectedSupplier(supplier)
@@ -83,25 +73,14 @@ export function SupplierManager({ onBack }: SupplierManagerProps) {
                         Add Supplier
                     </Button>
 
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold">All Suppliers ({suppliers.length})</h2>
-                        <div className="flex gap-2">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="icon">
-                                        <Search className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-[300px] p-2">
-                                    <Input
-                                        placeholder="Search suppliers..."
-                                        className="h-10"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        autoFocus
-                                    />
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                    <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-xl font-semibold">All Suppliers ({pagination?.total ?? suppliers.length})</h2>
+                        <div className="w-[300px]">
+                            <ListSearch
+                                placeholder="Search suppliers..."
+                                value={searchQuery}
+                                onChange={(v) => { setSearchQuery(v); setPage(1) }}
+                            />
                         </div>
                     </div>
 
@@ -167,6 +146,9 @@ export function SupplierManager({ onBack }: SupplierManagerProps) {
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                                <div className="px-4">
+                                    <ListPagination pagination={pagination} onPageChange={setPage} />
                                 </div>
                             </div>
                         </div>

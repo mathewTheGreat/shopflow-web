@@ -42,7 +42,7 @@ export function CustomerNetPositionDialog({ open, onOpenChange }: CustomerNetPos
     const [isGenerating, setIsGenerating] = useState(false)
 
     // Data Hooks
-    const { data: customers = [] } = useCustomersByShop(activeShop?.id || "")
+    const { customers = [] } = useCustomersByShop(activeShop?.id || "")
 
     const handleGenerateReport = async (action: 'preview' | 'excel' | 'pdf') => {
         if (!selectedCustomerId) {
@@ -352,7 +352,7 @@ const exportToExcelWeb = async (
     XLSX.utils.book_append_sheet(workbook, summaryWs, 'Summary');
 
     // Transactions Sheet
-    const transactionData = [
+    const transactionData: (string | number)[][] = [
         ['Date', 'Time', 'Type', 'Method', 'Reference/Notes', 'Staff', 'Amount', 'Running Balance']
     ];
 

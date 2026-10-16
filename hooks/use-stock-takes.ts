@@ -15,7 +15,8 @@ export function useCreateBulkStockTakes() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: stockTakeService.createBulkStockTakes,
+        mutationFn: ({ takes, autoAdjust }: { takes: Partial<StockTake>[]; autoAdjust?: boolean }) =>
+            stockTakeService.createBulkStockTakes(takes, autoAdjust),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["stock-takes"] })
             queryClient.invalidateQueries({ queryKey: ["stock-levels"] })

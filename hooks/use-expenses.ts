@@ -1,19 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { expenseService } from "@/services/expense.service"
-import { shiftService } from "@/services/shift.service"
 import { Expense } from "@/types/expense"
+import { ListParams, PagedResult } from "@/types/list"
 import { toast } from "sonner"
 import { v4 as uuidv4 } from "uuid"
 
-export function useExpenses(shopId: string | undefined, limit = 50) {
-    return useQuery({
-        queryKey: ["expenses", shopId, limit],
-        queryFn: () => {
-            if (!shopId) return []
-            return expenseService.getExpensesByShop(shopId, limit)
+export function useExpenses(shopId: string | undefined, params?: ListParams) {
+    const { data, isLoading, error, refetch } = useQuery({
+        queryKey: ["expenses", shopId, params?.search ?? "", params?.page ?? 1, params?.limit ?? 50],
+        queryFn: (): Promise<PagedResult<Expense>> => {
+            if (!shopId) return Promise.resolve({ data: [], pagination: { page: 1, limit: 0, total: 0, total_pages: 1 } })
+            return expenseService.getExpensesByShop(shopId, params)
         },
         enabled: !!shopId,
     })
+
+    return {
+        expenses: data?.data ?? [],
+        pagination: data?.pagination,
+        isLoading,
+        error,
+        refetch,
+    }
 }
 
 export function useCreateExpense() {
@@ -33,24 +41,7 @@ export function useCreateExpense() {
                 _is_pending: false,
             }
 
-            // 1. Create Expense
             const expense = await expenseService.createExpense(payload)
-
-            // 2. Record Cash Movement for Shift Reconciliation
-            const payoutReason = `Expense: ${data.description || data.category}`
-            await shiftService.recordCashMovement({
-                id: uuidv4(),
-                shift_id: data.shift_id,
-                type: 'PAY_OUT',
-                amount: data.amount,
-                payment_method: data.payment_method,
-                reason: payoutReason,
-                created_by: data.created_by,
-                _version: 1,
-                _last_modified_at: now,
-                _is_pending: false,
-            })
-
             return expense
         },
         onSuccess: () => {

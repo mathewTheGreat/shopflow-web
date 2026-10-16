@@ -7,7 +7,7 @@ export interface Shift extends BaseEntity {
     start_time: string;
     end_time: string;
     is_closed: boolean;
-    closing_status?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+    closing_status?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'PENDING_CORRECTION_APPROVAL' | 'ABANDONED';
     submitted_for_approval_at?: string | null;
     approved_by?: string | null;
     approved_at?: string | null;
@@ -38,6 +38,11 @@ export interface ShiftCashMovement extends BaseEntity {
     payment_method: 'CASH' | 'MPESA' | 'CARD' | 'BANK_TRANSFER' | 'OTHER';
     reason?: string | null;
     created_by: string;
+    expense_id?: string | null;
+    is_reversal?: boolean;
+    reversal_of?: string | null;
+    float_transaction_id?: string | null;
+    related_shift_id?: string | null;
 }
 
 export interface ShiftFinancialsBreakdownDetailed {

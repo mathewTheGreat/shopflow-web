@@ -4,7 +4,6 @@ import { useState } from "react"
 import {
     ChevronLeft,
     Plus,
-    Search,
     Edit,
     Trash2,
     Users,
@@ -13,17 +12,11 @@ import {
     Mail,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { useCustomersByShop, useDeleteCustomer } from "@/hooks/use-customers"
+import { ListSearch } from "@/components/ui/list-search"
+import { ListPagination } from "@/components/ui/list-pagination"
 import { Customer } from "@/types/customer"
 import { useAppStore } from "@/store/use-app-store"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
 import { CustomerFormDialog } from "./CustomerFormDialog"
 
 interface CustomerManagerProps {
@@ -36,14 +29,15 @@ export function CustomerManager({ onBack }: CustomerManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false)
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>()
 
-    const { data: customers = [], isLoading } = useCustomersByShop(activeShop?.id)
+    const [page, setPage] = useState(1)
+    const { customers = [], pagination, isLoading } = useCustomersByShop(activeShop?.id, {
+        search: searchQuery,
+        page,
+        limit: 20,
+    })
     const { mutate: deleteCustomer } = useDeleteCustomer()
 
-    const filteredCustomers = customers.filter(c =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.email?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const filteredCustomers = customers
 
     const handleEdit = (customer: Customer) => {
         setSelectedCustomer(customer)
@@ -84,18 +78,14 @@ export function CustomerManager({ onBack }: CustomerManagerProps) {
                         Add New Customer
                     </Button>
 
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold">Our Customers ({customers.length})</h2>
-                        <div className="flex gap-2">
-                            <div className="relative w-[300px]">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search by name, phone or email..."
-                                    className="pl-10 h-10 bg-card"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                            </div>
+                    <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-xl font-semibold">Our Customers ({pagination?.total ?? customers.length})</h2>
+                        <div className="w-[300px]">
+                            <ListSearch
+                                placeholder="Search by name, phone or email..."
+                                value={searchQuery}
+                                onChange={(v) => { setSearchQuery(v); setPage(1) }}
+                            />
                         </div>
                     </div>
 
@@ -165,6 +155,9 @@ export function CustomerManager({ onBack }: CustomerManagerProps) {
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                                <div className="px-4">
+                                    <ListPagination pagination={pagination} onPageChange={setPage} />
                                 </div>
                             </div>
                         </div>

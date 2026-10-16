@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Loader2, ArrowLeft, Package, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react"
-import { useProductionBatch, useCancelProductionBatch, useAddProductionOutput, useUpdateProductionOutput, useDeleteProductionOutput } from "@/hooks/use-production"
+import { useProductionBatch, useCancelProductionBatch, useAddProductionOutput, useUpdateProductionOutput, useDeleteProductionOutput, useAmendProductionBatch } from "@/hooks/use-production"
 import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
 import { ProductionBatch, ProductionBatchStatus, ProductionOutput } from "@/types/production"
@@ -47,14 +47,20 @@ export function ProductionBatchDetails({
     const { mutateAsync: addOutput, isPending: isAddingOutput } = useAddProductionOutput()
     const { mutateAsync: updateOutput, isPending: isUpdatingOutput } = useUpdateProductionOutput()
     const { mutateAsync: deleteOutput, isPending: isDeletingOutput } = useDeleteProductionOutput()
+    const { mutateAsync: amendBatch, isPending: isAmending } = useAmendProductionBatch()
     const { items } = useItems()
     const userInfo = useAppStore((state) => state.userInfo)
     const activeShift = useAppStore((state) => state.activeShift)
+    const activeShop = useAppStore((state) => state.activeShop)
+    const isManager = activeShop?.role === "Manager"
 
     const [showAddOutput, setShowAddOutput] = useState(false)
     const [editingOutput, setEditingOutput] = useState<ProductionOutput | null>(null)
     const [newOutputs, setNewOutputs] = useState<OutputItem[]>([{ item_id: "", quantity: "" }])
     const [editQuantity, setEditQuantity] = useState<string>("")
+    const [showAmend, setShowAmend] = useState(false)
+    const [amendQtys, setAmendQtys] = useState<Record<string, string>>({})
+    const [amendReason, setAmendReason] = useState("")
 
     const itemMap = useMemo(() => {
         const map: Record<string, string> = {}
@@ -162,6 +168,55 @@ export function ProductionBatchDetails({
         }
     }
 
+    const handleAmendBatch = async () => {
+        if (!batch || !activeShift || !userInfo) return
+
+        const reason = amendReason.trim()
+        if (!reason) {
+            alert("A reason is required to amend a finalized batch")
+            return
+        }
+
+        const changedInputs = (batch.inputs || [])
+            .map((input) => ({
+                lineId: input.id,
+                item_id: input.item_id,
+                quantity: parseFloat(amendQtys[`in:${input.id}`] ?? String(input.quantity)),
+                oldQuantity: input.quantity,
+            }))
+            .filter((l) => Number.isFinite(l.quantity) && l.quantity >= 0 && l.quantity !== l.oldQuantity)
+
+        const changedOutputs = (batch.outputs || [])
+            .map((output) => ({
+                lineId: output.id,
+                item_id: output.item_id,
+                quantity: parseFloat(amendQtys[`out:${output.id}`] ?? String(output.quantity)),
+                oldQuantity: output.quantity,
+            }))
+            .filter((l) => Number.isFinite(l.quantity) && l.quantity >= 0 && l.quantity !== l.oldQuantity)
+
+        if (changedInputs.length === 0 && changedOutputs.length === 0) {
+            alert("Change at least one quantity to amend the batch")
+            return
+        }
+
+        try {
+            await amendBatch({
+                id: batch.id,
+                data: {
+                    inputs: changedInputs.map(({ lineId, item_id, quantity }) => ({ lineId, item_id, quantity })),
+                    outputs: changedOutputs.map(({ lineId, item_id, quantity }) => ({ lineId, item_id, quantity })),
+                    reason,
+                    shift_id: activeShift.id,
+                },
+            })
+            setShowAmend(false)
+            refetch()
+        } catch (error) {
+            console.error("Failed to amend batch:", error)
+        }
+    }
+
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -232,6 +287,24 @@ export function ProductionBatchDetails({
                         </Button>
                         <Button onClick={() => onCloseBatch(batch)} className="bg-primary hover:bg-primary/90">
                             Close Batch
+                        </Button>
+                    </div>
+                )}
+                {batch.status === "FINALIZED" && isManager && (
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                const initial: Record<string, string> = {}
+                                ;(batch.inputs || []).forEach((i) => { initial[`in:${i.id}`] = String(i.quantity) })
+                                ;(batch.outputs || []).forEach((o) => { initial[`out:${o.id}`] = String(o.quantity) })
+                                setAmendQtys(initial)
+                                setAmendReason("")
+                                setShowAmend(true)
+                            }}
+                        >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Amend Batch
                         </Button>
                     </div>
                 )}
@@ -456,6 +529,81 @@ export function ProductionBatchDetails({
                             </Button>
                             <Button onClick={handleAddOutput} disabled={isAddingOutput}>
                                 {isAddingOutput ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Output"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Amend Finalized Batch Dialog */}
+            {showAmend && batch && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-background p-6 rounded-lg w-full max-w-lg shadow-lg">
+                        <h3 className="text-lg font-semibold mb-2">Amend Finalized Batch</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            The original finalization stays on record. Only changed quantities post compensating stock movements.
+                        </p>
+                        <div className="space-y-4 max-h-[320px] overflow-y-auto">
+                            <div>
+                                <Label className="font-medium">Inputs (consumed)</Label>
+                                <div className="space-y-2 mt-2">
+                                    {(batch.inputs || []).map((input) => (
+                                        <div key={input.id} className="flex gap-2 items-center">
+                                            <div className="flex-1 text-sm truncate" title={getItemName(input.item_id)}>
+                                                {getItemName(input.item_id)}
+                                                <span className="text-muted-foreground"> (was {input.quantity})</span>
+                                            </div>
+                                            <div className="w-28">
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={amendQtys[`in:${input.id}`] ?? String(input.quantity)}
+                                                    onChange={(e) => setAmendQtys((prev) => ({ ...prev, [`in:${input.id}`]: e.target.value }))}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <Label className="font-medium">Outputs (produced)</Label>
+                                <div className="space-y-2 mt-2">
+                                    {(batch.outputs || []).map((output) => (
+                                        <div key={output.id} className="flex gap-2 items-center">
+                                            <div className="flex-1 text-sm truncate" title={getItemName(output.item_id)}>
+                                                {getItemName(output.item_id)}
+                                                <span className="text-muted-foreground"> (was {output.quantity})</span>
+                                            </div>
+                                            <div className="w-28">
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={amendQtys[`out:${output.id}`] ?? String(output.quantity)}
+                                                    onChange={(e) => setAmendQtys((prev) => ({ ...prev, [`out:${output.id}`]: e.target.value }))}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <Label>Reason (required)</Label>
+                                <Input
+                                    value={amendReason}
+                                    onChange={(e) => setAmendReason(e.target.value)}
+                                    placeholder="Why is this correction needed?"
+                                    className="mt-1"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-4">
+                            <Button variant="ghost" onClick={() => setShowAmend(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={handleAmendBatch} disabled={isAmending}>
+                                {isAmending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Post Amendment"}
                             </Button>
                         </div>
                     </div>

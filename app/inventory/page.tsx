@@ -7,8 +7,6 @@ import {
     BarChart3,
     Settings,
     Plus,
-    Filter,
-    Search,
     Menu,
     Edit,
     Trash2,
@@ -27,6 +25,8 @@ import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppSidebar } from "@/components/app-sidebar"
+import { ListSearch } from "@/components/ui/list-search"
+import { ListPagination } from "@/components/ui/list-pagination"
 import { ItemFormDialog } from "@/components/inventory/ItemFormDialog"
 import { StockInDialog } from "@/components/inventory/StockInDialog"
 import { StockOutDialog } from "@/components/inventory/StockOutDialog"
@@ -55,7 +55,13 @@ export default function InventoryPage() {
     const [showVarianceSummaryReportDialog, setShowVarianceSummaryReportDialog] = useState(false)
     const [showProductionReportDialog, setShowProductionReportDialog] = useState(false)
     const [selectedItem, setSelectedItem] = useState<Item | null>(null)
-    const { items, isLoading, refetch } = useItems()
+    const [itemSearch, setItemSearch] = useState("")
+    const [itemPage, setItemPage] = useState(1)
+    const { items, pagination: itemsPagination, isLoading, refetch } = useItems({
+        search: itemSearch,
+        page: itemPage,
+        limit: 20,
+    })
     const currency = useAppStore((state) => state.userCurrency) || "KES"
     const activeShift = useAppStore((state) => state.activeShift)
     const activeShop = useAppStore((state) => state.activeShop)
@@ -189,11 +195,15 @@ export default function InventoryPage() {
                                             </Button>
                                         )}
 
-                                        <div className="flex items-center justify-between">
-                                            <h2 className="text-xl font-semibold">Items ({items.length})</h2>
-                                            <Button variant="outline" size="icon">
-                                                <Filter className="h-4 w-4" />
-                                            </Button>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <h2 className="text-xl font-semibold">Items ({itemsPagination?.total ?? items.length})</h2>
+                                            <div className="w-[260px]">
+                                                <ListSearch
+                                                    placeholder="Search items..."
+                                                    value={itemSearch}
+                                                    onChange={(v) => { setItemSearch(v); setItemPage(1) }}
+                                                />
+                                            </div>
                                         </div>
 
                                         {isLoading ? (
@@ -250,6 +260,7 @@ export default function InventoryPage() {
                                                             </div>
                                                         ))}
                                                     </div>
+                                                    <ListPagination pagination={itemsPagination} onPageChange={setItemPage} />
                                                 </div>
                                             </div>
                                         )}

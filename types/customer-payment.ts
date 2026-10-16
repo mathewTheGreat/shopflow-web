@@ -23,6 +23,7 @@ export interface CustomerPaymentTransaction extends BaseEntity {
     type: TransactionType;
     amount: number;
     payment_method: PaymentMethod;
+    reversal_of?: string | null;
     notes?: string | null;
     created_at: string;
     created_by: string;
@@ -32,9 +33,9 @@ export interface CustomerPaymentTransaction extends BaseEntity {
     customerId?: string;
 
     // Sync metadata
-    _is_pending?: boolean;
-    _version?: number;
-    _last_modified_at?: string;
+    _is_pending: boolean;
+    _version: number;
+    _last_modified_at: string;
     _synced_at?: string;
 }
 

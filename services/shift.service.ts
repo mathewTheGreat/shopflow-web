@@ -42,6 +42,29 @@ export const shiftService = {
         return apiClient.get<Shift[]>(`/api/shifts/shop/${shopId}?${params.toString()}`);
     },
 
+    getShiftsByShop: (shopId: string) =>
+        apiClient.get<Shift[]>(`/api/shifts/shop/${shopId}`),
+
+    reverseCashMovement: (id: string, reason: string) =>
+        apiClient.post<any>(`/api/shift-cash-movements/${id}/reverse`, { reason }),
+
+    // Late entry corrections (attributed to a prior shift; recordedShiftId is
+    // the shift where the correction is entered, so both are retained)
+    createLateSale: (originalShiftId: string, userId: string, payload: { saleData: any; items: any[]; payments: any[] }, recordedShiftId?: string) =>
+        apiClient.post<any>(`/api/shifts/${originalShiftId}/late-entries/sales`, { userId, recordedShiftId, ...payload }),
+
+    createLateExpense: (originalShiftId: string, userId: string, expenseData: any, recordedShiftId?: string) =>
+        apiClient.post<any>(`/api/shifts/${originalShiftId}/late-entries/expenses`, { userId, recordedShiftId, expenseData }),
+
+    createLateStockCorrection: (originalShiftId: string, userId: string, stockCorrections: any[], recordedShiftId?: string) =>
+        apiClient.post<any>(`/api/shifts/${originalShiftId}/late-entries/stock-corrections`, { userId, recordedShiftId, stockCorrections }),
+
+    createLateCashMovement: (originalShiftId: string, userId: string, cashMovementData: any, recordedShiftId?: string) =>
+        apiClient.post<any>(`/api/shifts/${originalShiftId}/late-entries/cash-movements`, { userId, recordedShiftId, cashMovementData }),
+
+    createLateReconciliation: (originalShiftId: string, userId: string, reconciliationData: any, recordedShiftId?: string) =>
+        apiClient.post<any>(`/api/shifts/${originalShiftId}/late-entries/reconciliation`, { userId, recordedShiftId, reconciliationData }),
+
     getShiftPerformanceReport: (shiftId: string) =>
         apiClient.get<any>(`/api/shift-reconciliation/shift/${shiftId}/performance-report`),
 
@@ -70,9 +93,6 @@ export const shiftService = {
 
     getFloatTransaction: (floatTransactionId: string) =>
         apiClient.get<any>(`/api/shifts/float/transaction/${floatTransactionId}`),
-
-    deleteFloatTransaction: (floatTransactionId: string) =>
-        apiClient.delete<any>(`/api/shifts/float/transaction/${floatTransactionId}`),
 
     getFinancialSummaryReport: (params: { shopId: string; startDate: string; endDate: string; cashierId?: string }) => {
         const queryParams = new URLSearchParams({
@@ -127,6 +147,17 @@ export const shiftService = {
 
     getShiftCashMovements: (shiftId: string) =>
         apiClient.get<ShiftCashMovement[]>(`/api/shift-cash-movements/shift/${shiftId}`),
+
+    getClosePreview: (shiftId: string) =>
+        apiClient.get<{
+            sales: number; salePayments: number; expenses: number; cashMovements: number;
+            stockTakes: number; stockTransactions: number; reconciliations: number;
+            customerTransactions: number; productionBatches: number; approvalEvents: number;
+            hasOperationalActivity: boolean; hasAnyActivity: boolean;
+        }>(`/api/shifts/${shiftId}/close-preview`),
+
+    abandonShift: (shiftId: string, reason: string) =>
+        apiClient.post<any>(`/api/shifts/${shiftId}/abandon`, { reason }),
 
     updateCashMovement: (id: string, data: { amount: number }) =>
         apiClient.patch<any>(`/api/shift-cash-movements/${id}`, data),

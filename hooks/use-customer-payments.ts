@@ -1,19 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customerPaymentService } from "@/services/customer-payment.service";
-import { CreateDebitDTO, CreatePaymentDTO } from "@/types/customer-payment";
+import { CreateDebitDTO, CreatePaymentDTO, CustomerPaymentTransaction } from "@/types/customer-payment";
+import { ListParams, PagedResult } from "@/types/list";
 import { toast } from "sonner";
 
 // Fetch recent shop transactions
-export function useShopTransactions(shopId: string | undefined, limit: number = 50) {
-    return useQuery({
-        queryKey: ["customer-payments", "shop", shopId],
-        queryFn: () => {
-            if (!shopId) return [];
-            return customerPaymentService.getShopTransactions(shopId, limit);
+export function useShopTransactions(shopId: string | undefined, params?: ListParams) {
+    const { data, isLoading, error, refetch } = useQuery({
+        queryKey: ["customer-payments", "shop", shopId, params?.search ?? "", params?.page ?? 1, params?.limit ?? 50],
+        queryFn: (): Promise<PagedResult<CustomerPaymentTransaction>> => {
+            if (!shopId) return Promise.resolve({ data: [], pagination: { page: 1, limit: 0, total: 0, total_pages: 1 } });
+            return customerPaymentService.getShopTransactions(shopId, params);
         },
         enabled: !!shopId,
         staleTime: 1000 * 60, // 1 minute
     });
+
+    return {
+        transactions: data?.data ?? [],
+        pagination: data?.pagination,
+        isLoading,
+        error,
+        refetch,
+    };
 }
 
 // Fetch specific customer account
@@ -69,6 +78,23 @@ export function useRecordWithdrawal() {
         },
         onError: (error: any) => {
             toast.error(error.message || "Failed to record charge");
+        }
+    });
+}
+
+// Mutation: Reverse Transaction
+export function useReverseCustomerTransaction() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+            customerPaymentService.reverseTransaction(id, reason),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["customer-payments"] });
+            queryClient.invalidateQueries({ queryKey: ["customers"] });
+            toast.success("Transaction reversed");
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "Failed to reverse transaction");
         }
     });
 }

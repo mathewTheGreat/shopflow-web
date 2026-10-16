@@ -9,6 +9,10 @@ export interface Sale extends BaseEntity {
     sale_category: 'IMMEDIATE' | 'CREDIT' | 'PREPAID';
     notes?: string | null;
     created_by?: string | null;
+    status?: 'POSTED' | 'VOIDED';
+    voided_at?: string | null;
+    voided_by?: string | null;
+    void_reason?: string | null;
 }
 
 export interface SaleItem extends BaseEntity {

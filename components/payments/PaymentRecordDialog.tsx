@@ -60,7 +60,11 @@ export function PaymentRecordDialog({
     const userInfo = useAppStore((state) => state.userInfo)
     const activeShift = useAppStore((state) => state.activeShift)
 
-    const { data: customers = [] } = useCustomersByShop(activeShop?.id)
+    const { customers = [] } = useCustomersByShop(activeShop?.id)
+    const [customerFilter, setCustomerFilter] = useState("")
+    const visibleCustomers = customers.filter((c) =>
+        c.name.toLowerCase().includes(customerFilter.toLowerCase())
+    )
     const { mutate: recordPayment, isPending: isPaymentPending } = useRecordPayment()
     const { mutate: recordWithdrawal, isPending: isWithdrawalPending } = useRecordWithdrawal()
 
@@ -158,7 +162,15 @@ export function PaymentRecordDialog({
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            {customers.map((customer) => (
+                                            <div className="p-2">
+                                                <Input
+                                                    placeholder="Search customers..."
+                                                    value={customerFilter}
+                                                    onChange={(e) => setCustomerFilter(e.target.value)}
+                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                />
+                                            </div>
+                                            {visibleCustomers.map((customer) => (
                                                 <SelectItem key={customer.id} value={customer.id}>
                                                     {customer.name}
                                                 </SelectItem>

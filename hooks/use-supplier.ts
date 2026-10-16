@@ -2,12 +2,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supplierService } from "@/services/supplier.service"
 import { toast } from "sonner"
 import { Supplier } from "@/types/supplier"
+import { ListParams } from "@/types/list"
 
-export function useSuppliers() {
-    return useQuery({
-        queryKey: ["suppliers"],
-        queryFn: supplierService.getSuppliers,
+export function useSuppliers(params?: ListParams) {
+    const { data, isLoading, error, refetch } = useQuery({
+        queryKey: ["suppliers", params?.search ?? "", params?.page ?? 0, params?.limit ?? 0],
+        queryFn: () => supplierService.getSuppliers(params),
     })
+
+    return {
+        suppliers: data?.data ?? [],
+        pagination: data?.pagination,
+        isLoading,
+        error,
+        refetch,
+    }
 }
 
 export function useSupplier(id: string) {

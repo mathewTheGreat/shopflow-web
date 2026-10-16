@@ -9,7 +9,7 @@ interface ShiftStatusCardProps {
     startTime?: string
     onOpenShift: () => void
     onCloseShift: () => void
-    closingStatus?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
+    closingStatus?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'PENDING_CORRECTION_APPROVAL' | 'ABANDONED'
     rejectionReason?: string | null
 }
 
@@ -27,7 +27,7 @@ export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShif
     }
 
     const isRejected = closingStatus === 'REJECTED'
-    const isPendingApproval = closingStatus === 'PENDING_APPROVAL'
+    const isPendingApproval = closingStatus === 'PENDING_APPROVAL' || closingStatus === 'PENDING_CORRECTION_APPROVAL'
     const isApproved = closingStatus === 'APPROVED'
     const isActive = shiftOpen && !isRejected
 

@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api-client"
 import { QuantityDiscount } from "@/types/pricing"
 
 export interface CreateQuantityDiscountInput {
+    id: string
     item_id: string
     shop_id: string
     min_quantity: number

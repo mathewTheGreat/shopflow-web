@@ -347,7 +347,7 @@ function formatProductionReportHTML(
                       <td><span class="${statusClass}">${batch.status}</span></td>
                       <td class="text-right">${batch.total_input_quantity || 0}</td>
                       <td class="text-right">${batch.total_output_quantity || 0}</td>
-                      <td class="text-right ${batch.total_loss_quantity > 0 ? 'negative' : ''}">${batch.total_loss_quantity || 0}</td>
+                      <td class="text-right ${(batch.total_loss_quantity || 0) > 0 ? 'negative' : ''}">${batch.total_loss_quantity || 0}</td>
                       <td class="text-right">${batchEfficiency}%</td>
                     </tr>
                   </table>

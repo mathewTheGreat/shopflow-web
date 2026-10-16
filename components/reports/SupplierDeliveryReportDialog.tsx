@@ -43,7 +43,7 @@ export function SupplierDeliveryReportDialog({ open, onOpenChange }: SupplierDel
     const [isGenerating, setIsGenerating] = useState(false)
 
     // Data Hooks
-    const { data: suppliers = [] } = useSuppliers()
+    const { suppliers = [] } = useSuppliers()
     const { items } = useItems()
 
     const handleGenerateReport = async (action: 'preview' | 'excel' | 'pdf') => {

@@ -5,6 +5,42 @@ import { toast } from "sonner"
 import { useAppStore } from "@/store/use-app-store"
 import { useUser } from "@clerk/nextjs"
 import { Shift, ShiftCashMovement, ShiftReconciliation } from "@/types/shift"
+import { ListParams } from "@/types/list"
+
+export function useShiftCashMovements(shiftId: string | undefined) {
+    const { data, isLoading, error, refetch } = useQuery({
+        queryKey: ["shift-cash-movements", shiftId],
+        queryFn: () => {
+            if (!shiftId) return []
+            return shiftService.getShiftCashMovements(shiftId)
+        },
+        enabled: !!shiftId,
+    })
+
+    return {
+        movements: (data || []) as ShiftCashMovement[],
+        isLoading,
+        error,
+        refetch,
+    }
+}
+
+export function useReverseCashMovement() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+            shiftService.reverseCashMovement(id, reason),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["shift-cash-movements"] })
+            await queryClient.invalidateQueries({ queryKey: ["current-shift"] })
+            toast.success("Cash movement reversed")
+        },
+        onError: (error: Error) => {
+            toast.error(error.message || "Failed to reverse cash movement")
+        },
+    })
+}
 
 export function useShift() {
     const queryClient = useQueryClient()
@@ -102,7 +138,7 @@ export function useShift() {
                 })
             }
 
-            return await shiftService.submitForApproval(currentShift.id)
+            return await shiftService.submitForApprovalV2(currentShift.id, userInfo.id)
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["current-shift"] })

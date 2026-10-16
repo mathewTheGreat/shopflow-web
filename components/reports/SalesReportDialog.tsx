@@ -65,7 +65,7 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
 
     // Data Hooks
     const { data: shops = [] } = useShops()
-    const { data: customers = [] } = useCustomersByShop(selectedShopId)
+    const { customers = [] } = useCustomersByShop(selectedShopId)
     const { items } = useItems()
 
     const { data: staff = [], isLoading: isLoadingStaff } = useQuery({

@@ -25,7 +25,7 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
     const [isSubmitting, setIsSubmitting] = useState(false)
     const { mutateAsync: createTransaction } = useCreateStockTransaction()
     const { items, isLoading: itemsLoading } = useItems()
-    const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers()
+    const { suppliers = [], isLoading: suppliersLoading } = useSuppliers()
     const userInfo = useAppStore((state) => state.userInfo)
     const activeShop = useAppStore((state) => state.activeShop)
     const activeShift = useAppStore((state) => state.activeShift)

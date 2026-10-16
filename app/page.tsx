@@ -30,9 +30,11 @@ import { useAppStore } from "@/store/use-app-store"
 import { useDashboardStats } from "@/hooks/use-dashboard-stats"
 import { useStockLevelsByShop } from "@/hooks/use-stock-levels"
 import { useItems } from "@/hooks/use-items"
+import { formatQty } from "@/lib/utils"
 
 // Components
 import { ShiftStatusCard } from "@/components/shifts/ShiftStatusCard"
+import { ReasonDialog } from "@/components/ui/reason-dialog"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -157,6 +159,9 @@ export default function DashboardPage() {
     }
   }
 
+  const [showEmptyShiftChoice, setShowEmptyShiftChoice] = useState(false)
+  const [isAbandoning, setIsAbandoning] = useState(false)
+
   const handleCloseShiftClick = async () => {
     if (isRejected) {
       toast.error("This shift is already closed and rejected. Record corrections instead.")
@@ -166,7 +171,19 @@ export default function DashboardPage() {
     setCashAmount("0")
     setMpesaAmount("0")
 
+    // Empty-shift decision first: a shift with no operational records gets an
+    // explicit choice instead of the stock-take nag.
     if (currentShift?.id) {
+      try {
+        const preview = await shiftService.getClosePreview(currentShift.id)
+        if (preview && !preview.hasOperationalActivity) {
+          setShowEmptyShiftChoice(true)
+          return
+        }
+      } catch {
+        // If the preview fails, fall through to the normal flow
+      }
+
       try {
         const stockTakes = await stockTakeService.getStockTakesByShift(currentShift.id)
         if (!stockTakes || stockTakes.length === 0) {
@@ -179,6 +196,24 @@ export default function DashboardPage() {
     }
 
     setShowCloseDialog(true)
+  }
+
+  const [showAbandonPrompt, setShowAbandonPrompt] = useState(false)
+
+  const handleAbandonShift = async (reason: string) => {
+    if (!currentShift?.id) return
+    setIsAbandoning(true)
+    try {
+      await shiftService.abandonShift(currentShift.id, reason)
+      setShowAbandonPrompt(false)
+      setShowEmptyShiftChoice(false)
+      toast.success("Empty shift discarded")
+      await queryClient.invalidateQueries({ queryKey: ["current-shift"] })
+    } catch (error: any) {
+      toast.error(error.message || "Failed to discard shift")
+    } finally {
+      setIsAbandoning(false)
+    }
   }
 
   const handleCloseShiftSubmit = async () => {
@@ -341,7 +376,7 @@ export default function DashboardPage() {
                                 <div className="col-span-3 text-right pr-4">
                                   <div className="flex flex-col items-end">
                                     <span className={`text-2xl font-black tracking-tighter ${isOut ? 'text-red-500' : isLow ? 'text-orange-500' : 'text-foreground'}`}>
-                                      {item.currentQuantity.toLocaleString()}
+                                      {formatQty(item.currentQuantity)}
                                     </span>
                                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-1">
                                       {item.unit_of_measure}
@@ -499,6 +534,61 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+        {showEmptyShiftChoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-md p-6 mx-4">
+              <div className="flex items-center gap-3 mb-4">
+                <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0" />
+                <h3 className="text-lg font-bold">Empty Shift</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                This shift has no sales, expenses, cash movements (other than the
+                opening float), counts, or other activity.
+                Close it with zero activity, or discard it entirely (recorded in the audit trail
+                and excluded from reports).
+              </p>
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setShowEmptyShiftChoice(false)
+                    setShowCloseDialog(true)
+                  }}
+                >
+                  Close With Zero Activity
+                </Button>
+                {isManager ? (
+                  <Button
+                    variant="outline"
+                    className="text-red-600"
+                    disabled={isAbandoning}
+                    onClick={() => setShowAbandonPrompt(true)}
+                  >
+                    {isAbandoning ? "Discarding..." : "Discard Empty Shift"}
+                  </Button>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Only a manager can discard a shift.
+                  </p>
+                )}
+                <Button variant="ghost" onClick={() => setShowEmptyShiftChoice(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <ReasonDialog
+          open={showAbandonPrompt}
+          onOpenChange={setShowAbandonPrompt}
+          title="Discard empty shift"
+          description="This is recorded in the audit trail and the shift is excluded from reports."
+          confirmLabel="Discard Shift"
+          isSubmitting={isAbandoning}
+          onSubmit={handleAbandonShift}
+        />
       </div>
     </div>
   )

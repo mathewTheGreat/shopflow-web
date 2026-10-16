@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client"
 import { Expense } from "@/types/expense"
+import { buildListQuery, ListParams, PagedResult } from "@/types/list"
 
 interface ExpenseSummaryResponse {
     totalAmount: number
@@ -21,10 +22,10 @@ export const expenseService = {
         return apiClient.post<Expense>("/api/expenses/v2", data)
     },
 
-    getExpensesByShop: (shopId: string, limit = 50) => {
-        const params = new URLSearchParams({
-            limit: limit.toString()
-        })
-        return apiClient.get<Expense[]>(`/api/expenses/shop/${shopId}?${params.toString()}`)
+    reverseExpense: (expenseId: string, reason: string) =>
+        apiClient.post<any>(`/api/expenses/${expenseId}/reverse`, { reason }),
+
+    getExpensesByShop: (shopId: string, params?: ListParams) => {
+        return apiClient.get<PagedResult<Expense>>(`/api/expenses/shop/${shopId}${buildListQuery(params)}`)
     },
 }

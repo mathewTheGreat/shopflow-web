@@ -88,6 +88,24 @@ export function useCancelProductionBatch() {
     })
 }
 
+export function useAmendProductionBatch() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: import("@/types/production").AmendBatchRequest }) => {
+            return productionService.amendBatch(id, data)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["production-batches"] })
+            queryClient.invalidateQueries({ queryKey: ["production-batch"] })
+            toast.success("Batch amended successfully")
+        },
+        onError: (error: Error) => {
+            toast.error(`Failed to amend batch: ${error.message}`)
+        },
+    })
+}
+
 export function useAddProductionOutput() {
     const queryClient = useQueryClient()
 

@@ -39,12 +39,13 @@ export function OpenShiftDialog({
                 <DialogHeader>
                     <DialogTitle className="text-xl">Open Shift</DialogTitle>
                     <DialogDescription>
-                        Enter the starting float for both Cash and M-Pesa.
+                        Enter the cash and M-Pesa already in the register at shift start. These
+                        become this shift's opening balances; they are not added to the register again.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label htmlFor="open-cash">Starting Cash Float (KES)</Label>
+                        <Label htmlFor="open-cash">Opening Cash (KES)</Label>
                         <Input
                             id="open-cash"
                             type="number"
@@ -54,7 +55,7 @@ export function OpenShiftDialog({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="open-mpesa">Starting M-Pesa Float (KES)</Label>
+                        <Label htmlFor="open-mpesa">Opening M-Pesa (KES)</Label>
                         <Input
                             id="open-mpesa"
                             type="number"

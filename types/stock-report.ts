@@ -2,14 +2,16 @@ export interface StockVarianceItem {
     stock_count_time: string;
     counted_by: string;
     item_name: string;
-    expected_qty: number;
+    expected_qty: number | null;
+    projection_expected_qty: number;
     counted_qty: number;
-    variance: number;
+    variance: number | null;
     notes: string;
 }
 
 export interface VarianceReportSummary {
     totalItems: number;
+    comparableItems: number;
     perfectMatches: number;
     overCounts: number;
     underCounts: number;

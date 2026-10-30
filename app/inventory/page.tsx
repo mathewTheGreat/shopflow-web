@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ListSearch } from "@/components/ui/list-search"
@@ -125,6 +125,7 @@ export default function InventoryPage() {
                             </Button>
                         </SheetTrigger>
                         <SheetContent side="left" className="w-[300px] p-0 border-r-border bg-card">
+                            <SheetTitle className="sr-only">Inventory navigation</SheetTitle>
                             <AppSidebar />
                         </SheetContent>
                     </Sheet>
@@ -268,6 +269,9 @@ export default function InventoryPage() {
 
                                     {/* Stock Tab */}
                                     <TabsContent value="stock" className="h-full p-6 space-y-8">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <h2 className="text-xl font-semibold">Stock</h2>
+                                        </div>
                                         {/* Action Grid */}
                                         <div className="grid grid-cols-2 gap-4">
                                             {/* Stock In Card */}

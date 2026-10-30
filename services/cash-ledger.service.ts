@@ -24,6 +24,29 @@ export interface PostDepositInput {
     idempotencyKey?: string
 }
 
+export interface AccountWithBalance {
+    id: string
+    account_type: RegisterAccountType
+    currency: string
+    is_active: boolean
+    balanceMinor: number
+    balance: number
+}
+
+export interface RegisterInitializationStatus {
+    initialized: boolean
+    initializedAt: string | null
+    accounts: AccountWithBalance[]
+    activeShiftId: string | null
+}
+
+export interface InitializeRegisterInput {
+    shopId: string
+    balances: Record<RegisterAccountType, number>
+    note?: string
+    requestId?: string
+}
+
 export const cashLedgerService = {
     postDeposit: (data: PostDepositInput) =>
         apiClient.post<CashLedgerLeg[]>("/api/cash-ledger/deposit", data),
@@ -37,14 +60,13 @@ export const cashLedgerService = {
         apiClient.get<CashLedgerLeg[]>(`/api/cash-ledger/transfer/${transferGroupId}`),
 
     listAccounts: (shopId: string) =>
-        apiClient.get<Array<{
-            id: string
-            account_type: RegisterAccountType
-            currency: string
-            is_active: boolean
-            balanceMinor: number
-            balance: number
-        }>>(`/api/cash-ledger/accounts/shop/${shopId}`),
+        apiClient.get<AccountWithBalance[]>(`/api/cash-ledger/accounts/shop/${shopId}`),
+
+    getInitialization: (shopId: string) =>
+        apiClient.get<RegisterInitializationStatus>(`/api/cash-ledger/initialization/${shopId}`),
+
+    initializeRegister: (data: InitializeRegisterInput) =>
+        apiClient.post<RegisterInitializationStatus>("/api/cash-ledger/initialize", data),
 
     getStatement: (accountId: string, params?: ListParams) =>
         apiClient.get<PagedResult<CashLedgerLeg & { running_minor: number; running: number }>>(

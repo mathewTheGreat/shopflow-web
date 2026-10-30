@@ -3,6 +3,7 @@
 import {
     Dialog,
     DialogContent,
+    DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,7 @@ export function ReceiptDialog({ saleId, open, onOpenChange }: ReceiptDialogProps
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[400px] p-0 overflow-hidden bg-white text-black">
+                <DialogTitle className="sr-only">Sale receipt</DialogTitle>
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center h-64">
                         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

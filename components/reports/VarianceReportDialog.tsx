@@ -88,7 +88,7 @@ export function VarianceReportDialog({ open, onOpenChange }: VarianceReportDialo
 
       if (action === 'excel') {
         // Calculate totalAbsoluteVariance inside the component before passing
-        const totalAbsoluteVariance = reportData.stockTakes.reduce((sum, item) => sum + Math.abs(item.variance), 0)
+        const totalAbsoluteVariance = reportData.stockTakes.reduce((sum, item) => sum + Math.abs(item.variance ?? 0), 0)
         const enrichedReportData: VarianceReportData = {
           ...reportData,
           summary: {
@@ -254,6 +254,7 @@ function formatVarianceReportHTML(
         .report-subtitle { font-size: 10pt; color: #666; margin: 0.02cm 0; }
         .report-meta { display: flex; justify-content: space-between; background: #f8f9fa; padding: 0.2cm; border-radius: 4px; border: 1px solid #eee; margin-bottom: 0.3cm; font-size: 8pt; flex-wrap: wrap; gap: 10px; }
         .section-title { font-size: 11pt; font-weight: bold; color: #2c5aa0; margin: 0.4cm 0 0.2cm 0; padding-bottom: 0.1cm; border-bottom: 1px solid #e0e0e0; page-break-after: avoid; }
+        .note { margin: 0.1cm 0; color: #666; font-size: 8pt; }
         .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.3cm; margin: 0.3cm 0; page-break-after: avoid; }
         .summary-card { background: white; border: 1px solid #ddd; border-radius: 4px; padding: 0.3cm; text-align: center; page-break-inside: avoid; }
         .summary-value { font-size: 14pt; font-weight: bold; color: #2c5aa0; margin: 0.1cm 0; }
@@ -267,6 +268,7 @@ function formatVarianceReportHTML(
         .variance-table tr:nth-child(even) { background: #f8f9fa; }
         .variance-table tr:hover { background: #e3f2fd; }
         .status-perfect { background: #d4edda; color: #155724; padding: 0.1cm 0.2cm; border-radius: 2px; font-weight: bold; }
+        .status-neutral { background: #e2e3e5; color: #383d41; padding: 0.1cm 0.2cm; border-radius: 2px; font-weight: bold; }
         .status-over { background: #fff3cd; color: #856404; padding: 0.1cm 0.2cm; border-radius: 2px; font-weight: bold; }
         .status-under { background: #f8d7da; color: #721c24; padding: 0.1cm 0.2cm; border-radius: 2px; font-weight: bold; }
         .performance-section { background: #e8f5e8; border: 1px solid #4caf50; border-radius: 4px; padding: 0.3cm; margin: 0.4cm 0; page-break-inside: avoid; }
@@ -307,7 +309,7 @@ function formatVarianceReportHTML(
   // === EXECUTIVE SUMMARY ===
   html += `<div class="section-title">Executive Summary</div>`;
 
-  const accuracyPercentage = ((summary.perfectMatches / summary.totalItems) * 100).toFixed(1);
+  const accuracyPercentage = (summary.comparableItems > 0 ? (summary.perfectMatches / summary.comparableItems) * 100 : 0).toFixed(1);
   const averageVarianceAbs = Math.abs(summary.averageVariance).toFixed(2);
 
   html += `
@@ -345,6 +347,7 @@ function formatVarianceReportHTML(
 
   // === VARIANCE ANALYSIS TABLE ===
   html += `<div class="section-title">Variance Analysis by Item</div>`;
+  html += `<p class="note">Expected is calculated from this shift's opening count and recorded activity through the count time. Saved Projection is the shop-wide quantity snapshot submitted with the stock count.</p>`;
 
   if (stockTakes.length === 0) {
     html += `<div class="highlight">No stock count data available for this shift</div>`;
@@ -355,6 +358,7 @@ function formatVarianceReportHTML(
           <tr>
             <th>Item Name</th>
             <th class="text-right">Expected</th>
+            <th class="text-right">Saved Projection</th>
             <th class="text-right">Counted</th>
             <th class="text-right">Variance</th>
             <th class="text-center">Status</th>
@@ -366,30 +370,35 @@ function formatVarianceReportHTML(
     `;
 
     let totalExpected = 0;
+    let totalProjectionExpected = 0;
     let totalCounted = 0;
     let totalVariance = 0;
 
     stockTakes.forEach(item => {
       const variance = item.variance;
-      const variancePercentage = item.expected_qty !== 0 ? ((variance / item.expected_qty) * 100).toFixed(1) : (variance === 0 ? "0.0" : "100.0");
-      const status = variance > 0 ? 'status-over' : variance < 0 ? 'status-under' : 'status-perfect';
-      const statusText = variance > 0 ? 'OVER' : variance < 0 ? 'UNDER' : 'PERFECT';
+      const variancePercentage = variance === null || item.expected_qty === null
+        ? 'N/A'
+        : item.expected_qty !== 0 ? ((variance / item.expected_qty) * 100).toFixed(1) : (variance === 0 ? "0.0" : "100.0");
+      const status = variance === null ? 'status-neutral' : variance > 0 ? 'status-over' : variance < 0 ? 'status-under' : 'status-perfect';
+      const statusText = variance === null ? 'NO BASELINE' : variance > 0 ? 'OVER' : variance < 0 ? 'UNDER' : 'PERFECT';
 
-      totalExpected += item.expected_qty;
+      if (item.expected_qty !== null) totalExpected += item.expected_qty;
+      totalProjectionExpected += item.projection_expected_qty;
       totalCounted += item.counted_qty;
-      totalVariance += variance;
+      if (variance !== null) totalVariance += variance;
 
       html += `
         <tr>
           <td>${item.item_name}</td>
-          <td class="text-right">${item.expected_qty}</td>
+          <td class="text-right">${item.expected_qty ?? 'N/A'}</td>
+          <td class="text-right">${item.projection_expected_qty}</td>
           <td class="text-right">${item.counted_qty}</td>
-          <td class="text-right ${variance > 0 ? 'positive' : variance < 0 ? 'negative' : 'neutral'}">
-            ${variance > 0 ? '+' : ''}${variance}
+          <td class="text-right ${variance === null ? 'neutral' : variance > 0 ? 'positive' : variance < 0 ? 'negative' : 'neutral'}">
+            ${variance === null ? 'N/A' : `${variance > 0 ? '+' : ''}${variance}`}
           </td>
           <td class="text-center"><span class="${status}">${statusText}</span></td>
-          <td class="text-right ${Math.abs(parseFloat(variancePercentage)) > 10 ? 'negative' : 'neutral'}">
-            ${variance > 0 ? '+' : ''}${variancePercentage}%
+          <td class="text-right ${variancePercentage !== 'N/A' && Math.abs(parseFloat(variancePercentage)) > 10 ? 'negative' : 'neutral'}">
+            ${variance !== null && variance > 0 ? '+' : ''}${variancePercentage}${variancePercentage === 'N/A' ? '' : '%'}
           </td>
           <td>${item.notes || '-'}</td>
         </tr>
@@ -402,6 +411,7 @@ function formatVarianceReportHTML(
         <tr style="background: #e3f2fd; font-weight: bold;">
           <td>TOTALS</td>
           <td class="text-right">${totalExpected}</td>
+          <td class="text-right">${totalProjectionExpected}</td>
           <td class="text-right">${totalCounted}</td>
           <td class="text-right ${totalVariance > 0 ? 'positive' : totalVariance < 0 ? 'negative' : 'neutral'}">
             ${totalVariance > 0 ? '+' : ''}${totalVariance}
@@ -470,6 +480,7 @@ function formatVarianceReportHTML(
 
   // === TOP VARIANCES ===
   const topVariances = [...stockTakes]
+    .filter((item): item is typeof item & { variance: number } => item.variance !== null)
     .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance))
     .slice(0, 5);
 
@@ -491,18 +502,19 @@ function formatVarianceReportHTML(
     `;
 
     topVariances.forEach((item, index) => {
-      const variancePercentage = item.expected_qty !== 0 ? ((item.variance / item.expected_qty) * 100).toFixed(1) : (item.variance === 0 ? "0.0" : "100.0");
+      const variance = item.variance;
+      const variancePercentage = item.expected_qty !== null && item.expected_qty !== 0 ? ((variance / item.expected_qty) * 100).toFixed(1) : (variance === 0 ? "0.0" : "100.0");
       html += `
         <tr>
           <td>${index + 1}</td>
           <td>${item.item_name}</td>
-          <td class="text-right">${item.expected_qty}</td>
+          <td class="text-right">${item.expected_qty ?? 'N/A'}</td>
           <td class="text-right">${item.counted_qty}</td>
-          <td class="text-right ${item.variance > 0 ? 'positive' : 'negative'}">
-            ${item.variance > 0 ? '+' : ''}${item.variance}
+          <td class="text-right ${variance > 0 ? 'positive' : variance < 0 ? 'negative' : 'neutral'}">
+            ${variance > 0 ? '+' : ''}${variance}
           </td>
           <td class="text-right ${Math.abs(parseFloat(variancePercentage)) > 10 ? 'negative' : 'neutral'}">
-            ${item.variance > 0 ? '+' : ''}${variancePercentage}%
+            ${variance > 0 ? '+' : ''}${variancePercentage}%
           </td>
         </tr>
       `;
@@ -591,7 +603,7 @@ const exportVarianceReportToExcelWeb = async (
   data.push(['Maximum Variance', Math.abs(report.varianceData.summary.maxVariance)]);
 
   // Calculate accuracy percentage
-  const accuracyPercentage = report.varianceData.summary.totalItems > 0 ? ((report.varianceData.summary.perfectMatches / report.varianceData.summary.totalItems) * 100).toFixed(1) : "0.0";
+  const accuracyPercentage = report.varianceData.summary.comparableItems > 0 ? ((report.varianceData.summary.perfectMatches / report.varianceData.summary.comparableItems) * 100).toFixed(1) : "0.0";
   data.push(['Accuracy Rate', `${accuracyPercentage}%`]);
   data.push([]);
 
@@ -601,6 +613,7 @@ const exportVarianceReportToExcelWeb = async (
   data.push([
     'Item Name',
     'Expected Qty',
+    'Saved Projection Qty',
     'Counted Qty',
     'Variance',
     'Variance Type',
@@ -610,27 +623,32 @@ const exportVarianceReportToExcelWeb = async (
   ]);
 
   let totalExpected = 0;
+  let totalProjectionExpected = 0;
   let totalCounted = 0;
   let totalVariance = 0;
 
   report.varianceData.stockTakes.forEach(item => {
     const variance = item.variance;
-    const varianceType = variance > 0 ? 'Over Count' : variance < 0 ? 'Under Count' : 'Perfect Match';
-    const absoluteVariance = Math.abs(variance);
-    const variancePercentage = item.expected_qty !== 0 ? ((variance / item.expected_qty) * 100).toFixed(1) : (variance === 0 ? "0.0" : "100.0");
+    const varianceType = variance === null ? 'No Opening Baseline' : variance > 0 ? 'Over Count' : variance < 0 ? 'Under Count' : 'Perfect Match';
+    const absoluteVariance = variance === null ? '' : Math.abs(variance);
+    const variancePercentage = variance === null || item.expected_qty === null
+      ? 'N/A'
+      : item.expected_qty !== 0 ? ((variance / item.expected_qty) * 100).toFixed(1) : (variance === 0 ? "0.0" : "100.0");
 
-    totalExpected += item.expected_qty;
+    if (item.expected_qty !== null) totalExpected += item.expected_qty;
+    totalProjectionExpected += item.projection_expected_qty;
     totalCounted += item.counted_qty;
-    totalVariance += variance;
+    if (variance !== null) totalVariance += variance;
 
     data.push([
       item.item_name,
-      item.expected_qty,
+      item.expected_qty ?? 'N/A',
+      item.projection_expected_qty,
       item.counted_qty,
-      variance,
+      variance ?? 'N/A',
       varianceType,
       absoluteVariance,
-      `${variancePercentage}%`,
+      variancePercentage === 'N/A' ? 'N/A' : `${variancePercentage}%`,
       item.notes || 'N/A'
     ]);
   });
@@ -639,6 +657,7 @@ const exportVarianceReportToExcelWeb = async (
   data.push([
     'TOTALS',
     totalExpected,
+    totalProjectionExpected,
     totalCounted,
     totalVariance,
     '',
@@ -655,17 +674,19 @@ const exportVarianceReportToExcelWeb = async (
 
   // Sort by absolute variance descending and take top 10
   const topVariances = [...report.varianceData.stockTakes]
+    .filter((item): item is typeof item & { variance: number } => item.variance !== null)
     .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance))
     .slice(0, 10);
 
   topVariances.forEach((item, index) => {
-    const variancePercentage = item.expected_qty !== 0 ? ((item.variance / item.expected_qty) * 100).toFixed(1) : (item.variance === 0 ? "0.0" : "100.0");
+    const variance = item.variance;
+    const variancePercentage = item.expected_qty !== null && item.expected_qty !== 0 ? ((variance / item.expected_qty) * 100).toFixed(1) : (variance === 0 ? "0.0" : "100.0");
     data.push([
       index + 1,
       item.item_name,
-      item.expected_qty,
+      item.expected_qty ?? 'N/A',
       item.counted_qty,
-      item.variance,
+      variance,
       `${variancePercentage}%`
     ]);
   });
@@ -676,7 +697,7 @@ const exportVarianceReportToExcelWeb = async (
   data.push([]);
   data.push(['Metric', 'Value', 'Rating']);
 
-  const accuracyRate = report.varianceData.summary.totalItems > 0 ? (report.varianceData.summary.perfectMatches / report.varianceData.summary.totalItems) * 100 : 0;
+  const accuracyRate = report.varianceData.summary.comparableItems > 0 ? (report.varianceData.summary.perfectMatches / report.varianceData.summary.comparableItems) * 100 : 0;
   const averageVarianceAbs = Math.abs(report.varianceData.summary.averageVariance);
 
   const getAccuracyRating = (rate: number): string => {

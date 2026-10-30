@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -168,7 +168,7 @@ export function StockOutDialog({ open, onOpenChange, onSuccess }: StockOutDialog
                 {/* Header */}
                 <div className="sticky top-0 bg-card z-10 border-b border-border px-6 py-4 flex items-center justify-between flex-shrink-0">
                     <div>
-                        <h2 className="text-2xl font-bold">Stock Out</h2>
+                        <SheetTitle className="text-2xl font-bold">Stock Out</SheetTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                             Record stock removal for damage, loss, or adjustments
                         </p>

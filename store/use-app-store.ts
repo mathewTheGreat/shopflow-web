@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import type { Shift } from '@/types/shift'
 
 interface ShopInfo {
     id: string
@@ -18,8 +19,8 @@ interface AppState {
     setActiveShop: (shop: ShopInfo | null) => void
     userInfo: UserInfo | null
     setUserInfo: (user: UserInfo | null) => void
-    activeShift: any | null
-    setActiveShift: (shift: any | null) => void
+    activeShift: Shift | null
+    setActiveShift: (shift: Shift | null) => void
     userCurrency: string
     setUserCurrency: (currency: string) => void
 }
@@ -32,7 +33,7 @@ export const useAppStore = create<AppState>()(
             userInfo: null,
             setUserInfo: (user: UserInfo | null) => set({ userInfo: user }),
             activeShift: null,
-            setActiveShift: (shift: any | null) => set({ activeShift: shift }),
+            setActiveShift: (shift: Shift | null) => set({ activeShift: shift }),
             userCurrency: 'KES',
             setUserCurrency: (currency: string) => set({ userCurrency: currency }),
         }),

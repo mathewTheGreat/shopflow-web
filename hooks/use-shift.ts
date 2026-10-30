@@ -70,18 +70,23 @@ export function useShift() {
         mutationFn: async (data: { cashAmount: number; mpesaAmount: number }) => {
             if (!activeShop || !userInfo) throw new Error("Shop or User not identified")
 
-            const newShift: any = await shiftService.createShift({
+            const newShift = (await shiftService.createShift({
                 name: `Shift ${new Date().toLocaleTimeString()}`,
                 shop_id: activeShop.id,
                 manager_id: userInfo.id,
                 start_time: new Date().toISOString(),
                 end_time: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
                 is_closed: false,
-            })
+            })) as Shift[]
+
+            const createdShift = newShift?.[0]
+            if (!createdShift?.id) {
+                throw new Error("Failed to open shift")
+            }
 
             if (data.cashAmount > 0) {
                 await shiftService.recordCashMovement({
-                    shift_id: newShift[0].id,
+                    shift_id: createdShift.id,
                     type: 'FLOAT_IN',
                     amount: data.cashAmount,
                     payment_method: 'CASH',
@@ -92,7 +97,7 @@ export function useShift() {
 
             if (data.mpesaAmount > 0) {
                 await shiftService.recordCashMovement({
-                    shift_id: newShift[0].id,
+                    shift_id: createdShift.id,
                     type: 'FLOAT_IN',
                     amount: data.mpesaAmount,
                     payment_method: 'MPESA',
@@ -101,12 +106,12 @@ export function useShift() {
                 })
             }
 
-            return newShift
+            return createdShift
         },
-        onSuccess: (newShift) => {
+        onSuccess: (createdShift) => {
             queryClient.invalidateQueries({ queryKey: ["current-shift"] })
-            setActiveShift(newShift)
-            toast.success("Shift opened successfully with initial float.")
+            setActiveShift(createdShift)
+            toast.success("Shift opened with opening balances.")
         },
         onError: (error: Error) => {
             toast.error(`Failed to open shift: ${error.message}`)

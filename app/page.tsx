@@ -22,18 +22,22 @@ import {
   TrendingDown,
   Search,
   Filter,
+  Wallet,
 } from "lucide-react"
 
 // Hooks
 import { useShift } from "@/hooks/use-shift"
 import { useAppStore } from "@/store/use-app-store"
 import { useDashboardStats } from "@/hooks/use-dashboard-stats"
+import { useMoneyPosition } from "@/hooks/use-money-position"
+import { useRegisterInitialization } from "@/hooks/use-cash-ledger"
 import { useStockLevelsByShop } from "@/hooks/use-stock-levels"
 import { useItems } from "@/hooks/use-items"
 import { formatQty } from "@/lib/utils"
 
 // Components
 import { ShiftStatusCard } from "@/components/shifts/ShiftStatusCard"
+import { InitializeRegisterDialog } from "@/components/shifts/InitializeRegisterDialog"
 import { ReasonDialog } from "@/components/ui/reason-dialog"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Button } from "@/components/ui/button"
@@ -42,6 +46,7 @@ import { Input } from "@/components/ui/input"
 import {
   Sheet,
   SheetContent,
+  SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
 
@@ -72,14 +77,22 @@ export default function DashboardPage() {
   const { activeShop, userInfo } = useAppStore()
   const { currentShift, isLoading: isLoadingShift, openShift, closeShift, isOpening, isClosing, expectedFinancials } = useShift()
   const { sales, expenses, isLoading: isLoadingStats, isManager, currency } = useDashboardStats()
+  const { position: moneyPosition, isLoading: isLoadingPosition, refetch: refetchPosition } = useMoneyPosition(activeShop?.id)
+  const { initialized, isLoading: initLoading, refetch: refetchInit } = useRegisterInitialization(activeShop?.id)
   const { items = [], isLoading: isLoadingItems } = useItems()
-  const { data: stockLevels = [], isLoading: isLoadingStock } = useStockLevelsByShop(activeShop?.id || "")
+  const {
+    data: stockLevels = [],
+    isLoading: isLoadingStock,
+    isFetching: isFetchingStock,
+    refetch: refetchStock,
+  } = useStockLevelsByShop(activeShop?.id || "")
 
   const [showOpenDialog, setShowOpenDialog] = useState(false)
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [showNoStockTakeWarning, setShowNoStockTakeWarning] = useState(false)
   const [showCorrectReconciliation, setShowCorrectReconciliation] = useState(false)
+  const [showInitialize, setShowInitialize] = useState(false)
   const [itemSearchQuery, setItemSearchQuery] = useState("")
 
   // Amounts for dialogs
@@ -88,6 +101,9 @@ export default function DashboardPage() {
 
   const shiftOpen = !!(currentShift && !currentShift.is_closed)
   const isCashier = activeShop?.role === "Cashier"
+  const canInitialize = ["manager", "admin", "owner"].includes(
+    (activeShop?.role || "").toLowerCase()
+  )
   const closingStatus = currentShift?.closing_status
   const rejectionReason = currentShift?.rejection_reason
   const isRejected = closingStatus === 'REJECTED'
@@ -142,8 +158,11 @@ export default function DashboardPage() {
       console.error("Failed to check active shift:", error)
     }
 
-    setCashAmount("0")
-    setMpesaAmount("0")
+    // Prefill the shift's declared opening balances from the register so the
+    // shift baseline matches the money already counted there. Before
+    // initialization there is no trustworthy baseline, so start at zero.
+    setCashAmount(initialized ? String(Math.max(0, moneyPosition.cash)) : "0")
+    setMpesaAmount(initialized ? String(Math.max(0, moneyPosition.mpesa)) : "0")
     setShowOpenDialog(true)
   }
 
@@ -262,6 +281,7 @@ export default function DashboardPage() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[300px] p-0 border-r-border bg-card">
+              <SheetTitle className="sr-only">Dashboard navigation</SheetTitle>
               <AppSidebar />
             </SheetContent>
           </Sheet>
@@ -305,11 +325,23 @@ export default function DashboardPage() {
               <Card className="bg-card border-none shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
                 <CardContent className="p-0">
                   <div className="p-6 border-b border-border/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        <Package className="h-5 w-5 text-primary" />
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Package className="h-5 w-5 text-primary" />
+                        </div>
+                        <h3 className="text-lg font-bold tracking-tight uppercase">Stock Balances</h3>
                       </div>
-                      <h3 className="text-lg font-bold tracking-tight uppercase">Stock Balances</h3>
+                      <button
+                        type="button"
+                        onClick={() => refetchStock()}
+                        disabled={isFetchingStock}
+                        title="Refresh stock"
+                        aria-label="Refresh stock"
+                        className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isFetchingStock ? "animate-spin" : ""}`} />
+                      </button>
                     </div>
 
                     <div className="relative flex-1 max-w-md group">
@@ -421,7 +453,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Stat Cards - Side by Side */}
-              <div className="grid grid-cols-2 gap-4 md:gap-8 w-full">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8 w-full">
                 <Card className="bg-card border-none shadow-sm h-full w-full">
                   <CardContent className="p-6 md:p-10 lg:p-12">
                     <p className="text-xs md:text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">
@@ -450,6 +482,64 @@ export default function DashboardPage() {
                         {currency}
                         {" " + Number(expenses).toLocaleString()}
                       </h3>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-none shadow-sm h-full w-full col-span-2 lg:col-span-1">
+                  <CardContent className="p-6 md:p-10 lg:p-12">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs md:text-sm font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                        <Wallet className="h-4 w-4" />
+                        Shop Position
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => refetchPosition()}
+                        title="Refresh position"
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isLoadingPosition ? "animate-spin" : ""}`} />
+                      </button>
+                    </div>
+                    {isLoadingPosition ? (
+                      <div className="space-y-3">
+                        <div className="h-8 w-36 bg-muted animate-pulse rounded-lg" />
+                        <div className="h-8 w-36 bg-muted animate-pulse rounded-lg" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Cash</p>
+                          <p className={`text-2xl md:text-4xl font-black tracking-tighter tabular-nums ${moneyPosition.cash < 0 ? "text-destructive" : "text-foreground"}`}>
+                            {currency} {moneyPosition.cash.toLocaleString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">M-Pesa</p>
+                          <p className={`text-2xl md:text-4xl font-black tracking-tighter tabular-nums ${moneyPosition.mpesa < 0 ? "text-destructive" : "text-foreground"}`}>
+                            {currency} {moneyPosition.mpesa.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {!initLoading && !initialized && (
+                      <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                        <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
+                          Register not initialized
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-amber-700/80 dark:text-amber-300/80">
+                          Set the actual balances so this reflects real money.
+                        </p>
+                        {canInitialize && (
+                          <Button
+                            size="sm"
+                            className="mt-2 w-full"
+                            onClick={() => setShowInitialize(true)}
+                          >
+                            Set balances
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -503,6 +593,18 @@ export default function DashboardPage() {
             shiftId={currentShift.id}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ["current-shift"] })
+            }}
+          />
+        )}
+
+        {showInitialize && (
+          <InitializeRegisterDialog
+            open={showInitialize}
+            onOpenChange={setShowInitialize}
+            shopId={activeShop?.id}
+            onSuccess={() => {
+              refetchPosition()
+              refetchInit()
             }}
           />
         )}

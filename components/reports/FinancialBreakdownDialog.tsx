@@ -332,6 +332,11 @@ export function formatFinancialBreakdownHTML(report: any) {
     <td>${b.mpesaPayIn.toFixed(2)}</td>
   </tr>
   <tr>
+    <td>Bank Deposits</td>
+    <td>${(-b.cashBankDeposit).toFixed(2)}</td>
+    <td>${(-b.mpesaBankDeposit).toFixed(2)}</td>
+  </tr>
+  <tr>
     <td>Expenses (Pay-Outs)</td>
     <td>-${b.cashPayOut.toFixed(2)}</td>
     <td>-${b.mpesaPayOut.toFixed(2)}</td>
@@ -468,6 +473,7 @@ async function exportFinancialBreakdownToExcel(report: any): Promise<void> {
   data.push(['Opening Float', b.cashOpeningFloat, b.mpesaOpeningFloat]);
   data.push(['Additional Float', b.cashAdditionalFloat, b.mpesaAdditionalFloat]);
   data.push(['Pay-Ins', b.cashPayIn, b.mpesaPayIn]);
+  data.push(['Bank Deposits', -b.cashBankDeposit, -b.mpesaBankDeposit]);
   data.push(['Expenses (Pay-Outs)', -b.cashPayOut, -b.mpesaPayOut]);
   data.push(['TOTAL EXPECTED', totalExpectedCash, totalExpectedMpesa]);
   data.push(['GRAND TOTAL EXPECTED', totalExpected]);

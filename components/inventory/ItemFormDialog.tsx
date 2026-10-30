@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -150,9 +150,9 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
                 {/* Header */}
                 <div className="sticky top-0 bg-card z-10 border-b border-border px-6 py-4 flex items-center justify-between flex-shrink-0">
                     <div>
-                        <h2 className="text-2xl font-bold">
+                        <SheetTitle className="text-2xl font-bold">
                             {item ? "Edit Item" : "Add New Item"}
-                        </h2>
+                        </SheetTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                             {isNewItem ? "Create a new item and configure pricing" : "Update item details and pricing rules"}
                         </p>

@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
     Sheet,
     SheetContent,
+    SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -253,6 +254,7 @@ export default function ApprovalsPage() {
                             </Button>
                         </SheetTrigger>
                         <SheetContent side="left" className="w-[300px] p-0 border-r-border bg-card">
+                            <SheetTitle className="sr-only">Approvals navigation</SheetTitle>
                             <AppSidebar />
                         </SheetContent>
                     </Sheet>

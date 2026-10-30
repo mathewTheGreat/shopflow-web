@@ -16,7 +16,6 @@ import {
   Plus,
   Minus,
   Wallet,
-  Landmark,
   ArrowRightLeft,
   PiggyBank,
   CreditCard,
@@ -64,11 +63,9 @@ import { useAllItemPrices } from "@/hooks/use-item-prices"
 import { getSelectedPrice, getActivePrices, getApplicablePrice, getPriceQuantityLabel, calculateTotalPrice, isFlatPriceTier, isQuantityInPriceRange } from "@/lib/pricing"
 import { useStockLevelsByShop, useBulkUpdateStockLevels } from "@/hooks/use-stock-levels"
 import { useCreateBulkTransactions } from "@/hooks/use-stock-transactions"
-import { useMoneyPosition } from "@/hooks/use-money-position"
 import { FinancialBreakdownDialog } from "@/components/reports/FinancialBreakdownDialog"
-import { BankDepositDialog } from "@/components/shifts/BankDepositDialog"
-import { CashMovementsDialog } from "@/components/shifts/CashMovementsDialog"
-import { CashRegisterDialog } from "@/components/shifts/CashRegisterDialog"
+import { CashMovementsManager } from "@/components/shifts/CashMovementsManager"
+import { CashRegisterManager } from "@/components/shifts/CashRegisterManager"
 import { ReasonDialog } from "@/components/ui/reason-dialog"
 import { DailyReportDialog } from "@/components/reports/DailyReportDialog"
 import { FinancialSummaryReportDialog } from "@/components/reports/FinancialSummaryReportDialog"
@@ -97,13 +94,10 @@ export default function SalesPage() {
   const [showSalesReportDialog, setShowSalesReportDialog] = useState(false)
   const [showNetPositionDialog, setShowNetPositionDialog] = useState(false)
   const [showFinancialBreakdown, setShowFinancialBreakdown] = useState(false)
-  const [showDepositDialog, setShowDepositDialog] = useState(false)
-  const [showMovementsDialog, setShowMovementsDialog] = useState(false)
-  const [showRegisterDialog, setShowRegisterDialog] = useState(false)
   const [showDailyReportDialog, setShowDailyReportDialog] = useState(false)
   const [showFinancialSummaryDialog, setShowFinancialSummaryDialog] = useState(false)
 
-  const [currentView, setCurrentView] = useState<"main" | "customers" | "payments">("main")
+  const [currentView, setCurrentView] = useState<"main" | "customers" | "payments" | "cash-register" | "cash-movements">("main")
 
   // Global State
   const activeShop = useAppStore((state) => state.activeShop)
@@ -161,7 +155,6 @@ export default function SalesPage() {
 
   // Stock Integration
   const { data: stockLevels = [] } = useStockLevelsByShop(activeShop?.id || "")
-  const { position: moneyPosition, isLoading: isLoadingPosition, refetch: refetchPosition } = useMoneyPosition(activeShop?.id)
   const { mutateAsync: bulkUpdateLevels } = useBulkUpdateStockLevels()
   const { mutateAsync: createBulkTransactions } = useCreateBulkTransactions()
 
@@ -454,7 +447,7 @@ export default function SalesPage() {
       return
     }
 
-    if (!activeShop || !activeShift) {
+    if (!activeShop || !activeShift || !activeShift.id) {
       toast.error("Shop or Shift not active")
       return
     }
@@ -556,6 +549,32 @@ export default function SalesPage() {
     )
   }
 
+  if (currentView === "cash-register") {
+    return (
+      <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
+        <div className="hidden md:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+          <AppSidebar />
+        </div>
+        <div className="flex-1 flex flex-col min-w-0">
+          <CashRegisterManager onBack={() => setCurrentView("main")} />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentView === "cash-movements") {
+    return (
+      <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
+        <div className="hidden md:block w-80 border-r border-border bg-card sticky top-0 h-screen overflow-y-auto">
+          <AppSidebar />
+        </div>
+        <div className="flex-1 flex flex-col min-w-0">
+          <CashMovementsManager onBack={() => setCurrentView("main")} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="flex min-h-screen bg-muted/40 text-foreground transition-colors duration-300">
@@ -575,6 +594,7 @@ export default function SalesPage() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[300px] p-0 border-r-border bg-card">
+                <SheetTitle className="sr-only">Sales navigation</SheetTitle>
                 <AppSidebar />
               </SheetContent>
             </Sheet>
@@ -936,71 +956,9 @@ export default function SalesPage() {
                           </CardContent>
                         </Card>
 
-                        {/* Running shop position across all posted activity.
-                            Replaces float allocation: large expenses post
-                            directly; top-ups are PAY_IN movements. */}
-
-                        <Card
-                          className="border hover:border-primary/50 transition-colors group"
-                          onClick={() => refetchPosition()}
-                          title="Refresh running position"
-                        >
-                          <CardContent className="p-6 flex items-start gap-4">
-                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                              <Wallet className="h-6 w-6 text-primary" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-lg mb-1">Shop Position</h3>
-                              <p className="text-sm text-muted-foreground">
-                                Running money across all posted activity. Click to refresh.
-                              </p>
-                              <div className="flex gap-6 mt-3">
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Cash</p>
-                                  <p className={`text-xl font-black tracking-tight ${moneyPosition.cash < 0 ? "text-destructive" : "text-foreground"}`}>
-                                    {isLoadingPosition ? "…" : `KES ${moneyPosition.cash.toLocaleString()}`}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">M-Pesa</p>
-                                  <p className={`text-xl font-black tracking-tight ${moneyPosition.mpesa < 0 ? "text-destructive" : "text-foreground"}`}>
-                                    {isLoadingPosition ? "…" : `KES ${moneyPosition.mpesa.toLocaleString()}`}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-
                         <Card
                           className="border hover:border-primary/50 transition-colors cursor-pointer group"
-                          onClick={() => setShowDepositDialog(true)}
-                        >
-                          <CardContent className="p-6 flex items-start gap-4">
-                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                              <Landmark className="h-6 w-6 text-primary" />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-lg mb-1">Bank Deposit</h3>
-                              <p className="text-sm text-muted-foreground">
-                                Move drawer cash to the bank as a balanced transfer.
-                              </p>
-                            </div>
-                          </CardContent>
-                        </Card>
-
-                        <Card
-                          className={`border transition-colors cursor-pointer group ${activeShift
-                            ? "hover:border-primary/50"
-                            : "opacity-50 cursor-not-allowed"
-                            }`}
-                          onClick={() => {
-                            if (activeShift) {
-                              setShowMovementsDialog(true)
-                            } else {
-                              toast.error("You need an open shift to view movements")
-                            }
-                          }}
+                          onClick={() => setCurrentView("cash-movements")}
                         >
                           <CardContent className="p-6 flex items-start gap-4">
                             <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -1009,9 +967,7 @@ export default function SalesPage() {
                             <div>
                               <h3 className="font-semibold text-lg mb-1">Cash Movements</h3>
                               <p className="text-sm text-muted-foreground">
-                                {activeShift
-                                  ? "Review and reverse this shift's cash ledger."
-                                  : "Open a shift to view movements."}
+                                Review and reverse this shift's cash ledger.
                               </p>
                             </div>
                           </CardContent>
@@ -1019,7 +975,7 @@ export default function SalesPage() {
 
                         <Card
                           className="border hover:border-primary/50 transition-colors cursor-pointer group"
-                          onClick={() => setShowRegisterDialog(true)}
+                          onClick={() => setCurrentView("cash-register")}
                         >
                           <CardContent className="p-6 flex items-start gap-4">
                             <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -1056,24 +1012,6 @@ export default function SalesPage() {
               <FinancialBreakdownDialog
                 open={showFinancialBreakdown}
                 onOpenChange={setShowFinancialBreakdown}
-              />
-
-              <BankDepositDialog
-                open={showDepositDialog}
-                onOpenChange={setShowDepositDialog}
-                shopId={activeShop?.id}
-              />
-
-              <CashMovementsDialog
-                open={showMovementsDialog}
-                onOpenChange={setShowMovementsDialog}
-                shiftId={activeShift?.id}
-              />
-
-              <CashRegisterDialog
-                open={showRegisterDialog}
-                onOpenChange={setShowRegisterDialog}
-                shopId={activeShop?.id}
               />
 
               <ReasonDialog
@@ -1117,7 +1055,7 @@ export default function SalesPage() {
                 <div className="flex items-center gap-4">
                   <Package className="h-8 w-8 text-primary" />
                   <div>
-                    <h2 className="text-2xl font-bold">Point of Sale</h2>
+                    <SheetTitle className="text-2xl font-bold">Point of Sale</SheetTitle>
                     <p className="text-sm text-muted-foreground">
                       Branch: <span className="font-medium">{activeShop?.name || "None"}</span> •
                       Shift: <span className="font-medium">#{activeShift?.id?.slice(-4) || "None"}</span>
@@ -1711,7 +1649,7 @@ export default function SalesPage() {
                   <Button
                     disabled={isExpenseSubmitting || !expenseAmount || parseFloat(expenseAmount) <= 0 || !expenseReference}
                     onClick={async () => {
-                      if (!activeShop || !activeShift || !userInfo) {
+                      if (!activeShop || !activeShift || !activeShift.id || !userInfo) {
                         toast.error("Required context missing (Shop/Shift/User)")
                         return
                       }

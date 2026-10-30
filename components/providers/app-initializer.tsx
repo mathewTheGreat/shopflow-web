@@ -1,25 +1,27 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useSyncExternalStore } from "react"
 import { useInitializeApp } from "@/hooks/use-initialize-app"
 import { useAuth } from "@clerk/nextjs"
 import { setApiTokenGetter } from "@/lib/api-client"
 import { Loader2 } from "lucide-react"
 
+const subscribeToMount = () => () => {}
+const getMountSnapshot = () => true
+const getServerMountSnapshot = () => false
+
 export function AppInitializer({ children }: { children: React.ReactNode }) {
     const { getToken } = useAuth()
     const { isInitialized } = useInitializeApp()
-    // Gate on mount so the server prerender and the first client render are
-    // structurally identical; the app content only swaps in post-hydration.
-    const [mounted, setMounted] = useState(false)
+    const mounted = useSyncExternalStore(
+        subscribeToMount,
+        getMountSnapshot,
+        getServerMountSnapshot
+    )
 
     useEffect(() => {
         setApiTokenGetter(getToken)
     }, [getToken])
-
-    useEffect(() => {
-        setMounted(true)
-    }, [])
 
     if (!mounted || !isInitialized) {
         return (

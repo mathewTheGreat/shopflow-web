@@ -40,6 +40,75 @@ const formatFullDateTime = (dateString: string) => {
   })
 }
 
+const escapeHtml = (value: string) => value
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;")
+
+type StockReportItem = {
+  opening_qty: number | null
+  closing_qty: number | null
+  expected_closing: number | null
+  variance: number | null
+  sales_qty: number
+  prepaid_qty: number
+  sales_by_category?: {
+    regular_qty: number
+    credit_qty: number
+    prepaid_qty: number
+  }
+  stock_movements?: {
+    increases: Array<{ label: string; direction: "increase"; quantity: number }>
+    decreases: Array<{ label: string; direction: "decrease"; quantity: number }>
+  }
+  total_in: number
+  total_out: number
+}
+
+const getSalesByCategory = (item: StockReportItem) => item.sales_by_category ?? {
+  regular_qty: Math.max(0, item.sales_qty - item.prepaid_qty),
+  credit_qty: 0,
+  prepaid_qty: item.prepaid_qty,
+}
+
+const formatInventoryEquation = (item: StockReportItem) => {
+  const rows: Array<{ label: string; quantity: number | null; sign?: "+" | "-" }> = [
+    { label: "Opening balance", quantity: item.opening_qty },
+  ]
+
+  if (item.stock_movements) {
+    item.stock_movements.increases.forEach((movement) => {
+      rows.push({ label: movement.label, quantity: movement.quantity, sign: "+" })
+    })
+    item.stock_movements.decreases.forEach((movement) => {
+      rows.push({ label: movement.label, quantity: movement.quantity, sign: "-" })
+    })
+  } else {
+    if (item.total_in) rows.push({ label: "Other stock increase (legacy)", quantity: item.total_in, sign: "+" })
+    if (item.total_out) rows.push({ label: "Other stock decrease (legacy)", quantity: item.total_out, sign: "-" })
+  }
+
+  const sales = getSalesByCategory(item)
+  if (sales.regular_qty) rows.push({ label: "Regular sale", quantity: sales.regular_qty, sign: "-" })
+  if (sales.credit_qty) rows.push({ label: "Credit sale", quantity: sales.credit_qty, sign: "-" })
+  if (sales.prepaid_qty) rows.push({ label: "Prepaid sale", quantity: sales.prepaid_qty, sign: "-" })
+
+  rows.push(
+    { label: "Expected closing", quantity: item.expected_closing },
+    { label: "Counted balance", quantity: item.closing_qty },
+    { label: "Variance", quantity: item.variance },
+  )
+
+  return rows.map(({ label, quantity, sign }) => `
+    <div class="calc-item">
+      <span class="calc-label">${escapeHtml(label)}</span>
+      <span class="calc-value">${quantity === null ? "N/A" : `${sign || ""}${quantity}`}</span>
+    </div>
+  `).join("")
+}
+
 interface ShiftPerformanceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -99,7 +168,6 @@ export function ShiftPerformanceDialog({ open, onOpenChange }: ShiftPerformanceD
       if (action === 'excel') {
         await exportShiftReportToExcel(
           reportData,
-          [], // groupedPrepaidSales - Assuming empty for now or fetched if API provided it
           selectedShop?.name || "Unknown Shop",
           userInfo?.name || "User",
           itemMap
@@ -114,7 +182,6 @@ export function ShiftPerformanceDialog({ open, onOpenChange }: ShiftPerformanceD
             closing_status: selectedShift?.closing_status,
             rejection_reason: selectedShift?.rejection_reason
           },
-          [], // groupedPrepaidSales
           selectedShop?.name || "Unknown Shop",
           userInfo?.name || "User",
           itemMap
@@ -254,6 +321,8 @@ function formatShiftReportHTML(
       total_out: number;
       prepaid_qty: number;
       sales_qty: number;
+      sales_by_category?: StockReportItem["sales_by_category"];
+      stock_movements?: StockReportItem["stock_movements"];
       effective_out: number;
       expected_closing: number | null;
       variance: number | null;
@@ -267,7 +336,6 @@ function formatShiftReportHTML(
     };
     financials_breakdown?: Record<string, any>;
   },
-  groupedPrepaidSales: { item_id: string; customers: Array<{ customer_name?: string; quantity: number }> }[],
   shopName: string,
   userName: string,
   itemMap: Record<string, { name?: string; item_type?: string; sale_price?: number }>
@@ -297,7 +365,7 @@ function formatShiftReportHTML(
 
   for (const item of saleItems) {
     const itemName = itemMap[item.item_id]?.name || item.item_id;
-    const regularSalesQty = item.sales_qty - (item.prepaid_qty ?? 0);
+    const regularSalesQty = getSalesByCategory(item).regular_qty;
     const itemPrice = itemMap[item.item_id]?.sale_price || 0;
     const cashSaleAmount = regularSalesQty * itemPrice;
 
@@ -381,83 +449,18 @@ function formatShiftReportHTML(
 
     for (const item of saleItems) {
       const itemName = itemMap[item.item_id]?.name || item.item_id;
-      const total = (item.opening_qty ?? 0) + (item.total_in ?? 0);
-      const prepaid = groupedPrepaidSales.find(p => p.item_id === item.item_id);
-      const prepaidTotal = prepaid?.customers.reduce((a, c) => a + c.quantity, 0) ?? 0;
-      const totalSold = item.sales_qty + prepaidTotal;
+      const sales = getSalesByCategory(item);
+      const totalSold = sales.regular_qty + sales.credit_qty + sales.prepaid_qty;
 
       html += `
           <div class="item-card" style="${useCompactGrid ? 'margin-bottom: 0.2cm; padding: 0.2cm;' : ''}">
             <div class="item-header">
-              <div class="item-id" style="${useCompactGrid ? 'font-size: 9pt;' : ''}">${itemName}</div>
+              <div class="item-id" style="${useCompactGrid ? 'font-size: 9pt;' : ''}">${escapeHtml(itemName)}</div>
               <div class="item-total" style="${useCompactGrid ? 'font-size: 8pt;' : ''}">Sold: ${totalSold}</div>
             </div>
             
-            <div class="calculation-grid">
-              <div class="calc-item">
-                <span class="calc-label">Opening Balance:</span>
-                <span class="calc-value">${item.opening_qty ?? 0}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Delivered:</span>
-                <span class="calc-value">${item.total_in ?? 0}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Total Available:</span>
-                <span class="calc-value">${total}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Total Out:</span>
-                <span class="calc-value">${item.total_out ?? 0}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Sales:</span>
-                <span class="calc-value">${item.sales_qty ?? 0}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Prepaid:</span>
-                <span class="calc-value">${item.prepaid_qty ?? 0}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Effective Out:</span>
-                <span class="calc-value">${item.effective_out ?? 0}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Expected Closing:</span>
-                <span class="calc-value">${item.expected_closing ?? 0}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Balance:</span>
-                <span class="calc-value">${item.closing_qty ?? 0}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Variance:</span>
-                <span class="calc-value">${item.variance ?? 0}</span>
-              </div>
-            </div>
+            <div class="calculation-grid">${formatInventoryEquation(item)}</div>
       `;
-
-      if (prepaid && prepaid.customers.length > 0) {
-        html += `
-            <div class="advance-section" style="${useCompactGrid ? 'padding: 0.1cm; font-size: 7pt;' : ''}">
-              <div class="advance-title">Advance Sales</div>
-        `;
-        for (const c of prepaid.customers) {
-          html += `
-              <div class="advance-customer">
-                <span>${c.customer_name ?? "Unknown Customer"}</span>
-                <span><strong>${c.quantity}</strong></span>
-              </div>
-          `;
-        }
-        html += `
-              <div class="advance-customer" style="border-top: 1px solid #ffd54f; margin-top: 0.1cm; padding-top: 0.1cm;">
-                <span><strong>Total Advance:</strong></span>
-                <span><strong>${prepaidTotal}</strong></span>
-              </div>
-            </div>
-        `;
-      }
 
       html += `</div>`;
     }
@@ -479,20 +482,11 @@ function formatShiftReportHTML(
       html += `
           <div class="item-card in-house-card" style="${useCompactGrid ? 'margin-bottom: 0.2cm; padding: 0.2cm;' : ''}">
             <div class="item-header">
-              <div class="item-id in-house-id" style="${useCompactGrid ? 'font-size: 8pt;' : ''}">${itemName}</div>
+              <div class="item-id in-house-id" style="${useCompactGrid ? 'font-size: 8pt;' : ''}">${escapeHtml(itemName)}</div>
               <div class="item-total in-house-total" style="${useCompactGrid ? 'font-size: 7pt;' : ''}">In-House</div>
             </div>
             
-            <div class="calculation-grid">
-              <div class="calc-item">
-                <span class="calc-label">Delivered:</span>
-                <span class="calc-value">${item.total_in ?? 0}</span>
-              </div>
-              <div class="calc-item">
-                <span class="calc-label">Balance:</span>
-                <span class="calc-value">${item.closing_qty ?? 0}</span>
-              </div>
-            </div>
+            <div class="calculation-grid">${formatInventoryEquation(item)}</div>
           </div>
       `;
     }
@@ -601,7 +595,6 @@ function formatShiftReportHTML(
 
 async function exportShiftReportToExcel(
   report: any,
-  groupedPrepaidSales: any[],
   shopName: string,
   userName: string,
   itemMap: Record<string, any>
@@ -619,20 +612,46 @@ async function exportShiftReportToExcel(
 
   // Items
   data.push(['ITEM PERFORMANCE']);
-  data.push(['Item Name', 'Opening', 'In', 'Sales', 'Closing', 'Variance']);
+  data.push([
+    'Item Name',
+    'Stock movement / sale category',
+    'Opening',
+    'Increase',
+    'Decrease',
+    'Regular sale',
+    'Credit sale',
+    'Prepaid sale',
+    'Expected closing',
+    'Counted balance',
+    'Variance',
+  ]);
 
   report.items.forEach((item: any) => {
     const itemName = itemMap[item.item_id]?.name || item.item_id;
-    data.push([
-      itemName,
-      item.opening_qty,
-      item.total_in,
-      item.sales_qty,
-      item.closing_qty,
-      item.variance
-    ]);
+    const sales = getSalesByCategory(item);
+    data.push([itemName, 'Opening balance', item.opening_qty, '', '', '', '', '', '', '', '']);
+
+    if (item.stock_movements) {
+      item.stock_movements.increases.forEach((movement: { label: string; quantity: number }) => {
+        data.push([itemName, movement.label, '', movement.quantity, '', '', '', '', '', '', '']);
+      });
+      item.stock_movements.decreases.forEach((movement: { label: string; quantity: number }) => {
+        data.push([itemName, movement.label, '', '', movement.quantity, '', '', '', '', '', '']);
+      });
+    } else {
+      if (item.total_in) data.push([itemName, 'Other stock increase (legacy)', '', item.total_in, '', '', '', '', '', '', '']);
+      if (item.total_out) data.push([itemName, 'Other stock decrease (legacy)', '', '', item.total_out, '', '', '', '', '', '']);
+    }
+
+    if (sales.regular_qty) data.push([itemName, 'Regular sale', '', '', '', sales.regular_qty, '', '', '', '', '']);
+    if (sales.credit_qty) data.push([itemName, 'Credit sale', '', '', '', '', sales.credit_qty, '', '', '', '']);
+    if (sales.prepaid_qty) data.push([itemName, 'Prepaid sale', '', '', '', '', '', sales.prepaid_qty, '', '', '']);
+
+    data.push([itemName, 'Expected closing', '', '', '', '', '', '', item.expected_closing, '', '']);
+    data.push([itemName, 'Counted balance', '', '', '', '', '', '', '', item.closing_qty, '']);
+    data.push([itemName, 'Variance', '', '', '', '', '', '', '', '', item.variance]);
+    data.push([]);
   });
-  data.push([]);
 
   // Expenses
   data.push(['EXPENSES']);

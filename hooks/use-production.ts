@@ -98,10 +98,10 @@ export function useAmendProductionBatch() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["production-batches"] })
             queryClient.invalidateQueries({ queryKey: ["production-batch"] })
-            toast.success("Batch amended successfully")
+            toast.success("Batch correction saved successfully")
         },
         onError: (error: Error) => {
-            toast.error(`Failed to amend batch: ${error.message}`)
+            toast.error(`Failed to correct batch: ${error.message}`)
         },
     })
 }

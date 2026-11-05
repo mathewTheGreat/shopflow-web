@@ -54,6 +54,27 @@ export interface AmendBatchRequest {
     outputs?: AmendBatchLine[]
     reason: string
     shift_id?: string
+    adjust_stock?: boolean
+}
+
+export interface ProductionBatchAmendment {
+    id: string
+    amended_by: string
+    amended_by_name: string | null
+    reason: string
+    responsible_shift_id: string | null
+    recorded_shift_id: string | null
+    stock_adjustment_applied: boolean | null
+    lines: Array<{
+        kind: "input" | "output"
+        line_id: string | null
+        item_id: string
+        old_item_id: string | null
+        old_quantity: number
+        new_quantity: number
+        stock_transaction_ids: string[]
+    }>
+    created_at: string | null
 }
 
 export interface ProductionBatch {
@@ -61,6 +82,7 @@ export interface ProductionBatch {
     shop_id: string
     start_shift_id: string
     finalized_shift_id?: string
+    original_shift_id?: string
     finalized_by?: string
     process_type: ProductionProcessType
     status: ProductionBatchStatus
@@ -75,6 +97,14 @@ export interface ProductionBatch {
     _is_pending: boolean
     inputs: ProductionInput[]
     outputs: ProductionOutput[]
+    responsible_shift?: {
+        id: string
+        manager_id: string
+        is_closed: boolean
+        closing_status: string | null
+        name: string
+    } | null
+    amendments?: ProductionBatchAmendment[]
 }
 
 export interface OpenBatchRequest {

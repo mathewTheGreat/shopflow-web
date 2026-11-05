@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Loader2, ArrowLeft, Package, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react"
-import { useProductionBatch, useCancelProductionBatch, useAddProductionOutput, useUpdateProductionOutput, useDeleteProductionOutput, useAmendProductionBatch } from "@/hooks/use-production"
+import { useProductionBatch, useCancelProductionBatch, useAddProductionOutput, useAmendProductionBatch } from "@/hooks/use-production"
 import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
-import { ProductionBatch, ProductionBatchStatus, ProductionOutput } from "@/types/production"
+import { ProductionBatch, ProductionBatchStatus } from "@/types/production"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { format } from "date-fns"
 import {
     Select,
@@ -45,22 +46,28 @@ export function ProductionBatchDetails({
     const { data: batch, isLoading, refetch } = useProductionBatch(batchId)
     const { mutateAsync: cancelBatch, isPending: isCancelling } = useCancelProductionBatch()
     const { mutateAsync: addOutput, isPending: isAddingOutput } = useAddProductionOutput()
-    const { mutateAsync: updateOutput, isPending: isUpdatingOutput } = useUpdateProductionOutput()
-    const { mutateAsync: deleteOutput, isPending: isDeletingOutput } = useDeleteProductionOutput()
     const { mutateAsync: amendBatch, isPending: isAmending } = useAmendProductionBatch()
     const { items } = useItems()
     const userInfo = useAppStore((state) => state.userInfo)
     const activeShift = useAppStore((state) => state.activeShift)
-    const activeShop = useAppStore((state) => state.activeShop)
-    const isManager = activeShop?.role === "Manager"
+    const responsibleShift = batch?.responsible_shift
+    const canCorrectBatch = Boolean(
+        batch &&
+        batch.status !== "CANCELLED" &&
+        responsibleShift &&
+        userInfo?.id === responsibleShift.manager_id &&
+        (!responsibleShift.is_closed ||
+            responsibleShift.closing_status === "REJECTED" ||
+            responsibleShift.closing_status === "PENDING_CORRECTION_APPROVAL")
+    )
+    const canOperateBatch = Boolean(activeShift)
 
     const [showAddOutput, setShowAddOutput] = useState(false)
-    const [editingOutput, setEditingOutput] = useState<ProductionOutput | null>(null)
     const [newOutputs, setNewOutputs] = useState<OutputItem[]>([{ item_id: "", quantity: "" }])
-    const [editQuantity, setEditQuantity] = useState<string>("")
     const [showAmend, setShowAmend] = useState(false)
     const [amendQtys, setAmendQtys] = useState<Record<string, string>>({})
     const [amendReason, setAmendReason] = useState("")
+    const [adjustStock, setAdjustStock] = useState(false)
 
     const itemMap = useMemo(() => {
         const map: Record<string, string> = {}
@@ -119,61 +126,12 @@ export function ProductionBatchDetails({
         }
     }
 
-    const handleUpdateOutput = async () => {
-        if (!batch || !editingOutput || !activeShift || !userInfo) return
-
-        const quantity = parseFloat(editQuantity)
-        if (!quantity || quantity <= 0) {
-            alert("Please enter a valid quantity")
-            return
-        }
-
-        try {
-            await updateOutput({
-                batchId: batch.id,
-                outputId: editingOutput.id,
-                data: {
-                    item_id: editingOutput.item_id,
-                    quantity: quantity,
-                    updated_by: userInfo.id,
-                    shift_id: activeShift.id,
-                },
-            })
-            setEditingOutput(null)
-            setEditQuantity("")
-            refetch()
-        } catch (error) {
-            console.error("Failed to update output:", error)
-        }
-    }
-
-    const handleDeleteOutput = async (outputId: string) => {
-        if (!batch || !activeShift || !userInfo) return
-
-        const confirmDelete = window.confirm("Are you sure you want to delete this output?")
-        if (!confirmDelete) return
-
-        try {
-            await deleteOutput({
-                batchId: batch.id,
-                outputId: outputId,
-                data: {
-                    deleted_by: userInfo.id,
-                    shift_id: activeShift.id,
-                },
-            })
-            refetch()
-        } catch (error) {
-            console.error("Failed to delete output:", error)
-        }
-    }
-
     const handleAmendBatch = async () => {
-        if (!batch || !activeShift || !userInfo) return
+        if (!batch || !responsibleShift || !userInfo) return
 
         const reason = amendReason.trim()
         if (!reason) {
-            alert("A reason is required to amend a finalized batch")
+            alert("A reason is required to correct a batch")
             return
         }
 
@@ -207,10 +165,12 @@ export function ProductionBatchDetails({
                     inputs: changedInputs.map(({ lineId, item_id, quantity }) => ({ lineId, item_id, quantity })),
                     outputs: changedOutputs.map(({ lineId, item_id, quantity }) => ({ lineId, item_id, quantity })),
                     reason,
-                    shift_id: activeShift.id,
+                    shift_id: responsibleShift.id,
+                    adjust_stock: adjustStock,
                 },
             })
             setShowAmend(false)
+            setAdjustStock(false)
             refetch()
         } catch (error) {
             console.error("Failed to amend batch:", error)
@@ -258,7 +218,7 @@ export function ProductionBatchDetails({
                         </div>
                     </div>
                 </div>
-                {batch.status === "DRAFT" && (
+                {batch.status === "DRAFT" && canOperateBatch && (
                     <div className="flex gap-2">
                         <Button
                             variant="outline"
@@ -275,7 +235,7 @@ export function ProductionBatchDetails({
                         </Button>
                     </div>
                 )}
-                {batch.status === "IN_PROGRESS" && (
+                {batch.status === "IN_PROGRESS" && canOperateBatch && (
                     <div className="flex gap-2">
                         <Button
                             variant="outline"
@@ -290,7 +250,7 @@ export function ProductionBatchDetails({
                         </Button>
                     </div>
                 )}
-                {batch.status === "FINALIZED" && isManager && (
+                {canCorrectBatch && (
                     <div className="flex gap-2">
                         <Button
                             variant="outline"
@@ -300,11 +260,12 @@ export function ProductionBatchDetails({
                                 ;(batch.outputs || []).forEach((o) => { initial[`out:${o.id}`] = String(o.quantity) })
                                 setAmendQtys(initial)
                                 setAmendReason("")
+                                setAdjustStock(false)
                                 setShowAmend(true)
                             }}
                         >
                             <Pencil className="h-4 w-4 mr-2" />
-                            Amend Batch
+                            Correct Batch
                         </Button>
                     </div>
                 )}
@@ -355,6 +316,60 @@ export function ProductionBatchDetails({
                 </Card>
             )}
 
+            {responsibleShift && (
+                <Card className="bg-card">
+                    <CardContent className="p-4">
+                        <p className="text-sm text-muted-foreground mb-1">Responsible Shift</p>
+                        <p className="font-medium">{responsibleShift.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {responsibleShift.closing_status || (responsibleShift.is_closed ? "Closed" : "Active")}
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
+
+            {batch.amendments && batch.amendments.length > 0 && (
+                <Card className="bg-card">
+                    <div className="p-4 border-b">
+                        <h3 className="font-medium">Correction History</h3>
+                    </div>
+                    <div className="divide-y">
+                        {batch.amendments.map((amendment) => (
+                            <div key={amendment.id} className="p-4 space-y-2">
+                                <div className="flex flex-wrap justify-between gap-2">
+                                    <span className="font-medium">
+                                        {amendment.amended_by_name || amendment.amended_by}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">
+                                        {amendment.created_at
+                                            ? format(new Date(amendment.created_at), "MMM dd, yyyy HH:mm")
+                                            : "Date unavailable"}
+                                    </span>
+                                </div>
+                                <p className="text-sm">{amendment.reason}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {amendment.stock_adjustment_applied === null
+                                        ? "Stock adjustment status was not recorded"
+                                        : `Current stock ${amendment.stock_adjustment_applied ? "was adjusted" : "was not adjusted"}`}
+                                    {amendment.responsible_shift_id ? ` · Shift ${amendment.responsible_shift_id}` : ""}
+                                </p>
+                                <ul className="text-sm text-muted-foreground space-y-1">
+                                    {amendment.lines.map((line, index) => (
+                                        <li key={`${amendment.id}:${line.line_id || index}`}>
+                                            {line.kind === "input" ? "Input" : "Output"}:{" "}
+                                            {line.old_item_id && line.old_item_id !== line.item_id
+                                                ? `${getItemName(line.old_item_id)} → ${getItemName(line.item_id)}`
+                                                : getItemName(line.item_id)}{" "}
+                                            {line.old_quantity} → {line.new_quantity}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+            )}
+
             {/* Inputs and Outputs */}
             <div className="grid md:grid-cols-2 gap-6">
                 <Card className="bg-card overflow-hidden">
@@ -383,7 +398,7 @@ export function ProductionBatchDetails({
                 <Card className="bg-card overflow-hidden">
                     <div className="p-4 border-b bg-muted/40 flex justify-between items-center">
                         <h3 className="font-medium">Outputs</h3>
-                        {batch.status !== "FINALIZED" && batch.status !== "CANCELLED" && (
+                        {canOperateBatch && batch.status !== "FINALIZED" && batch.status !== "CANCELLED" && (
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -411,30 +426,6 @@ export function ProductionBatchDetails({
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="font-medium">{output.quantity}</span>
-                                        {batch.status !== "FINALIZED" && batch.status !== "CANCELLED" && (
-                                            <div className="flex gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7"
-                                                    onClick={() => {
-                                                        setEditingOutput(output)
-                                                        setEditQuantity(String(output.quantity))
-                                                    }}
-                                                >
-                                                    <Pencil className="h-3 w-3" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7 text-red-500"
-                                                    onClick={() => handleDeleteOutput(output.id)}
-                                                    disabled={isDeletingOutput}
-                                                >
-                                                    <Trash2 className="h-3 w-3" />
-                                                </Button>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             ))
@@ -535,13 +526,13 @@ export function ProductionBatchDetails({
                 </div>
             )}
 
-            {/* Amend Finalized Batch Dialog */}
+            {/* Correct Batch Dialog */}
             {showAmend && batch && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-background p-6 rounded-lg w-full max-w-lg shadow-lg">
-                        <h3 className="text-lg font-semibold mb-2">Amend Finalized Batch</h3>
+                        <h3 className="text-lg font-semibold mb-2">Correct Batch</h3>
                         <p className="text-sm text-muted-foreground mb-4">
-                            The original finalization stays on record. Only changed quantities post compensating stock movements.
+                            Corrections are recorded with your reason. The batch is attributed to {responsibleShift?.name || "its responsible shift"}.
                         </p>
                         <div className="space-y-4 max-h-[320px] overflow-y-auto">
                             <div>
@@ -597,54 +588,32 @@ export function ProductionBatchDetails({
                                     className="mt-1"
                                 />
                             </div>
+                            <div className="flex items-start gap-3">
+                                <Checkbox
+                                    id="adjust-stock"
+                                    checked={adjustStock}
+                                    onCheckedChange={(checked) => setAdjustStock(checked === true)}
+                                />
+                                <div className="space-y-1">
+                                    <Label htmlFor="adjust-stock">Adjust current stock</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        Off by default. When checked, compensating stock movements are posted for the correction.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                         <div className="flex justify-end gap-2 mt-4">
                             <Button variant="ghost" onClick={() => setShowAmend(false)}>
                                 Cancel
                             </Button>
-                            <Button onClick={handleAmendBatch} disabled={isAmending}>
-                                {isAmending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Post Amendment"}
+                            <Button onClick={handleAmendBatch} disabled={isAmending || !canCorrectBatch}>
+                                {isAmending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Correction"}
                             </Button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Edit Output Dialog */}
-            {editingOutput && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-background p-6 rounded-lg w-full max-w-sm shadow-lg">
-                        <h3 className="text-lg font-semibold mb-4">Edit Output</h3>
-                        <div className="space-y-3">
-                            <div>
-                                <Label>Item</Label>
-                                <div className="mt-1 p-2 bg-muted rounded">
-                                    {getItemName(editingOutput.item_id)}
-                                </div>
-                            </div>
-                            <div>
-                                <Label>Quantity</Label>
-                                <Input
-                                    type="number"
-                                    value={editQuantity}
-                                    onChange={(e) => setEditQuantity(e.target.value)}
-                                    min="0"
-                                    step="0.01"
-                                    className="mt-1"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex justify-end gap-2 mt-4">
-                            <Button variant="ghost" onClick={() => setEditingOutput(null)}>
-                                Cancel
-                            </Button>
-                            <Button onClick={handleUpdateOutput} disabled={isUpdatingOutput}>
-                                {isUpdatingOutput ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

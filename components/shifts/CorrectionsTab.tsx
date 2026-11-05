@@ -35,9 +35,11 @@ export function CorrectionsTab() {
     const [cmType, setCmType] = useState<"PAY_IN" | "PAY_OUT" | "FLOAT_IN">("PAY_IN")
     const [cmAmount, setCmAmount] = useState("")
     const [cmMethod, setCmMethod] = useState<"CASH" | "MPESA">("CASH")
+    const [cmReason, setCmReason] = useState("")
 
     const [cashActual, setCashActual] = useState("")
     const [mpesaActual, setMpesaActual] = useState("")
+    const [reconciliationReason, setReconciliationReason] = useState("")
 
     useEffect(() => {
         if (!activeShop?.id) return
@@ -54,6 +56,10 @@ export function CorrectionsTab() {
 
     const submitLateExpense = async () => {
         if (!userInfo || !targetShift) return
+        if (!expenseDesc.trim()) {
+            toast.error("Enter a reason for the late expense")
+            return
+        }
         const amount = parseFloat(expenseAmount)
         if (!amount || amount <= 0) {
             toast.error("Enter a valid expense amount")
@@ -91,6 +97,10 @@ export function CorrectionsTab() {
 
     const submitLateCashMovement = async () => {
         if (!userInfo || !targetShift) return
+        if (!cmReason.trim()) {
+            toast.error("Enter a reason for the cash movement")
+            return
+        }
         const amount = parseFloat(cmAmount)
         if (!amount || amount <= 0) {
             toast.error("Enter a valid amount")
@@ -105,7 +115,7 @@ export function CorrectionsTab() {
                 type: cmType,
                 amount,
                 payment_method: cmMethod,
-                reason: `Late correction for shift ${targetShift.name}`,
+                reason: cmReason.trim(),
                 created_by: userInfo.id,
                 created_at: now,
                 _version: 1,
@@ -114,6 +124,7 @@ export function CorrectionsTab() {
             }, activeShift?.id)
             toast.success("Late cash movement recorded.")
             setCmAmount("")
+            setCmReason("")
             queryClient.invalidateQueries({ queryKey: ["shift-cash-movements"] })
         } catch (error: any) {
             toast.error(error.message || "Failed to record late cash movement")
@@ -124,6 +135,10 @@ export function CorrectionsTab() {
 
     const submitReconciliation = async () => {
         if (!userInfo || !targetShift) return
+        if (!reconciliationReason.trim()) {
+            toast.error("Enter a reason for correcting the cash counts")
+            return
+        }
         setBusy(true)
         try {
             const now = new Date().toISOString()
@@ -137,6 +152,7 @@ export function CorrectionsTab() {
                 reconciliation_date: now,
                 created_by: userInfo.id,
                 created_at: now,
+                notes: reconciliationReason.trim(),
                 _version: 1,
                 _last_modified_at: now,
                 _is_pending: false,
@@ -144,6 +160,7 @@ export function CorrectionsTab() {
             toast.success("Cash counts corrected.")
             setCashActual("")
             setMpesaActual("")
+            setReconciliationReason("")
             queryClient.invalidateQueries({ queryKey: ["current-shift"] })
         } catch (error: any) {
             toast.error(error.message || "Failed to correct reconciliation")
@@ -212,9 +229,9 @@ export function CorrectionsTab() {
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="le-desc">Description</Label>
-                                <Input id="le-desc" value={expenseDesc} onChange={(e) => setExpenseDesc(e.target.value)} placeholder="Reason" />
+                                <Input id="le-desc" value={expenseDesc} onChange={(e) => setExpenseDesc(e.target.value)} placeholder="What was the expense for?" />
                             </div>
-                            <Button onClick={submitLateExpense} disabled={busy} className="w-full">
+                            <Button onClick={submitLateExpense} disabled={busy || !expenseDesc.trim()} className="w-full">
                                 {busy ? "Saving..." : "Record Late Expense"}
                             </Button>
                         </CardContent>
@@ -244,7 +261,11 @@ export function CorrectionsTab() {
                                     <Input id="cm-amount" type="number" value={cmAmount} onChange={(e) => setCmAmount(e.target.value)} placeholder="0.00" />
                                 </div>
                             </div>
-                            <Button onClick={submitLateCashMovement} disabled={busy} className="w-full">
+                            <div className="space-y-1">
+                                <Label htmlFor="cm-reason">Reason</Label>
+                                <Input id="cm-reason" value={cmReason} onChange={(e) => setCmReason(e.target.value)} placeholder="Why is this movement being recorded late?" />
+                            </div>
+                            <Button onClick={submitLateCashMovement} disabled={busy || !cmReason.trim()} className="w-full">
                                 {busy ? "Saving..." : "Record Cash Movement"}
                             </Button>
                         </CardContent>
@@ -263,7 +284,11 @@ export function CorrectionsTab() {
                                     <Input id="rc-mpesa" type="number" value={mpesaActual} onChange={(e) => setMpesaActual(e.target.value)} placeholder="0.00" />
                                 </div>
                             </div>
-                            <Button onClick={submitReconciliation} disabled={busy} className="w-full">
+                            <div className="space-y-1">
+                                <Label htmlFor="rc-reason">Correction Reason</Label>
+                                <Input id="rc-reason" value={reconciliationReason} onChange={(e) => setReconciliationReason(e.target.value)} placeholder="Explain why these counts are being corrected" />
+                            </div>
+                            <Button onClick={submitReconciliation} disabled={busy || !reconciliationReason.trim()} className="w-full">
                                 {busy ? "Saving..." : "Save Cash Counts"}
                             </Button>
                         </CardContent>

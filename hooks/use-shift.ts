@@ -125,13 +125,16 @@ export function useShift() {
             let existingRecon: any = null
             try {
                 existingRecon = await shiftService.getShiftReconciliation(currentShift.id)
-            } catch {
-                // No existing reconciliation, will create one
+            } catch (error) {
+                if ((error as Error & { status?: number }).status !== 404) throw error
             }
             if (existingRecon) {
                 await shiftService.amendReconciliation(currentShift.id, {
                     actual_cash_amount: data.cashAmount,
                     actual_mpesa_amount: data.mpesaAmount,
+                    reason: "Cash count updated during shift close",
+                    userId: userInfo.id,
+                    recordedShiftId: currentShift.id,
                 })
             } else {
                 await shiftService.createReconciliation({

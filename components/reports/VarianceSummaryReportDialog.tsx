@@ -420,15 +420,15 @@ function formatVarianceSummaryHTML(
             `;
             groups.forEach((items, itemName) => {
                     items.forEach((item, idx) => {
-                    const varianceClass = item.variance > 0 ? 'positive' : item.variance < 0 ? 'negative' : 'neutral';
+                    const varianceClass = item.variance === null ? 'neutral' : item.variance > 0 ? 'positive' : item.variance < 0 ? 'negative' : 'neutral';
                     html += `
                         <tr>
                             <td>${item.created_at ? formatTime(item.created_at) : '-'}</td>
                             <td>${item.cashierName}</td>
                             <td>${idx === 0 ? '<strong>' + itemName + '</strong>' : item.item_name}</td>
-                            <td class="text-right">${item.expected_qty}</td>
+                            <td class="text-right">${item.expected_qty ?? 'N/A'}</td>
                             <td class="text-right">${item.counted_qty}</td>
-                            <td class="text-right ${varianceClass}">${item.variance > 0 ? '+' : ''}${item.variance}</td>
+                            <td class="text-right ${varianceClass}">${item.variance === null ? 'N/A' : `${item.variance > 0 ? '+' : ''}${item.variance}`}</td>
                             <td>${item.notes || '-'}</td>
                         </tr>
                     `;
@@ -455,15 +455,15 @@ function formatVarianceSummaryHTML(
                     <tbody>
             `;
             sorted.forEach(item => {
-                const varianceClass = item.variance > 0 ? 'positive' : item.variance < 0 ? 'negative' : 'neutral';
+                const varianceClass = item.variance === null ? 'neutral' : item.variance > 0 ? 'positive' : item.variance < 0 ? 'negative' : 'neutral';
                 html += `
                     <tr>
                         <td>${item.created_at ? formatTime(item.created_at) : '-'}</td>
                         <td>${item.cashierName}</td>
                         <td>${item.item_name}</td>
-                        <td class="text-right">${item.expected_qty}</td>
+                        <td class="text-right">${item.expected_qty ?? 'N/A'}</td>
                         <td class="text-right">${item.counted_qty}</td>
-                        <td class="text-right ${varianceClass}">${item.variance > 0 ? '+' : ''}${item.variance}</td>
+                        <td class="text-right ${varianceClass}">${item.variance === null ? 'N/A' : `${item.variance > 0 ? '+' : ''}${item.variance}`}</td>
                         <td>${item.notes || '-'}</td>
                     </tr>
                 `;
@@ -578,30 +578,34 @@ const exportVarianceSummaryToExcel = async (
             groups.forEach((items, itemName) => {
                 topData.push([`--- ${itemName} ---`, '', '', '', '', '', '', ''])
                 items.forEach(item => {
-                    const variancePct = item.expected_qty !== 0 ? ((item.variance / item.expected_qty) * 100).toFixed(1) : '0.0';
+                    const variancePct = item.expected_qty !== null && item.expected_qty !== 0 && item.variance !== null
+                        ? ((item.variance / item.expected_qty) * 100).toFixed(1)
+                        : null;
                     topData.push([
                         new Date(item.created_at || 0).toLocaleString(),
                         item.cashierName,
                         item.item_name,
-                        item.expected_qty,
+                        item.expected_qty ?? 'N/A',
                         item.counted_qty,
-                        item.variance,
-                        `${variancePct}%`,
+                        item.variance ?? 'N/A',
+                        variancePct === null ? 'N/A' : `${variancePct}%`,
                         item.notes || ''
                     ]);
                 })
             })
         } else {
             sorted.forEach((item, index) => {
-                const variancePct = item.expected_qty !== 0 ? ((item.variance / item.expected_qty) * 100).toFixed(1) : '0.0';
+                const variancePct = item.expected_qty !== null && item.expected_qty !== 0 && item.variance !== null
+                    ? ((item.variance / item.expected_qty) * 100).toFixed(1)
+                    : null;
                 topData.push([
                     new Date(item.created_at || 0).toLocaleString(),
                     item.cashierName,
                     item.item_name,
-                    item.expected_qty,
+                    item.expected_qty ?? 'N/A',
                     item.counted_qty,
-                    item.variance,
-                    `${variancePct}%`,
+                    item.variance ?? 'N/A',
+                    variancePct === null ? 'N/A' : `${variancePct}%`,
                     item.notes || ''
                 ]);
             });

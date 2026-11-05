@@ -9,6 +9,8 @@ export interface CashLedgerLeg {
     amount_minor: number
     type: string
     transfer_group_id: string | null
+    source_entity?: string | null
+    reversal_of?: string | null
     notes?: string | null
     created_at?: string | null
     effective_at?: string | null
@@ -50,6 +52,9 @@ export interface InitializeRegisterInput {
 export const cashLedgerService = {
     postDeposit: (data: PostDepositInput) =>
         apiClient.post<CashLedgerLeg[]>("/api/cash-ledger/deposit", data),
+
+    reverseDeposit: (data: { shopId: string; transferGroupId: string; reason: string }) =>
+        apiClient.post<CashLedgerLeg[]>("/api/cash-ledger/deposit/reverse", data),
 
     getBalance: (accountId: string) =>
         apiClient.get<{ accountId: string; balanceMinor: number; balance: number; currency: string }>(

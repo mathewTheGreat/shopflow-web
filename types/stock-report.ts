@@ -44,6 +44,7 @@ export interface CashierVarianceSummary {
     underCounts: number;
     averageVariance: number;
     totalAbsoluteVariance: number;
+    comparableItems: number;
     accuracyRate: number;
 }
 
@@ -56,6 +57,7 @@ export interface VarianceSummaryOverall {
     overallAverageVariance: number;
     totalAbsoluteVariance: number;
     accuracyRate: number;
+    comparableItems: number;
 }
 
 export interface VarianceSummaryStockTake {
@@ -64,9 +66,9 @@ export interface VarianceSummaryStockTake {
     cashierName: string;
     shiftId: string;
     item_name: string;
-    expected_qty: number;
+    expected_qty: number | null;
     counted_qty: number;
-    variance: number;
+    variance: number | null;
     notes: string | null;
 }
 

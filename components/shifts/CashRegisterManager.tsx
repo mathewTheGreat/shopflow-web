@@ -27,6 +27,10 @@ import { MoveMoneyDialog } from "./MoveMoneyDialog"
 import { InitializeRegisterDialog } from "./InitializeRegisterDialog"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { cashLedgerService } from "@/services/cash-ledger.service"
 
 interface CashRegisterManagerProps {
     onBack?: () => void
@@ -47,15 +51,20 @@ const money = (value: number) => value.toLocaleString(undefined, {
 export function CashRegisterManager({ onBack }: CashRegisterManagerProps) {
     const activeShop = useAppStore((state) => state.activeShop)
     const activeShift = useAppStore((state) => state.activeShift)
+    const userInfo = useAppStore((state) => state.userInfo)
     const { accounts = [], isLoading, refetch } = useRegisterAccounts(activeShop?.id)
     const { initialized, isLoading: initLoading, refetch: refetchInit } = useRegisterInitialization(activeShop?.id)
     const [accountId, setAccountId] = useState("")
     const [page, setPage] = useState(1)
     const [showMoveMoney, setShowMoveMoney] = useState(false)
     const [showInitialize, setShowInitialize] = useState(false)
+    const [depositToReverse, setDepositToReverse] = useState<string | null>(null)
+    const [reversalReason, setReversalReason] = useState("")
+    const [isReversingDeposit, setIsReversingDeposit] = useState(false)
     const canInitialize = ["manager", "admin", "owner"].includes(
         (activeShop?.role || "").toLowerCase()
     )
+    const canReverseDeposit = canInitialize
 
     useEffect(() => {
         if (accounts.length > 0 && !accounts.some((a) => a.id === accountId)) {
@@ -64,7 +73,7 @@ export function CashRegisterManager({ onBack }: CashRegisterManagerProps) {
         }
     }, [accounts, accountId])
 
-    const { entries = [], pagination, isLoading: entriesLoading } = useLedgerStatement(
+    const { entries = [], pagination, isLoading: entriesLoading, refetch: refetchStatement } = useLedgerStatement(
         accountId || undefined,
         { page, limit: 20 }
     )
@@ -77,6 +86,26 @@ export function CashRegisterManager({ onBack }: CashRegisterManagerProps) {
             return
         }
         setShowMoveMoney(true)
+    }
+
+    const handleReverseDeposit = async () => {
+        if (!activeShop?.id || !userInfo?.id || !depositToReverse || !reversalReason.trim()) return
+        setIsReversingDeposit(true)
+        try {
+            await cashLedgerService.reverseDeposit({
+                shopId: activeShop.id,
+                transferGroupId: depositToReverse,
+                reason: reversalReason.trim(),
+            })
+            toast.success("Deposit reversal recorded")
+            setDepositToReverse(null)
+            setReversalReason("")
+            await Promise.all([refetch(), refetchStatement()])
+        } catch (error: any) {
+            toast.error(error.message || "Failed to reverse deposit")
+        } finally {
+            setIsReversingDeposit(false)
+        }
     }
 
     return (
@@ -256,6 +285,16 @@ export function CashRegisterManager({ onBack }: CashRegisterManagerProps) {
                                                 </div>
                                                 <div className="col-span-3 text-muted-foreground truncate text-xs" title={entry.notes || ""}>
                                                     {entry.notes || "-"}
+                                                    {canReverseDeposit && entry.source_entity === "DEPOSIT" && entry.type === "TRANSFER" && entry.transfer_group_id && !entry.reversal_of && (
+                                                        <Button
+                                                            variant="link"
+                                                            size="sm"
+                                                            className="h-auto p-0 ml-2"
+                                                            onClick={() => setDepositToReverse(entry.transfer_group_id)}
+                                                        >
+                                                            Reverse
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -283,6 +322,42 @@ export function CashRegisterManager({ onBack }: CashRegisterManagerProps) {
                 shopId={activeShop?.id}
                 onSuccess={() => { refetch(); refetchInit(); setPage(1) }}
             />
+            <Dialog
+                open={!!depositToReverse}
+                onOpenChange={(open) => {
+                    if (!open && !isReversingDeposit) {
+                        setDepositToReverse(null)
+                        setReversalReason("")
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Reverse Deposit</DialogTitle>
+                        <DialogDescription>
+                            This appends compensating register entries and preserves the original deposit for audit.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-2">
+                        <Label htmlFor="deposit-reversal-reason">Reason</Label>
+                        <Input
+                            id="deposit-reversal-reason"
+                            value={reversalReason}
+                            onChange={(event) => setReversalReason(event.target.value)}
+                            placeholder="Explain why this deposit is being reversed"
+                            disabled={isReversingDeposit}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDepositToReverse(null)} disabled={isReversingDeposit}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleReverseDeposit} disabled={isReversingDeposit || !reversalReason.trim()}>
+                            {isReversingDeposit ? "Reversing..." : "Confirm Reversal"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

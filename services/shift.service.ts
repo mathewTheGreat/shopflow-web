@@ -74,6 +74,11 @@ export const shiftService = {
     getShiftReconciliation: (shiftId: string) =>
         apiClient.get<ShiftReconciliation | null>(`/api/shift-reconciliation/shift/${shiftId}`),
 
+    getShiftReconciliationHistory: (shiftId: string) =>
+        apiClient.get<Array<ShiftReconciliation & { is_superseded: boolean; created_by_name: string | null }>>(
+            `/api/shift-reconciliation/shift/${shiftId}/history`
+        ),
+
     getActiveShift: (shopId: string) =>
         apiClient.get<Shift | null>(`/api/shifts/shop/${shopId}/active-shift`),
 
@@ -142,7 +147,13 @@ export const shiftService = {
     getRejectedShifts: (shopId: string, userId: string) =>
         apiClient.get<Shift[]>(`/api/shifts/rejected/list?shopId=${shopId}&userId=${userId}`),
 
-    amendReconciliation: (shiftId: string, data: { actual_cash_amount?: number; actual_mpesa_amount?: number }) =>
+    amendReconciliation: (shiftId: string, data: {
+        actual_cash_amount?: number
+        actual_mpesa_amount?: number
+        reason: string
+        userId: string
+        recordedShiftId?: string
+    }) =>
         apiClient.patch<any>(`/api/shift-reconciliation/shift/${shiftId}/amend`, data),
 
     getShiftCashMovements: (shiftId: string) =>

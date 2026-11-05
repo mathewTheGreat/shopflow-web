@@ -31,38 +31,57 @@ export function CorrectReconciliationDialog({
 }: CorrectReconciliationDialogProps) {
     const [cashAmount, setCashAmount] = useState("")
     const [mpesaAmount, setMpesaAmount] = useState("")
+    const [reason, setReason] = useState("")
+    const [history, setHistory] = useState<Array<{
+        id: string
+        is_superseded: boolean
+        actual_cash_amount: number
+        actual_mpesa_amount?: number | null
+        created_at?: string | null
+        created_by_name: string | null
+        notes?: string | null
+    }>>([])
     const [isLoading, setIsLoading] = useState(false)
     const [isFetching, setIsFetching] = useState(false)
     const userInfo = useAppStore((state) => state.userInfo)
+    const activeShift = useAppStore((state) => state.activeShift)
 
     useEffect(() => {
         if (open && shiftId) {
             setIsFetching(true)
-            shiftService.getShiftReconciliation(shiftId)
-                .then((recon) => {
+            Promise.all([
+                shiftService.getShiftReconciliation(shiftId),
+                shiftService.getShiftReconciliationHistory(shiftId),
+            ])
+                .then(([recon, revisions]) => {
                     if (recon) {
                         setCashAmount(String(recon.actual_cash_amount ?? ""))
                         setMpesaAmount(String(recon.actual_mpesa_amount ?? ""))
                     }
+                    setHistory(revisions)
                 })
-                .catch(() => {
-                    setCashAmount("")
-                    setMpesaAmount("")
-                })
+                .catch((error) => toast.error(`Failed to load reconciliation: ${error.message}`))
                 .finally(() => setIsFetching(false))
         }
     }, [open, shiftId])
 
     const handleSubmit = async () => {
         if (!userInfo) return
+        if (!reason.trim()) {
+            toast.error("Enter a reason for this correction")
+            return
+        }
 
         setIsLoading(true)
         try {
             await shiftService.amendReconciliation(shiftId, {
                 actual_cash_amount: parseFloat(cashAmount) || 0,
                 actual_mpesa_amount: parseFloat(mpesaAmount) || 0,
+                reason: reason.trim(),
+                userId: userInfo.id,
+                recordedShiftId: activeShift?.id,
             })
-            toast.success("Reconciliation amounts updated")
+            toast.success("Correction recorded for approval")
             onOpenChange(false)
             onSuccess?.()
         } catch (error: any) {
@@ -107,12 +126,40 @@ export function CorrectReconciliationDialog({
                             disabled={isFetching}
                         />
                     </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="correction-reason">Correction Reason</Label>
+                        <Input
+                            id="correction-reason"
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            placeholder="Explain why these counts are being corrected"
+                            disabled={isFetching}
+                        />
+                    </div>
+                    {history.some((revision) => revision.is_superseded) && (
+                        <div className="space-y-2 border-t pt-3">
+                            <Label>Previous Reconciliation Versions</Label>
+                            <div className="max-h-32 space-y-2 overflow-y-auto text-xs text-muted-foreground">
+                                {history.filter((revision) => revision.is_superseded).map((revision) => (
+                                    <div key={revision.id} className="rounded border p-2">
+                                        <div>
+                                            {revision.created_by_name || "Unknown user"} · {revision.created_at ? new Date(revision.created_at).toLocaleString() : "Unknown date"}
+                                        </div>
+                                        <div>
+                                            Cash {revision.actual_cash_amount} / M-Pesa {revision.actual_mpesa_amount ?? 0}
+                                        </div>
+                                        <div>{revision.notes || "No reason recorded"}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <DialogFooter className="sm:justify-end gap-2">
                     <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isLoading}>
                         Cancel
                     </Button>
-                    <Button onClick={handleSubmit} disabled={isLoading || isFetching} className="bg-primary hover:bg-primary/90">
+                    <Button onClick={handleSubmit} disabled={isLoading || isFetching || !reason.trim()} className="bg-primary hover:bg-primary/90">
                         {isLoading ? "Saving..." : "Save Corrections"}
                     </Button>
                 </DialogFooter>

@@ -24,6 +24,8 @@ export function ProductionManager({ onBack }: ProductionManagerProps) {
     const [selectedBatch, setSelectedBatch] = useState<ProductionBatch | null>(null)
 
     const activeShift = useAppStore((state) => state.activeShift)
+    const activeShop = useAppStore((state) => state.activeShop)
+    const isManager = activeShop?.role === "Manager"
 
     const handleBatchClick = (batch: ProductionBatch) => {
         setSelectedBatchId(batch.id)
@@ -79,7 +81,9 @@ export function ProductionManager({ onBack }: ProductionManagerProps) {
 
                     {!activeShift && (
                         <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                            You need an open shift to start production. Please open a shift first.
+                            {isManager
+                                ? "You can view production batches without a shift. Open a shift to create batches."
+                                : "You need an open shift to start production. Please open a shift first."}
                         </div>
                     )}
 

@@ -438,12 +438,12 @@ export default function InventoryPage() {
                                     <TabsContent value="more" className="h-full p-6">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <Card
-                                                className={`border transition-colors cursor-pointer group ${activeShift
+                                                className={`border transition-colors cursor-pointer group ${(activeShift || isManager)
                                                     ? "hover:border-primary/50"
                                                     : "opacity-50 cursor-not-allowed"
                                                     }`}
                                                 onClick={() => {
-                                                    if (activeShift) {
+                                                    if (activeShift || isManager) {
                                                         setCurrentView("production")
                                                     }
                                                 }}
@@ -457,7 +457,9 @@ export default function InventoryPage() {
                                                         <p className="text-sm text-muted-foreground">
                                                             {activeShift
                                                                 ? "Manage pasteurization and production batches."
-                                                                : "Open a shift to manage production."}
+                                                                : isManager
+                                                                    ? "View production batches. Open a shift to create or manage batches."
+                                                                    : "Open a shift to manage production."}
                                                         </p>
                                                     </div>
                                                 </CardContent>

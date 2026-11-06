@@ -45,7 +45,13 @@ export function ProductionBatchesGrid({ onBatchClick }: ProductionBatchesGridPro
         sort_order: sortOrder,
     }
 
-    const { data: response, isLoading } = useProductionBatches(activeShop?.id, queryParams)
+    const {
+        data: response,
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useProductionBatches(activeShop?.id, queryParams)
 
     const batches = response?.data || []
     const pagination = response?.pagination
@@ -75,6 +81,20 @@ export function ProductionBatchesGrid({ onBatchClick }: ProductionBatchesGridPro
             <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
                 <p className="text-muted-foreground">Loading production batches...</p>
+            </div>
+        )
+    }
+
+    if (isError) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 text-center border border-destructive/30 rounded-lg bg-card px-6">
+                <p className="font-medium text-destructive">Could not load production batches</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                    {error instanceof Error ? error.message : "The production batch request failed."}
+                </p>
+                <Button variant="outline" className="mt-4" onClick={() => refetch()}>
+                    Try again
+                </Button>
             </div>
         )
     }

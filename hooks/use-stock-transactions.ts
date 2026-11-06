@@ -78,3 +78,37 @@ export function useReverseStockTransaction() {
         },
     })
 }
+
+export function usePurchaseCorrectionContext(id: string | null, correctedItemId?: string) {
+    return useQuery({
+        queryKey: ["stock-purchase-correction-context", id, correctedItemId ?? ""],
+        queryFn: () => stockTransactionService.getPurchaseCorrectionContext(id!, correctedItemId),
+        enabled: !!id,
+    })
+}
+
+export function useCorrectPurchaseForReport() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: ({ id, correctedItemId, quantity, reason, relatedAdjustmentTransactionIds }: {
+            id: string
+            correctedItemId: string
+            quantity: number
+            reason: string
+            relatedAdjustmentTransactionIds: string[]
+        }) => stockTransactionService.correctPurchaseForReport(id, {
+            correctedItemId,
+            quantity,
+            reason,
+            relatedAdjustmentTransactionIds,
+        }),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["stock-transactions"] })
+            toast.success("Purchase correction saved. The original shift report now reflects the correction.")
+        },
+        onError: (error: Error) => {
+            toast.error(`Failed to correct purchase report: ${error.message}`)
+        },
+    })
+}

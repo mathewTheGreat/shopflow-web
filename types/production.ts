@@ -102,6 +102,7 @@ export interface ProductionBatch {
         manager_id: string
         is_closed: boolean
         closing_status: string | null
+        rejection_reason?: string | null
         name: string
     } | null
     amendments?: ProductionBatchAmendment[]

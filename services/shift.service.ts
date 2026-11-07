@@ -65,6 +65,36 @@ export const shiftService = {
     createLateReconciliation: (originalShiftId: string, userId: string, reconciliationData: any, recordedShiftId?: string) =>
         apiClient.post<any>(`/api/shifts/${originalShiftId}/late-entries/reconciliation`, { userId, recordedShiftId, reconciliationData }),
 
+    createCorrectionCase: (data: {
+        shopId: string
+        responsibleShiftId: string
+        recordedShiftId?: string
+        intent: string
+        effectScope: "REPORT_ONLY" | "REPORT_AND_OPERATIONAL"
+        reason: string
+        evidence?: string
+        idempotencyKey: string
+    }) => apiClient.post<any>("/api/shift-corrections", data),
+
+    getCorrectionCases: (shopId: string, shiftId?: string) => {
+        const params = new URLSearchParams()
+        if (shiftId) params.set("shiftId", shiftId)
+        const query = params.toString()
+        return apiClient.get<any[]>(`/api/shift-corrections/shop/${shopId}${query ? `?${query}` : ""}`)
+    },
+
+    executeCorrectionAction: (caseId: string, data: {
+        actionType: string
+        idempotencyKey: string
+        actionData: Record<string, unknown>
+    }) => apiClient.post<any>(`/api/shift-corrections/${caseId}/actions`, data),
+
+    submitCorrectionCase: (caseId: string) =>
+        apiClient.post<any>(`/api/shift-corrections/${caseId}/submit`, {}),
+
+    finalizeCorrectionCase: (caseId: string, data: { decision: 'APPROVED' | 'REJECTED'; reviewNotes?: string }) =>
+        apiClient.post<any>(`/api/shift-corrections/${caseId}/finalize`, data),
+
     getShiftPerformanceReport: (shiftId: string) =>
         apiClient.get<any>(`/api/shift-reconciliation/shift/${shiftId}/performance-report`),
 

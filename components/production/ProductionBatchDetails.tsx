@@ -2,15 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Loader2, ArrowLeft, Package, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react"
-import { useProductionBatch, useCancelProductionBatch, useAddProductionOutput, useAmendProductionBatch } from "@/hooks/use-production"
+import { useProductionBatch, useCancelProductionBatch, useAddProductionOutput } from "@/hooks/use-production"
 import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
+import { shiftService } from "@/services/shift.service"
 import { ProductionBatch, ProductionBatchStatus } from "@/types/production"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { toast } from "sonner"
+import { v4 as uuidv4 } from "uuid"
 import { format } from "date-fns"
 import {
     Select,
@@ -46,7 +49,6 @@ export function ProductionBatchDetails({
     const { data: batch, isLoading, refetch } = useProductionBatch(batchId)
     const { mutateAsync: cancelBatch, isPending: isCancelling } = useCancelProductionBatch()
     const { mutateAsync: addOutput, isPending: isAddingOutput } = useAddProductionOutput()
-    const { mutateAsync: amendBatch, isPending: isAmending } = useAmendProductionBatch()
     const { items } = useItems()
     const userInfo = useAppStore((state) => state.userInfo)
     const activeShift = useAppStore((state) => state.activeShift)
@@ -68,6 +70,10 @@ export function ProductionBatchDetails({
     const [amendQtys, setAmendQtys] = useState<Record<string, string>>({})
     const [amendReason, setAmendReason] = useState("")
     const [adjustStock, setAdjustStock] = useState(false)
+    const [correctionCaseId, setCorrectionCaseId] = useState("")
+    const [caseIdempotencyKey, setCaseIdempotencyKey] = useState(uuidv4())
+    const [actionIdempotencyKey, setActionIdempotencyKey] = useState(uuidv4())
+    const [isAmending, setIsAmending] = useState(false)
 
     const itemMap = useMemo(() => {
         const map: Record<string, string> = {}
@@ -158,22 +164,49 @@ export function ProductionBatchDetails({
             return
         }
 
+        if (!userInfo) return
+
+        setIsAmending(true)
         try {
-            await amendBatch({
-                id: batch.id,
-                data: {
+            const correctionCase = correctionCaseId
+                ? { id: correctionCaseId }
+                : await shiftService.createCorrectionCase({
+                    shopId: batch.shop_id,
+                    responsibleShiftId: responsibleShift.id,
+                    recordedShiftId: activeShift?.id,
+                    intent: "SOURCE_FACT_CORRECTION",
+                    effectScope: adjustStock ? "REPORT_AND_OPERATIONAL" : "REPORT_ONLY",
+                    reason,
+                    idempotencyKey: caseIdempotencyKey,
+                }) as { id: string }
+            setCorrectionCaseId(correctionCase.id)
+            await shiftService.executeCorrectionAction(correctionCase.id, {
+                actionType: "AMEND_PRODUCTION_BATCH",
+                idempotencyKey: actionIdempotencyKey,
+                actionData: {
+                    batchId: batch.id,
                     inputs: changedInputs.map(({ lineId, item_id, quantity }) => ({ lineId, item_id, quantity })),
                     outputs: changedOutputs.map(({ lineId, item_id, quantity }) => ({ lineId, item_id, quantity })),
-                    reason,
-                    shift_id: responsibleShift.id,
                     adjust_stock: adjustStock,
                 },
             })
+            if (responsibleShift.closing_status
+                && ["REJECTED", "PENDING_CORRECTION_APPROVAL", "PENDING_APPROVAL"].includes(responsibleShift.closing_status)) {
+                await shiftService.submitCorrectionCase(correctionCase.id)
+                toast.success("Production correction submitted for manager review.")
+            } else {
+                toast.success("Production correction recorded. Submit the shift for manager review to finish the correction.")
+            }
+            setCorrectionCaseId("")
+            setCaseIdempotencyKey(uuidv4())
+            setActionIdempotencyKey(uuidv4())
             setShowAmend(false)
             setAdjustStock(false)
             refetch()
         } catch (error) {
-            console.error("Failed to amend batch:", error)
+            toast.error(error instanceof Error ? error.message : "Failed to amend batch")
+        } finally {
+            setIsAmending(false)
         }
     }
 

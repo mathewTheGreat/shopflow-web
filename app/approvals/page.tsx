@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useUser } from "@clerk/nextjs"
 import { Loader2, ChevronRight, Check, X, AlertTriangle } from "lucide-react"
 import { useAppStore } from "@/store/use-app-store"
@@ -19,6 +19,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { Shift } from "@/types/shift"
 import { CorrectionsTab } from "@/components/shifts/CorrectionsTab"
 import { ListSearch } from "@/components/ui/list-search"
+import { shiftService } from "@/services/shift.service"
 
 function formatDateTime(isoString?: string | null) {
     if (!isoString) return ""
@@ -103,6 +104,37 @@ function ManagerApprovalView({
 }) {
     const [showReject, setShowReject] = useState(false)
     const [expanded, setExpanded] = useState(false)
+    const [correctionCases, setCorrectionCases] = useState<Array<{
+        id: string
+        reason: string
+        evidence?: string | null
+        intent: string
+        effect_scope: string
+        status: string
+        actions: Array<{ action_type: string; details?: Record<string, unknown> | null }>
+    }>>([])
+    const [loadingCorrections, setLoadingCorrections] = useState(false)
+    const [correctionLoadError, setCorrectionLoadError] = useState("")
+
+    useEffect(() => {
+        if (!expanded || shift.closing_status !== "PENDING_CORRECTION_APPROVAL") return
+        let cancelled = false
+        setLoadingCorrections(true)
+        setCorrectionLoadError("")
+        shiftService.getCorrectionCases(shift.shop_id, shift.id)
+            .then((records) => {
+                if (!cancelled) {
+                    setCorrectionCases(records.filter((record) => record.status === "PENDING_REVIEW"))
+                }
+            })
+            .catch((error: Error) => {
+                if (!cancelled) setCorrectionLoadError(error.message || "Could not load correction details")
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingCorrections(false)
+            })
+        return () => { cancelled = true }
+    }, [expanded, shift.closing_status, shift.id, shift.shop_id])
 
     return (
         <Card className="bg-card border shadow-sm">
@@ -116,6 +148,11 @@ function ManagerApprovalView({
                         <p className="text-xs text-muted-foreground">
                             Duration: {formatDuration(shift.start_time, shift.end_time)}
                         </p>
+                        {shift.closing_status === "PENDING_CORRECTION_APPROVAL" && (
+                            <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                                Correction review — expand details before deciding.
+                            </p>
+                        )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         <Button
@@ -149,6 +186,91 @@ function ManagerApprovalView({
                     <div className="mt-3 pt-3 border-t text-sm space-y-1 text-muted-foreground">
                         <p><strong>Shift:</strong> {shift.name}</p>
                         <p><strong>Cashier:</strong> {shift.manager_name || "Unknown staff"}</p>
+                        {shift.closing_status === "PENDING_CORRECTION_APPROVAL" && (
+                            <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                                <p className="font-semibold">Correction review</p>
+                                {loadingCorrections && <p className="mt-1">Loading case details…</p>}
+                                {correctionLoadError && <p className="mt-1">{correctionLoadError}</p>}
+                                {!loadingCorrections && !correctionLoadError && correctionCases.length === 0 && (
+                                    <p className="mt-1">No guided correction case is attached; review the shift changes and prior correction records.</p>
+                                )}
+                                {correctionCases.map((correctionCase) => (
+                                    <div key={correctionCase.id} className="mt-2 border-t border-amber-300/70 pt-2 dark:border-amber-800">
+                                        <p>{correctionCase.reason}</p>
+                                        <p className="mt-1 text-xs">
+                                            Intent: {correctionCase.intent.replace(/_/g, " ").toLowerCase()}
+                                        </p>
+                                        {correctionCase.evidence && (
+                                            <p className="mt-1 text-xs">Evidence: {correctionCase.evidence}</p>
+                                        )}
+                                        <p className="mt-1 text-xs">
+                                            {correctionCase.effect_scope === "REPORT_ONLY"
+                                                ? "Report-only; no current cash or stock adjustment."
+                                                : "Changes report history and operational balances."}
+                                        </p>
+                                        <ul className="mt-1 list-inside list-disc text-xs">
+                                            {correctionCase.actions.map((action, index) => {
+                                                const impactLabels: Record<string, string> = {
+                                                    total_amount: "Sale total",
+                                                    sale_category: "Sale category",
+                                                    amount: "Amount",
+                                                    category: "Category",
+                                                    movement_type: "Movement",
+                                                    payment_method: "Payment method",
+                                                    transaction_type: "Customer transaction type",
+                                                    quantity: "Quantity",
+                                                    item_count: "Items",
+                                                    item_quantities: "Item quantities",
+                                                    source_quantity: "Original quantity",
+                                                    reversal_quantity: "Reversal quantity",
+                                                    reversed_amount: "Reversed amount",
+                                                    count_before: "Count before",
+                                                    count_after: "Count after",
+                                                    expected_quantity: "Expected quantity",
+                                                    variance_after: "Variance after",
+                                                    amount_minor: "Cash adjustment (minor units)",
+                                                    quantity_delta: "Stock adjustment",
+                                                    stock_adjustment_applied: "Current stock adjusted",
+                                                    totals_before: "Production totals before",
+                                                    totals_after: "Production totals after",
+                                                    corrected_lines: "Corrected production lines",
+                                                    actual_cash_amount: "Actual cash",
+                                                    actual_mpesa_amount: "Actual M-Pesa",
+                                                    replaces_event_id: "Replaces record",
+                                                    status_before: "Status before",
+                                                    status_after: "Status after",
+                                                    report_and_balance_impact: "Report and balance deltas",
+                                                }
+                                                const details = Object.entries(action.details || {}).filter(([key, value]) =>
+                                                    key in impactLabels && value !== null && value !== undefined
+                                                )
+                                                return (
+                                                    <li key={`${correctionCase.id}-${index}`} className="mb-1">
+                                                        <span className="font-medium">{action.action_type.replace(/_/g, " ").toLowerCase()}</span>
+                                                        {details.length > 0 && (
+                                                            <ul className="ml-4 list-inside list-[circle]">
+                                                                {details.map(([key, value]) => (
+                                                                    <li key={key}>
+                                                                        {impactLabels[key]}:
+                                                                        {key === "report_and_balance_impact" && typeof value === "object" && value !== null
+                                                                            ? (
+                                                                                <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-black/5 p-2 text-[10px] dark:bg-white/5">
+                                                                                    {JSON.stringify((value as { delta?: unknown }).delta ?? value, null, 2)}
+                                                                                </pre>
+                                                                            )
+                                                                            : ` ${typeof value === "object" ? JSON.stringify(value) : String(value)}`}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </li>
+                                                )
+                                            })}
+                                        </ul>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </CardContent>
@@ -283,14 +405,12 @@ export default function ApprovalsPage() {
                             >
                                 Rejected
                             </button>
-                            {isManager && (
-                                <button
-                                    onClick={() => setSelectedTab("corrections")}
-                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${selectedTab === "corrections" ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                                >
-                                    Corrections
-                                </button>
-                            )}
+                            <button
+                                onClick={() => setSelectedTab("corrections")}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${selectedTab === "corrections" ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                            >
+                                Corrections
+                            </button>
                         </div>
 
                         {selectedTab === "pending" && isManager && (
@@ -369,9 +489,9 @@ export default function ApprovalsPage() {
                             </div>
                         )}
 
-                        {selectedTab === "corrections" && isManager && (
+                        {selectedTab === "corrections" && (
                             <div className="space-y-3">
-                                <h2 className="text-lg font-bold">Record Corrections</h2>
+                                <h2 className="text-lg font-bold">Shift Corrections</h2>
                                 <CorrectionsTab />
                             </div>
                         )}

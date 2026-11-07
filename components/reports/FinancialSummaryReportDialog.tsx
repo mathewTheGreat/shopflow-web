@@ -49,9 +49,9 @@ export function FinancialSummaryReportDialog({ open, onOpenChange }: FinancialSu
     const [isGenerating, setIsGenerating] = useState(false)
 
     const { data: staff = [], isLoading: isLoadingStaff } = useQuery({
-        queryKey: ["shop-staff-cashiers-financial", activeShopId],
-        queryFn: () => userService.getUsersByRole("2fb92608-7257-485d-9c58-14ed6586d6b9", activeShopId),
-        enabled: !!activeShopId && open,
+        queryKey: ["report-cashiers", activeShopId, startDate, endDate],
+        queryFn: () => userService.getReportCashiers(activeShopId, startDate, endDate),
+        enabled: !!activeShopId && !!startDate && !!endDate && open,
     })
 
     const handleGenerateReport = async (action: 'preview' | 'excel' | 'pdf') => {

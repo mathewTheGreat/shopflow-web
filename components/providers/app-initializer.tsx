@@ -1,25 +1,18 @@
 "use client"
 
-import { useEffect, useSyncExternalStore } from "react"
+import { useEffect, useState } from "react"
 import { useInitializeApp } from "@/hooks/use-initialize-app"
 import { useAuth } from "@clerk/nextjs"
 import { setApiTokenGetter } from "@/lib/api-client"
 import { Loader2 } from "lucide-react"
 
-const subscribeToMount = () => () => {}
-const getMountSnapshot = () => true
-const getServerMountSnapshot = () => false
-
 export function AppInitializer({ children }: { children: React.ReactNode }) {
     const { getToken } = useAuth()
     const { isInitialized } = useInitializeApp()
-    const mounted = useSyncExternalStore(
-        subscribeToMount,
-        getMountSnapshot,
-        getServerMountSnapshot
-    )
+    const [mounted, setMounted] = useState(false)
 
     useEffect(() => {
+        setMounted(true)
         setApiTokenGetter(getToken)
     }, [getToken])
 

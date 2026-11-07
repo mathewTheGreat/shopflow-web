@@ -79,11 +79,15 @@ Base path: `/api/shop-staff`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/` | Assign staff to shop |
+| POST | `/transfer` | Transfer an active cashier to another shop (manager/admin in source shop required) |
+| GET | `/report-cashiers/:shopId?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` | List active and historically active report cashiers for the shop and date range |
 | GET | `/shop/:shopId` | Get staff by shop |
 | GET | `/:staffId` | Get assignment by ID |
 | GET | `/user/:userId` | Get assignment by user ID |
 | PATCH | `/:staffId/role` | Update staff role |
 | DELETE | `/:staffId` | Remove staff |
+
+Cashier transfers replace active shop membership and are recorded in the append-only `shop_staff_transfers` audit table. Historical sales and shifts remain attributed to their original shop and cashier.
 
 ---
 

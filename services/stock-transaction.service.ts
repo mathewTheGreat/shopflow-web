@@ -38,7 +38,9 @@ export const stockTransactionService = {
                 corrected_quantity: number
                 reason: string
                 related_adjustment_transaction_ids: string[]
+                stock_adjustment_applied: boolean
             } | null
+            isReversed: boolean
         }>(`/api/stock/transactions/${id}/correction-context${correctedItemId ? `?correctedItemId=${encodeURIComponent(correctedItemId)}` : ""}`),
 
     correctPurchaseForReport: (
@@ -50,4 +52,17 @@ export const stockTransactionService = {
             relatedAdjustmentTransactionIds: string[]
         }
     ) => apiClient.post(`/api/stock/transactions/${id}/correct-for-report`, data),
+
+    amendPurchaseReceipt: (
+        id: string,
+        data: {
+            correctedItemId?: string
+            quantity: number
+            reason: string
+            relatedAdjustmentTransactionIds: string[]
+            adjustStock: boolean
+            voidReceipt: boolean
+            idempotencyKey: string
+        }
+    ) => apiClient.post(`/api/stock/transactions/${id}/amend`, data),
 }

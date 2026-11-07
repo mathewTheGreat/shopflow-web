@@ -112,3 +112,41 @@ export function useCorrectPurchaseForReport() {
         },
     })
 }
+
+export function useAmendPurchaseReceipt() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: ({ id, correctedItemId, quantity, reason, relatedAdjustmentTransactionIds, adjustStock, voidReceipt, idempotencyKey }: {
+            id: string
+            correctedItemId?: string
+            quantity: number
+            reason: string
+            relatedAdjustmentTransactionIds: string[]
+            adjustStock: boolean
+            voidReceipt: boolean
+            idempotencyKey: string
+        }) => stockTransactionService.amendPurchaseReceipt(id, {
+            correctedItemId,
+            quantity,
+            reason,
+            relatedAdjustmentTransactionIds,
+            adjustStock,
+            voidReceipt,
+            idempotencyKey,
+        }),
+        onSuccess: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["stock-transactions"] }),
+                queryClient.invalidateQueries({ queryKey: ["stock-levels"] }),
+                queryClient.invalidateQueries({ queryKey: ["stock-purchase-correction-context"] }),
+                queryClient.invalidateQueries({ queryKey: ["daily-report"] }),
+                queryClient.invalidateQueries({ queryKey: ["shift-performance"] }),
+            ])
+            toast.success("Purchase receipt amendment saved")
+        },
+        onError: (error: Error) => {
+            toast.error(`Failed to amend purchase receipt: ${error.message}`)
+        },
+    })
+}

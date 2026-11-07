@@ -34,6 +34,7 @@ import { useRegisterInitialization } from "@/hooks/use-cash-ledger"
 import { useStockLevelsByShop } from "@/hooks/use-stock-levels"
 import { useItems } from "@/hooks/use-items"
 import { formatQty } from "@/lib/utils"
+import { isRejectedShift } from "@/types/shift"
 
 // Components
 import { ShiftStatusCard } from "@/components/shifts/ShiftStatusCard"
@@ -106,7 +107,7 @@ export default function DashboardPage() {
   )
   const closingStatus = currentShift?.closing_status
   const rejectionReason = currentShift?.rejection_reason
-  const isRejected = closingStatus === 'REJECTED'
+  const isRejected = isRejectedShift(currentShift)
 
   // Create highly efficient lookup map for stock levels
   const stockLevelMap = useMemo(() => {
@@ -437,6 +438,7 @@ export default function DashboardPage() {
                   onCloseShift={handleCloseShiftClick}
                   closingStatus={closingStatus}
                   rejectionReason={rejectionReason}
+                  isClosed={currentShift?.is_closed}
                 />
                 {isRejected && currentShift?.id && (
                   <div className="mt-3">

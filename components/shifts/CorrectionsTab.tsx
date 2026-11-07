@@ -5,7 +5,8 @@ import { Loader2 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useAppStore } from "@/store/use-app-store"
 import { shiftService } from "@/services/shift.service"
-import { Shift } from "@/types/shift"
+import { isRejectedShift, Shift } from "@/types/shift"
+import { CorrectionCasePanel } from "./CorrectionCasePanel"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,11 +16,13 @@ import { v4 as uuidv4 } from "uuid"
 
 function formatShiftLabel(shift: Shift) {
     const start = shift.start_time ? new Date(shift.start_time).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""
-    return `${shift.name} — ${start} (${shift.closing_status})`
+    const status = isRejectedShift(shift) ? "REJECTED" : shift.closing_status
+    return `${shift.name} — ${start} (${status})`
 }
 
 export function CorrectionsTab() {
     const { activeShop, activeShift, userInfo } = useAppStore()
+    const isManager = activeShop?.role === "Manager" || activeShop?.role === "Admin"
     const queryClient = useQueryClient()
 
     const [shifts, setShifts] = useState<Shift[]>([])
@@ -47,12 +50,15 @@ export function CorrectionsTab() {
         shiftService
             .getShiftsByShop(activeShop.id)
             .then((s) => setShifts(s || []))
-            .catch(() => setShifts([]))
+            .catch((error: Error) => {
+                toast.error(error.message || "Could not load shifts for correction")
+                setShifts([])
+            })
             .finally(() => setLoading(false))
     }, [activeShop?.id])
 
     const targetShift = shifts.find((s) => s.id === selectedShiftId)
-    const isCorrectable = targetShift && (targetShift.closing_status === "APPROVED" || targetShift.closing_status === "REJECTED" || targetShift.closing_status === "PENDING_CORRECTION_APPROVAL")
+    const isCorrectable = targetShift && (isRejectedShift(targetShift) || targetShift.closing_status === "PENDING_CORRECTION_APPROVAL")
 
     const submitLateExpense = async () => {
         if (!userInfo || !targetShift) return
@@ -180,7 +186,7 @@ export function CorrectionsTab() {
     return (
         <div className="space-y-4">
             <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-800 dark:text-blue-200">
-                Record corrections against a prior closed shift. Corrections that change money or stock will move the shift back to pending approval.
+                Record corrections against a rejected shift. A manager must reject an approved shift first; the corrected shift then follows the normal approval process.
             </div>
 
             <div className="space-y-2">
@@ -199,7 +205,9 @@ export function CorrectionsTab() {
                 >
                     <option value="">Select a shift…</option>
                     {shifts
-                        .filter((s) => (s.closing_status === "APPROVED" || s.closing_status === "REJECTED" || s.closing_status === "PENDING_CORRECTION_APPROVAL") && s.name.toLowerCase().includes(shiftFilter.toLowerCase()))
+                        .filter((s) => (isManager || s.manager_id === userInfo?.id)
+                            && (isRejectedShift(s) || s.closing_status === "PENDING_CORRECTION_APPROVAL")
+                            && s.name.toLowerCase().includes(shiftFilter.toLowerCase()))
                         .map((s) => (
                             <option key={s.id} value={s.id}>
                                 {formatShiftLabel(s)}
@@ -209,11 +217,17 @@ export function CorrectionsTab() {
             </div>
 
             {!isCorrectable && (
-                <p className="text-sm text-muted-foreground">Select an APPROVED, REJECTED, or correction-review shift to record corrections.</p>
+                <p className="text-sm text-muted-foreground">Select a rejected or correction-review shift. A manager must reject an approved shift before it can be corrected.</p>
+            )}
+
+            {isCorrectable && targetShift && (
+                <CorrectionCasePanel targetShift={targetShift} recordedShiftId={activeShift?.id} />
             )}
 
             {isCorrectable && (
-                <>
+                <details className="rounded-md border p-4">
+                    <summary className="cursor-pointer text-sm font-medium">Individual correction tools</summary>
+                    <div className="mt-4 space-y-4">
                     <Card className="bg-card border shadow-sm">
                         <CardContent className="p-4 space-y-3">
                             <h3 className="font-bold text-sm">Late Expense</h3>
@@ -293,7 +307,8 @@ export function CorrectionsTab() {
                             </Button>
                         </CardContent>
                     </Card>
-                </>
+                    </div>
+                </details>
             )}
         </div>
     )

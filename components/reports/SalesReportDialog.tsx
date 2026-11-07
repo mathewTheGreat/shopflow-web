@@ -69,9 +69,9 @@ export function SalesReportDialog({ open, onOpenChange }: SalesReportDialogProps
     const { items } = useItems()
 
     const { data: staff = [], isLoading: isLoadingStaff } = useQuery({
-        queryKey: ["shop-staff", selectedShopId, "CASHIER"],
-        queryFn: () => userService.getUsersByRole("2fb92608-7257-485d-9c58-14ed6586d6b9", selectedShopId),
-        enabled: !!selectedShopId && open,
+        queryKey: ["report-cashiers", selectedShopId, startDate, endDate],
+        queryFn: () => userService.getReportCashiers(selectedShopId, startDate, endDate),
+        enabled: !!selectedShopId && !!startDate && !!endDate && open,
     })
 
     const { data: shifts = [], isLoading: isLoadingShifts } = useQuery({

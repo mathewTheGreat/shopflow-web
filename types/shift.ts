@@ -15,6 +15,16 @@ export interface Shift extends BaseEntity {
     manager_name?: string;
 }
 
+export function isRejectedShift(
+    shift: Partial<Pick<Shift, "closing_status" | "is_closed" | "rejection_reason">> | null | undefined
+) {
+    if (!shift) return false
+    if (shift.closing_status === "REJECTED") return true
+    return shift.is_closed !== true
+        && (shift.closing_status === "OPEN" || shift.closing_status == null)
+        && Boolean(shift.rejection_reason?.trim())
+}
+
 export interface ShiftReconciliation extends BaseEntity {
     shift_id: string;
     expected_cash_sales: number;

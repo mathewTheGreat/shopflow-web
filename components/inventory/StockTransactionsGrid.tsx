@@ -6,7 +6,7 @@ import {
     useStockTransactionsByShop,
     useReverseStockTransaction,
     usePurchaseCorrectionContext,
-    useCorrectPurchaseForReport,
+    useAmendPurchaseReceipt,
 } from "@/hooks/use-stock-transactions"
 import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
@@ -26,6 +26,7 @@ import { ListSearch } from "@/components/ui/list-search"
 import { ListPagination } from "@/components/ui/list-pagination"
 import { ReasonDialog } from "@/components/ui/reason-dialog"
 import { formatQty } from "@/lib/utils"
+import { v4 as uuidv4 } from "uuid"
 
 const transactionTypeColors = {
     IN: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
@@ -47,7 +48,7 @@ export function StockTransactionsGrid() {
         limit: 20,
     })
     const { mutateAsync: reverseTransaction, isPending: isReversing } = useReverseStockTransaction()
-    const { mutateAsync: correctPurchase, isPending: isCorrecting } = useCorrectPurchaseForReport()
+    const { mutateAsync: amendPurchase, isPending: isAmending } = useAmendPurchaseReceipt()
     const {
         items = [],
         isLoading: isLoadingItems,
@@ -63,6 +64,9 @@ export function StockTransactionsGrid() {
     const [correctedQuantity, setCorrectedQuantity] = useState("")
     const [correctionReason, setCorrectionReason] = useState("")
     const [selectedAdjustmentIds, setSelectedAdjustmentIds] = useState<string[]>([])
+    const [voidReceipt, setVoidReceipt] = useState(false)
+    const [adjustStock, setAdjustStock] = useState(false)
+    const [idempotencyKey, setIdempotencyKey] = useState("")
     const [initializedCorrectionId, setInitializedCorrectionId] = useState<string | null>(null)
     const correctionContextQuery = usePurchaseCorrectionContext(correctionTarget?.id ?? null, correctedItemId)
     const correctionContext = correctionContextQuery.data
@@ -75,6 +79,8 @@ export function StockTransactionsGrid() {
             setSelectedAdjustmentIds(
                 correctionContext.currentCorrection.related_adjustment_transaction_ids ?? []
             )
+            setVoidReceipt(Number(correctionContext.currentCorrection.corrected_quantity) === 0)
+            setAdjustStock(correctionContext.currentCorrection.stock_adjustment_applied)
         }
         setInitializedCorrectionId(correctionTarget.id)
     }, [correctionContext, correctionTarget, initializedCorrectionId])
@@ -105,33 +111,47 @@ export function StockTransactionsGrid() {
         setCorrectedQuantity(String(transaction.quantity))
         setCorrectionReason("")
         setSelectedAdjustmentIds([])
+        setVoidReceipt(false)
+        setAdjustStock(false)
+        setIdempotencyKey(uuidv4())
         setInitializedCorrectionId(null)
     }
 
     const closeCorrection = (open: boolean) => {
-        if (open || isCorrecting) return
+        if (open || isAmending) return
         setCorrectionTarget(null)
         setCorrectedItemId("")
         setCorrectedQuantity("")
         setCorrectionReason("")
         setSelectedAdjustmentIds([])
+        setVoidReceipt(false)
+        setAdjustStock(false)
+        setIdempotencyKey("")
         setInitializedCorrectionId(null)
     }
 
-    const handleCorrectPurchase = async () => {
+    const handleAmendPurchase = async () => {
         if (!correctionTarget) return
         try {
-            await correctPurchase({
+            await amendPurchase({
                 id: correctionTarget.id,
-                correctedItemId,
-                quantity: Number(correctedQuantity),
+                correctedItemId: voidReceipt ? undefined : correctedItemId,
+                quantity: voidReceipt ? 0 : Number(correctedQuantity),
                 reason: correctionReason.trim(),
                 relatedAdjustmentTransactionIds: selectedAdjustmentIds,
+                adjustStock,
+                voidReceipt,
+                idempotencyKey,
             })
             closeCorrection(false)
         } catch {
             // The mutation surfaces the server error via a toast.
         }
+    }
+
+    const updateAmendment = (update: () => void) => {
+        update()
+        setIdempotencyKey(uuidv4())
     }
 
     const currency = useAppStore((state) => state.userCurrency) || "KES"
@@ -229,7 +249,7 @@ export function StockTransactionsGrid() {
                                         className="w-full max-w-[150px]"
                                         onClick={() => openCorrection(transaction)}
                                     >
-                                        Correct report
+                                        Amend / void receipt
                                     </Button>
                                 )}
                                 {isManager && transaction.reason !== 'REVERSAL' && (
@@ -263,11 +283,10 @@ export function StockTransactionsGrid() {
         <Dialog open={correctionTarget !== null} onOpenChange={closeCorrection}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Correct purchase on original shift</DialogTitle>
+                    <DialogTitle>Amend or void purchase receipt</DialogTitle>
                     <DialogDescription>
-                        This records a report-only correction. It will revise the responsible shift&apos;s report,
-                        keep the original stocktake counts and audit history, and will not change current stock
-                        or later shifts&apos; reports.
+                        The original receipt stays in the audit history. This revision restates the responsible
+                        shift&apos;s report; changing current on-hand stock is a separate, optional choice.
                     </DialogDescription>
                 </DialogHeader>
                 {correctionTarget && (
@@ -298,12 +317,36 @@ export function StockTransactionsGrid() {
                                             : ""}
                                     </p>
                                 </div>
-                                {correctionContext?.currentCorrection && (
-                                    <p className="text-sm text-amber-700 dark:text-amber-300">
-                                        An active correction already exists. Saving will supersede it and add a new
-                                        audited revision.
+                                {correctionContext?.isReversed && (
+                                    <p role="alert" className="text-sm text-destructive">
+                                        This receipt has already been reversed and cannot also be amended.
                                     </p>
                                 )}
+                                {correctionContext?.currentCorrection && (
+                                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                                        Active revision: {Number(correctionContext.currentCorrection.corrected_quantity) === 0
+                                            ? "voided"
+                                            : `${formatQty(Number(correctionContext.currentCorrection.corrected_quantity))} receipt`}
+                                        {correctionContext.currentCorrection.stock_adjustment_applied
+                                            ? " · current stock was adjusted"
+                                            : " · report only"}
+                                        . Saving will supersede it with a new audited revision.
+                                    </p>
+                                )}
+                                <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={voidReceipt}
+                                        onChange={(event) => updateAmendment(() => setVoidReceipt(event.target.checked))}
+                                        className="mt-1"
+                                    />
+                                    <span>
+                                        Void this receipt
+                                        <span className="block text-xs text-muted-foreground">
+                                            The corrected purchase quantity becomes zero in the responsible shift&apos;s report.
+                                        </span>
+                                    </span>
+                                </label>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label htmlFor="correction-item">Correct item</Label>
@@ -315,11 +358,11 @@ export function StockTransactionsGrid() {
                                         <select
                                             id="correction-item"
                                             value={correctedItemId}
-                                            disabled={isLoadingItems}
-                                            onChange={(event) => {
+                                            disabled={isLoadingItems || voidReceipt}
+                                            onChange={(event) => updateAmendment(() => {
                                                 setCorrectedItemId(event.target.value)
                                                 setSelectedAdjustmentIds([])
-                                            }}
+                                            })}
                                             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                         >
                                             <option value="">Select an item</option>
@@ -338,10 +381,26 @@ export function StockTransactionsGrid() {
                                             min="0.01"
                                             step="0.01"
                                             value={correctedQuantity}
-                                            onChange={(event) => setCorrectedQuantity(event.target.value)}
+                                            disabled={voidReceipt}
+                                            onChange={(event) => updateAmendment(() => setCorrectedQuantity(event.target.value))}
                                         />
                                     </div>
                                 </div>
+                                <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={adjustStock}
+                                        onChange={(event) => updateAmendment(() => setAdjustStock(event.target.checked))}
+                                        className="mt-1"
+                                    />
+                                    <span>
+                                        Also adjust current on-hand stock
+                                        <span className="block text-xs text-muted-foreground">
+                                            Off by default. When selected, the system applies only the operational delta
+                                            from the previous receipt target to the corrected target.
+                                        </span>
+                                    </span>
+                                </label>
                                 <div className="rounded-md border p-3">
                                     <h4 className="mb-2 text-sm font-medium">
                                         Related original-shift records
@@ -370,11 +429,11 @@ export function StockTransactionsGrid() {
                                                         id={`correction-adjustment-${adjustment.id}`}
                                                         type="checkbox"
                                                         checked={selectedAdjustmentIds.includes(adjustment.id)}
-                                                        onChange={(event) => setSelectedAdjustmentIds((selected) => (
+                                                        onChange={(event) => updateAmendment(() => setSelectedAdjustmentIds((selected) => (
                                                             event.target.checked
                                                                 ? [...selected, adjustment.id]
                                                                 : selected.filter((id) => id !== adjustment.id)
-                                                        ))}
+                                                        )))}
                                                         className="mt-1"
                                                     />
                                                     <label htmlFor={`correction-adjustment-${adjustment.id}`}>
@@ -394,7 +453,7 @@ export function StockTransactionsGrid() {
                                     <textarea
                                         id="correction-reason"
                                         value={correctionReason}
-                                        onChange={(event) => setCorrectionReason(event.target.value)}
+                                        onChange={(event) => updateAmendment(() => setCorrectionReason(event.target.value))}
                                         maxLength={2000}
                                         rows={3}
                                         className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -406,25 +465,27 @@ export function StockTransactionsGrid() {
                     </div>
                 )}
                 <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => closeCorrection(false)} disabled={isCorrecting}>
+                    <Button type="button" variant="outline" onClick={() => closeCorrection(false)} disabled={isAmending}>
                         Cancel
                     </Button>
                     <Button
                         type="button"
                         disabled={
-                            isCorrecting
+                            isAmending
                             || correctionContextQuery.isLoading
                             || !!correctionContextQuery.error
                             || !!itemsError
-                            || !correctedItemId
-                            || !Number.isFinite(Number(correctedQuantity))
-                            || Number(correctedQuantity) <= 0
+                            || correctionContext?.isReversed
+                            || (!voidReceipt && !correctedItemId)
+                            || (!voidReceipt && !Number.isFinite(Number(correctedQuantity)))
+                            || (!voidReceipt && Number(correctedQuantity) <= 0)
                             || !correctionReason.trim()
+                            || !idempotencyKey
                         }
-                        onClick={handleCorrectPurchase}
+                        onClick={handleAmendPurchase}
                     >
-                        {isCorrecting && <Loader2 className="h-4 w-4 animate-spin" />}
-                        Save report correction
+                        {isAmending && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {voidReceipt ? "Void receipt" : "Save amendment"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

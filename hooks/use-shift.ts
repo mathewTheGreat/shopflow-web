@@ -70,16 +70,15 @@ export function useShift() {
         mutationFn: async (data: { cashAmount: number; mpesaAmount: number }) => {
             if (!activeShop || !userInfo) throw new Error("Shop or User not identified")
 
-            const newShift = (await shiftService.createShift({
+            const createdShift = await shiftService.createShift({
                 name: `Shift ${new Date().toLocaleTimeString()}`,
                 shop_id: activeShop.id,
                 manager_id: userInfo.id,
                 start_time: new Date().toISOString(),
                 end_time: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
                 is_closed: false,
-            })) as Shift[]
+            })
 
-            const createdShift = newShift?.[0]
             if (!createdShift?.id) {
                 throw new Error("Failed to open shift")
             }

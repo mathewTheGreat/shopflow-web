@@ -3,6 +3,7 @@
 import { Calendar, Lock, LockOpen, AlertTriangle, Clock, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { isRejectedShift } from "@/types/shift"
 
 interface ShiftStatusCardProps {
     shiftOpen: boolean
@@ -11,9 +12,10 @@ interface ShiftStatusCardProps {
     onCloseShift: () => void
     closingStatus?: 'OPEN' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'PENDING_CORRECTION_APPROVAL' | 'ABANDONED'
     rejectionReason?: string | null
+    isClosed?: boolean
 }
 
-export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShift, closingStatus, rejectionReason }: ShiftStatusCardProps) {
+export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShift, closingStatus, rejectionReason, isClosed }: ShiftStatusCardProps) {
     const formatDateTime = (isoString?: string) => {
         if (!isoString) return ""
         return new Date(isoString).toLocaleString('en-US', {
@@ -26,7 +28,11 @@ export function ShiftStatusCard({ shiftOpen, startTime, onOpenShift, onCloseShif
         })
     }
 
-    const isRejected = closingStatus === 'REJECTED'
+    const isRejected = isRejectedShift({
+        closing_status: closingStatus,
+        is_closed: isClosed,
+        rejection_reason: rejectionReason,
+    })
     const isPendingApproval = closingStatus === 'PENDING_APPROVAL' || closingStatus === 'PENDING_CORRECTION_APPROVAL'
     const isApproved = closingStatus === 'APPROVED'
     const isActive = shiftOpen && !isRejected

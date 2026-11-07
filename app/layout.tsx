@@ -40,10 +40,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
-      <QueryProvider>
-        <html lang="en" suppressHydrationWarning>
-          <body className="font-sans antialiased">
+    <html lang="en" suppressHydrationWarning>
+      <body className="font-sans antialiased">
+        <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+          <QueryProvider>
             <ThemeProvider
               attribute="class"
               defaultTheme="system"
@@ -56,9 +56,9 @@ export default function RootLayout({
               <Toaster position="top-right" />
               <Analytics />
             </ThemeProvider>
-          </body>
-        </html>
-      </QueryProvider>
-    </ClerkProvider>
+          </QueryProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   )
 }

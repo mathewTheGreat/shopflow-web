@@ -42,7 +42,7 @@ import Link from "next/link"
 import { AppSidebar } from "@/components/app-sidebar"
 import { useItems } from "@/hooks/use-items"
 import { useCustomersByShop, useCustomerBalance } from "@/hooks/use-customers"
-import { useCreateSale, useSales } from "@/hooks/use-sales"
+import { useCreateSale, useSales, useSalesCashiers } from "@/hooks/use-sales"
 import { useAppStore } from "@/store/use-app-store"
 import { v4 as uuidv4 } from "uuid"
 import { toast } from "sonner"
@@ -69,6 +69,7 @@ import { CashRegisterManager } from "@/components/shifts/CashRegisterManager"
 import { ReasonDialog } from "@/components/ui/reason-dialog"
 import { DailyReportDialog } from "@/components/reports/DailyReportDialog"
 import { FinancialSummaryReportDialog } from "@/components/reports/FinancialSummaryReportDialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 type SaleCategory = "IMMEDIATE" | "CREDIT" | "PREPAID"
 type PaymentMethod = "CASH" | "MPESA" | "SPLIT"
@@ -139,12 +140,23 @@ export default function SalesPage() {
   const { items, isLoading: itemsLoading } = useItems()
   const { customers, isLoading: customersLoading } = useCustomersByShop(activeShop?.id)
   const [saleSearch, setSaleSearch] = useState("")
+  const [saleStartDate, setSaleStartDate] = useState("")
+  const [saleEndDate, setSaleEndDate] = useState("")
+  const [saleCashierId, setSaleCashierId] = useState("all")
   const [salePage, setSalePage] = useState(1)
   const [expenseSearch, setExpenseSearch] = useState("")
   const [expensePage, setExpensePage] = useState(1)
+  const { data: salesCashiers = [] } = useSalesCashiers(activeShop?.id)
   const { sales = [], pagination: salesPagination, isLoading: salesLoading } = useSales(
     activeShop?.id,
-    { search: saleSearch, page: salePage, limit: 20 }
+    {
+      search: saleSearch,
+      startDate: saleStartDate || undefined,
+      endDate: saleEndDate || undefined,
+      cashierId: saleCashierId === "all" ? undefined : saleCashierId,
+      page: salePage,
+      limit: 20,
+    }
   )
   const { expenses = [], pagination: expensesPagination, isLoading: expensesLoading } = useExpenses(
     activeShop?.id,
@@ -664,14 +676,66 @@ export default function SalesPage() {
                         New Sale
                       </Button>
 
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                         <h2 className="text-xl font-semibold">Recent Sales</h2>
-                        <div className="w-[260px]">
+                        <div className="flex flex-wrap items-end gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="sales-start-date">From</Label>
+                            <Input
+                              id="sales-start-date"
+                              type="date"
+                              value={saleStartDate}
+                              max={saleEndDate || undefined}
+                              onChange={(event) => {
+                                setSaleStartDate(event.target.value)
+                                setSalePage(1)
+                              }}
+                              className="w-[160px]"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="sales-end-date">To</Label>
+                            <Input
+                              id="sales-end-date"
+                              type="date"
+                              value={saleEndDate}
+                              min={saleStartDate || undefined}
+                              onChange={(event) => {
+                                setSaleEndDate(event.target.value)
+                                setSalePage(1)
+                              }}
+                              className="w-[160px]"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="sales-cashier">Cashier</Label>
+                            <Select
+                              value={saleCashierId}
+                              onValueChange={(cashierId) => {
+                                setSaleCashierId(cashierId)
+                                setSalePage(1)
+                              }}
+                            >
+                              <SelectTrigger id="sales-cashier" className="w-[190px]">
+                                <SelectValue placeholder="All cashiers" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All cashiers</SelectItem>
+                                {salesCashiers.map((cashier) => (
+                                  <SelectItem key={cashier.id} value={cashier.id}>
+                                    {cashier.name || cashier.email}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="w-[260px]">
                           <ListSearch
                             placeholder="Search id, type, customer..."
                             value={saleSearch}
                             onChange={(v) => { setSaleSearch(v); setSalePage(1) }}
                           />
+                          </div>
                         </div>
                       </div>
 

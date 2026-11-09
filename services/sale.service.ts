@@ -5,6 +5,18 @@ interface SalesSummaryResponse {
     totalAmount: number
 }
 
+export interface SalesListParams extends ListParams {
+    startDate?: string
+    endDate?: string
+    cashierId?: string
+}
+
+export interface SalesCashier {
+    id: string
+    name: string
+    email: string
+}
+
 export const saleService = {
     getSummary: (shopId: string, date: string, shiftId?: string) => {
         const params = new URLSearchParams({
@@ -21,9 +33,16 @@ export const saleService = {
         return apiClient.post("/api/sales/complete-v2", data)
     },
 
-    getSales: (shopId: string, params?: ListParams) => {
-        return apiClient.get<PagedResult<any>>(`/api/sales/shop/${shopId}${buildListQuery(params)}`)
+    getSales: (shopId: string, params?: SalesListParams) => {
+        const query = new URLSearchParams(buildListQuery(params).replace(/^\?/, ""))
+        if (params?.startDate) query.set("startDate", params.startDate)
+        if (params?.endDate) query.set("endDate", params.endDate)
+        if (params?.cashierId) query.set("cashierId", params.cashierId)
+        return apiClient.get<PagedResult<any>>(`/api/sales/shop/${shopId}?${query.toString()}`)
     },
+
+    getSalesCashiers: (shopId: string) =>
+        apiClient.get<SalesCashier[]>(`/api/sales/shop/${shopId}/cashiers`),
 
     getSaleReceipt: (saleId: string) => {
         return apiClient.get<any>(`/api/sales/${saleId}/receipt`)
@@ -55,4 +74,3 @@ export const saleService = {
         return apiClient.get<any[]>(`/api/sales/report?${queryParams.toString()}`);
     },
 }
-

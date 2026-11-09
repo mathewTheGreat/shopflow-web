@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { saleService } from "@/services/sale.service"
-import { ListParams, PagedResult } from "@/types/list"
+import { saleService, SalesListParams } from "@/services/sale.service"
+import { PagedResult } from "@/types/list"
 import { toast } from "sonner"
 
 export function useCreateSale() {
@@ -10,6 +10,7 @@ export function useCreateSale() {
         mutationFn: saleService.completeSale,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["sales"] })
+            queryClient.invalidateQueries({ queryKey: ["sales-cashiers"] })
             queryClient.invalidateQueries({ queryKey: ["sales-summary"] })
             queryClient.invalidateQueries({ queryKey: ["items"] }) // Stock might have changed
             queryClient.invalidateQueries({ queryKey: ["customer-balance"] })
@@ -21,9 +22,18 @@ export function useCreateSale() {
     })
 }
 
-export function useSales(shopId: string | undefined, params?: ListParams) {
+export function useSales(shopId: string | undefined, params?: SalesListParams) {
     const { data, isLoading, error, refetch } = useQuery({
-        queryKey: ["sales", shopId, params?.search ?? "", params?.page ?? 1, params?.limit ?? 50],
+        queryKey: [
+            "sales",
+            shopId,
+            params?.search ?? "",
+            params?.startDate ?? "",
+            params?.endDate ?? "",
+            params?.cashierId ?? "",
+            params?.page ?? 1,
+            params?.limit ?? 50,
+        ],
         queryFn: (): Promise<PagedResult<any>> => {
             if (!shopId) return Promise.resolve({ data: [], pagination: { page: 1, limit: 0, total: 0, total_pages: 1 } })
             return saleService.getSales(shopId, params)
@@ -38,6 +48,17 @@ export function useSales(shopId: string | undefined, params?: ListParams) {
         error,
         refetch,
     }
+}
+
+export function useSalesCashiers(shopId: string | undefined) {
+    return useQuery({
+        queryKey: ["sales-cashiers", shopId],
+        queryFn: () => {
+            if (!shopId) return Promise.resolve([])
+            return saleService.getSalesCashiers(shopId)
+        },
+        enabled: !!shopId,
+    })
 }
 
 export function useSaleReceipt(saleId: string | null) {

@@ -7,6 +7,7 @@ import { shiftService } from "@/services/shift.service"
 import { AccountWithBalance, cashLedgerService } from "@/services/cash-ledger.service"
 import { useItems } from "@/hooks/use-items"
 import { useCustomersByShop } from "@/hooks/use-customers"
+import { useSuppliers } from "@/hooks/use-supplier"
 import { usePurchaseCorrectionContext } from "@/hooks/use-stock-transactions"
 import { Shift } from "@/types/shift"
 import { Button } from "@/components/ui/button"
@@ -45,7 +46,12 @@ type CorrectionCase = {
     status: string
     intent: CorrectionIntent
     reason: string
-    actions: Array<{ id: string; action_type: string; status: string }>
+    actions: Array<{
+        id: string
+        action_type: string
+        status: string
+        details?: Record<string, unknown> | null
+    }>
     effect_scope?: string
 }
 
@@ -89,9 +95,17 @@ const actionOptions: Record<CorrectionIntent, Array<{ value: CorrectionAction; l
     ],
 }
 
-function getEffectScope(action: CorrectionAction, adjustPurchaseStock = false) {
+function getEffectScope(
+    action: CorrectionAction,
+    adjustPurchaseStock = false,
+    latePurchaseEntry = false,
+    adjustLatePurchaseStock = false,
+) {
     if (action === "AMEND_PURCHASE_RECEIPT") {
         return adjustPurchaseStock ? "REPORT_AND_OPERATIONAL" as const : "REPORT_ONLY" as const
+    }
+    if (action === "LATE_STOCK_TRANSACTION" && latePurchaseEntry) {
+        return adjustLatePurchaseStock ? "REPORT_AND_OPERATIONAL" as const : "REPORT_ONLY" as const
     }
     return action === "AMEND_RECONCILIATION" || action === "LATE_RECONCILIATION" || action === "RECORD_STOCK_TAKE"
         ? "REPORT_ONLY" as const
@@ -108,6 +122,7 @@ export function CorrectionCasePanel({
     const { activeShop, userInfo } = useAppStore()
     const { items } = useItems()
     const { customers } = useCustomersByShop(activeShop?.id)
+    const { suppliers = [] } = useSuppliers()
     const queryClient = useQueryClient()
     const [intent, setIntent] = useState<CorrectionIntent>("DUPLICATE_EVENT")
     const [actionType, setActionType] = useState<CorrectionAction>("VOID_SALE")
@@ -119,6 +134,9 @@ export function CorrectionCasePanel({
     const [category, setCategory] = useState("general")
     const [movementType, setMovementType] = useState<"PAY_IN" | "PAY_OUT" | "FLOAT_IN">("PAY_IN")
     const [stockDirection, setStockDirection] = useState<"IN" | "OUT">("IN")
+    const [stockEntryKind, setStockEntryKind] = useState<"MOVEMENT" | "FARMER_PURCHASE">("MOVEMENT")
+    const [selectedSupplierId, setSelectedSupplierId] = useState("")
+    const [adjustLatePurchaseStock, setAdjustLatePurchaseStock] = useState(false)
     const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MPESA">("CASH")
     const [customerPaymentMethod, setCustomerPaymentMethod] = useState<"CASH" | "MPESA" | "CARD" | "BANK_TRANSFER" | "OTHER">("CASH")
     const [saleCategory, setSaleCategory] = useState<SaleCategory>("IMMEDIATE")
@@ -173,6 +191,12 @@ export function CorrectionCasePanel({
                         : initialAction
                     setActionType(matchingAction)
                     setAdjustPurchaseStock(editable.effect_scope === "REPORT_AND_OPERATIONAL")
+                    const isLatePurchase = latestAction?.details?.late_purchase === true
+                        || (!latestAction && matchingAction === "LATE_STOCK_TRANSACTION" && editable.effect_scope === "REPORT_ONLY")
+                    setStockEntryKind(isLatePurchase ? "FARMER_PURCHASE" : "MOVEMENT")
+                    setAdjustLatePurchaseStock(latestAction
+                        ? latestAction.details?.stock_adjustment_applied === true
+                        : editable.effect_scope === "REPORT_AND_OPERATIONAL")
                 }
             })
             .catch((error: Error) => toast.error(error.message || "Could not load correction cases"))
@@ -205,14 +229,24 @@ export function CorrectionCasePanel({
                 responsibleShiftId: targetShift.id,
                 recordedShiftId,
                 intent,
-                effectScope: getEffectScope(actionType, adjustPurchaseStock),
+                effectScope: getEffectScope(
+                    actionType,
+                    adjustPurchaseStock,
+                    stockEntryKind === "FARMER_PURCHASE",
+                    adjustLatePurchaseStock,
+                ),
                 reason: reason.trim(),
                 evidence: evidence.trim() || undefined,
                 idempotencyKey: caseIdempotencyKey,
             }) as CorrectionCase
             created.actions = created.actions || []
             created.intent = intent
-            created.effect_scope = getEffectScope(actionType, adjustPurchaseStock)
+            created.effect_scope = getEffectScope(
+                actionType,
+                adjustPurchaseStock,
+                stockEntryKind === "FARMER_PURCHASE",
+                adjustLatePurchaseStock,
+            )
             setCaseIdempotencyKey(uuidv4())
             setCases((previous) => [created, ...previous.filter((record) => record.id !== created.id)])
             setCaseId(created.id)
@@ -305,18 +339,25 @@ export function CorrectionCasePanel({
             }
         } else if (actionType === "LATE_STOCK_TRANSACTION") {
             const parsedQuantity = Number(quantity)
+            const isFarmerPurchase = stockEntryKind === "FARMER_PURCHASE"
             if (!activeShop?.id || !selectedItemId || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
                 toast.error("Select an item and enter a valid positive quantity")
                 return
             }
+            if (isFarmerPurchase && !selectedSupplierId) {
+                toast.error("Select the farmer or supplier for this purchase")
+                return
+            }
             actionData = {
                 transaction: {
-                    type: stockDirection,
+                    type: isFarmerPurchase ? "IN" : stockDirection,
                     item_id: selectedItemId,
                     shop_id: activeShop.id,
                     quantity: parsedQuantity,
-                    reason: "ADJUSTMENT",
+                    reason: isFarmerPurchase ? "PURCHASE" : "ADJUSTMENT",
+                    supplier_id: isFarmerPurchase ? selectedSupplierId : null,
                 },
+                adjust_stock: isFarmerPurchase ? adjustLatePurchaseStock : true,
             }
         } else if (actionType === "RECORD_STOCK_TAKE") {
             const countedQuantity = Number(quantity)
@@ -461,11 +502,17 @@ export function CorrectionCasePanel({
                                     setIntent(selected.intent)
                                     setAdjustPurchaseStock(selected.effect_scope === "REPORT_AND_OPERATIONAL")
                                     const nextAction = selected.actions?.[0]?.action_type
-                                    setActionType(
-                                        actionOptions[selected.intent].some((option) => option.value === nextAction)
-                                            ? nextAction as CorrectionAction
-                                            : actionOptions[selected.intent][0].value
-                                    )
+                                    const matchingAction = actionOptions[selected.intent].some((option) => option.value === nextAction)
+                                        ? nextAction as CorrectionAction
+                                        : actionOptions[selected.intent][0].value
+                                    setActionType(matchingAction)
+                                    const latestAction = selected.actions?.[0]
+                                    const isLatePurchase = latestAction?.details?.late_purchase === true
+                                        || (!latestAction && matchingAction === "LATE_STOCK_TRANSACTION" && selected.effect_scope === "REPORT_ONLY")
+                                    setStockEntryKind(isLatePurchase ? "FARMER_PURCHASE" : "MOVEMENT")
+                                    setAdjustLatePurchaseStock(latestAction
+                                        ? latestAction.details?.stock_adjustment_applied === true
+                                        : selected.effect_scope === "REPORT_AND_OPERATIONAL")
                                 }
                             }}
                             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -492,6 +539,9 @@ export function CorrectionCasePanel({
                                         const next = event.target.value as CorrectionIntent
                                         setIntent(next)
                                         setActionType(actionOptions[next][0].value)
+                                        setStockEntryKind("MOVEMENT")
+                                        setSelectedSupplierId("")
+                                        setAdjustLatePurchaseStock(false)
                                         setSaleCategory("IMMEDIATE")
                                         setSelectedCustomerId("")
                                         setCashAmount("")
@@ -512,7 +562,11 @@ export function CorrectionCasePanel({
                                     id="correction-action"
                                     value={actionType}
                                     onChange={(event) => {
-                                        setActionType(event.target.value as CorrectionAction)
+                                        const nextAction = event.target.value as CorrectionAction
+                                        setActionType(nextAction)
+                                        setStockEntryKind("MOVEMENT")
+                                        setSelectedSupplierId("")
+                                        setAdjustLatePurchaseStock(false)
                                         setVoidPurchaseReceipt(false)
                                     }}
                                     className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -521,6 +575,29 @@ export function CorrectionCasePanel({
                                 </select>
                             </div>
                         </div>
+                        {actionType === "LATE_STOCK_TRANSACTION" && (
+                            <div className="space-y-1">
+                                <Label htmlFor="correction-stock-entry-kind">Stock entry type</Label>
+                                <select
+                                    id="correction-stock-entry-kind"
+                                    value={stockEntryKind}
+                                    onChange={(event) => {
+                                        const nextKind = event.target.value as typeof stockEntryKind
+                                        setStockEntryKind(nextKind)
+                                        if (nextKind === "FARMER_PURCHASE") {
+                                            setStockDirection("IN")
+                                            setAdjustLatePurchaseStock(false)
+                                        } else {
+                                            setSelectedSupplierId("")
+                                        }
+                                    }}
+                                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                >
+                                    <option value="MOVEMENT">Other stock movement</option>
+                                    <option value="FARMER_PURCHASE">Farmer purchase receipt</option>
+                                </select>
+                            </div>
+                        )}
                         <div className="space-y-1">
                             <Label htmlFor="correction-reason">Explain the mistake</Label>
                             <Input id="correction-reason" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Be specific about what actually happened" />
@@ -530,7 +607,12 @@ export function CorrectionCasePanel({
                             <Input id="correction-evidence" value={evidence} onChange={(event) => setEvidence(event.target.value)} placeholder="Receipt number, count sheet, or note" />
                         </div>
                         <p className="rounded-md bg-muted p-3 text-sm">
-                            {getEffectScope(actionType, adjustPurchaseStock) === "REPORT_ONLY"
+                            {getEffectScope(
+                                actionType,
+                                adjustPurchaseStock,
+                                stockEntryKind === "FARMER_PURCHASE",
+                                adjustLatePurchaseStock,
+                            ) === "REPORT_ONLY"
                                 ? "This corrects the shift record and reports only. It will not adjust current cash or stock."
                                 : "This action also affects operational balances, in addition to the corrected shift record."}
                         </p>
@@ -545,6 +627,20 @@ export function CorrectionCasePanel({
                                 <span>
                                     Also adjust current on-hand stock
                                     <span className="block text-xs text-muted-foreground">Off by default; this also determines the correction case&apos;s effect scope.</span>
+                                </span>
+                            </label>
+                        )}
+                        {actionType === "LATE_STOCK_TRANSACTION" && stockEntryKind === "FARMER_PURCHASE" && (
+                            <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={adjustLatePurchaseStock}
+                                    onChange={(event) => setAdjustLatePurchaseStock(event.target.checked)}
+                                    className="mt-1"
+                                />
+                                <span>
+                                    Also add this receipt to current on-hand stock
+                                    <span className="block text-xs text-muted-foreground">Off by default because closing stock counts are expected to set the current stock correctly.</span>
                                 </span>
                             </label>
                         )}
@@ -573,9 +669,14 @@ export function CorrectionCasePanel({
                                         id="correction-case-action"
                                         value={actionType}
                                         onChange={(event) => {
-                                            setActionType(event.target.value as CorrectionAction)
+                                            const nextAction = event.target.value as CorrectionAction
+                                            setActionType(nextAction)
                                             setVoidPurchaseReceipt(false)
                                             setAdjustPurchaseStock(activeCase.effect_scope === "REPORT_AND_OPERATIONAL")
+                                            const isReportOnlyLatePurchase = nextAction === "LATE_STOCK_TRANSACTION"
+                                                && activeCase.effect_scope === "REPORT_ONLY"
+                                            setStockEntryKind(isReportOnlyLatePurchase ? "FARMER_PURCHASE" : "MOVEMENT")
+                                            setAdjustLatePurchaseStock(activeCase.effect_scope === "REPORT_AND_OPERATIONAL")
                                         }}
                                         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                     >
@@ -612,6 +713,29 @@ export function CorrectionCasePanel({
                                     || actionType === "AMEND_PURCHASE_RECEIPT"
                                     || (actionType === "RECORD_PHYSICAL_ADJUSTMENT" && adjustmentTarget === "stock")) && (
                                     <div className="grid gap-3 sm:grid-cols-2">
+                                        {actionType === "LATE_STOCK_TRANSACTION" && (
+                                            <div className="space-y-1 sm:col-span-2">
+                                                <Label htmlFor="correction-stock-entry-kind">Stock entry type</Label>
+                                                <select
+                                                    id="correction-stock-entry-kind"
+                                                    value={stockEntryKind}
+                                                    onChange={(event) => {
+                                                        const nextKind = event.target.value as typeof stockEntryKind
+                                                        setStockEntryKind(nextKind)
+                                                        if (nextKind === "FARMER_PURCHASE") {
+                                                            setStockDirection("IN")
+                                                            setAdjustLatePurchaseStock(activeCase?.effect_scope === "REPORT_AND_OPERATIONAL")
+                                                        } else {
+                                                            setSelectedSupplierId("")
+                                                        }
+                                                    }}
+                                                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                                >
+                                                    <option value="MOVEMENT">Other stock movement</option>
+                                                    <option value="FARMER_PURCHASE">Farmer purchase receipt</option>
+                                                </select>
+                                            </div>
+                                        )}
                                         <div className="space-y-1 sm:col-span-2">
                                             <Label htmlFor="correction-item">{actionType === "AMEND_PURCHASE_RECEIPT" ? "Corrected purchase item" : "Item"}</Label>
                                             <select
@@ -628,6 +752,24 @@ export function CorrectionCasePanel({
                                                 {items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                                             </select>
                                         </div>
+                                        {actionType === "LATE_STOCK_TRANSACTION" && stockEntryKind === "FARMER_PURCHASE" && (
+                                            <div className="space-y-1 sm:col-span-2">
+                                                <Label htmlFor="correction-purchase-supplier">Farmer / supplier</Label>
+                                                <select
+                                                    id="correction-purchase-supplier"
+                                                    value={selectedSupplierId}
+                                                    onChange={(event) => setSelectedSupplierId(event.target.value)}
+                                                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                                >
+                                                    <option value="">Select a farmer / supplier</option>
+                                                    {suppliers
+                                                        .filter((supplier) => !supplier.shop_id || supplier.shop_id === activeShop?.id)
+                                                        .map((supplier) => (
+                                                            <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                                                        ))}
+                                                </select>
+                                            </div>
+                                        )}
                                         <div className="space-y-1">
                                             <Label htmlFor="correction-quantity">
                                                 {actionType === "AMEND_PURCHASE_RECEIPT" ? "Corrected quantity"
@@ -689,7 +831,7 @@ export function CorrectionCasePanel({
                                                     </>
                                                 )}
                                             </>
-                                        ) : actionType === "LATE_STOCK_TRANSACTION" ? (
+                                        ) : actionType === "LATE_STOCK_TRANSACTION" && stockEntryKind === "MOVEMENT" ? (
                                             <div className="space-y-1">
                                                 <Label htmlFor="correction-stock-direction">Stock movement</Label>
                                                 <select id="correction-stock-direction" value={stockDirection} onChange={(event) => setStockDirection(event.target.value as typeof stockDirection)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">

@@ -12,7 +12,6 @@ import { useSuppliers } from "@/hooks/use-supplier"
 import { useAppStore } from "@/store/use-app-store"
 import { Card, CardContent } from "../ui/card"
 import { v4 as uuidv4 } from "uuid"
-import { isRejectedShift } from "@/types/shift"
 
 interface StockInDialogProps {
     open: boolean
@@ -41,7 +40,7 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
         reference_id: "",
         notes: "",
     })
-    const isLatePurchase = isRejectedShift(activeShift) && formData.reason === "PURCHASE"
+    const isLatePurchase = activeShift?.closing_status === "REJECTED" && formData.reason === "PURCHASE"
 
     // Reset form when dialog opens
     useEffect(() => {

@@ -12,6 +12,7 @@ import { useSuppliers } from "@/hooks/use-supplier"
 import { useAppStore } from "@/store/use-app-store"
 import { Card, CardContent } from "../ui/card"
 import { v4 as uuidv4 } from "uuid"
+import { isRejectedShift } from "@/types/shift"
 
 interface StockInDialogProps {
     open: boolean
@@ -29,6 +30,7 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
     const userInfo = useAppStore((state) => state.userInfo)
     const activeShop = useAppStore((state) => state.activeShop)
     const activeShift = useAppStore((state) => state.activeShift)
+    const [adjustLatePurchaseStock, setAdjustLatePurchaseStock] = useState(false)
 
     // Form state
     const [formData, setFormData] = useState({
@@ -39,6 +41,7 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
         reference_id: "",
         notes: "",
     })
+    const isLatePurchase = isRejectedShift(activeShift) && formData.reason === "PURCHASE"
 
     // Reset form when dialog opens
     useEffect(() => {
@@ -51,6 +54,7 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
                 reference_id: "",
                 notes: "",
             })
+            setAdjustLatePurchaseStock(false)
         }
     }, [open])
 
@@ -106,6 +110,7 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
 
             // 1. Create the transaction record
             const transactionData = {
+                id: uuidv4(),
                 item_id: formData.item_id,
                 shop_id: activeShop!.id,
                 shift_id: activeShift!.id,
@@ -122,29 +127,31 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
             await createTransaction(transactionData);
 
             // 2. Update the stock level
-            const { stockLevelService } = await import("@/services/stock-level.service")
+            if (!isLatePurchase || adjustLatePurchaseStock) {
+                const { stockLevelService } = await import("@/services/stock-level.service")
 
-            try {
-                const currentLevel = await stockLevelService.getStockLevelByItemAndShop(
-                    formData.item_id,
-                    activeShop!.id
-                );
-
-                if (currentLevel) {
-                    const newQuantity = (currentLevel.quantity || 0) + parsedQuantity;
-                    await stockLevelService.updateStockLevel(
+                try {
+                    const currentLevel = await stockLevelService.getStockLevelByItemAndShop(
                         formData.item_id,
-                        activeShop!.id,
-                        { quantity: newQuantity }
+                        activeShop!.id
                     );
+
+                    if (currentLevel) {
+                        const newQuantity = (currentLevel.quantity || 0) + parsedQuantity;
+                        await stockLevelService.updateStockLevel(
+                            formData.item_id,
+                            activeShop!.id,
+                            { quantity: newQuantity }
+                        );
+                    }
+                } catch (error) {
+                    // If fetching fails (likely 404 Not Found), create a new stock level record.
+                    await stockLevelService.setStockLevel({
+                        item_id: formData.item_id,
+                        shop_id: activeShop!.id,
+                        quantity: parsedQuantity,
+                    });
                 }
-            } catch (error) {
-                // If fetching fails (likely 404 Not Found), we create a new stock level record
-                await stockLevelService.setStockLevel({
-                    item_id: formData.item_id,
-                    shop_id: activeShop!.id,
-                    quantity: parsedQuantity,
-                });
             }
 
             // Close dialog and trigger success callback
@@ -190,6 +197,23 @@ export function StockInDialog({ open, onOpenChange, onSuccess }: StockInDialogPr
                             <Card>
                                 <CardContent className="p-6 md:p-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {isLatePurchase && (
+                                            <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={adjustLatePurchaseStock}
+                                                    onChange={(event) => setAdjustLatePurchaseStock(event.target.checked)}
+                                                    className="mt-1"
+                                                />
+                                                <span>
+                                                    Also add this receipt to current on-hand stock
+                                                    <span className="block text-xs text-muted-foreground">
+                                                        Off by default because closing stock counts are expected to set the current stock correctly.
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        )}
+
                                         {/* Reason Selection */}
                                         <div className="md:col-span-2">
                                             <Label className="text-base mb-3 block">

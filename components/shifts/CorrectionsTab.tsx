@@ -58,7 +58,11 @@ export function CorrectionsTab() {
     }, [activeShop?.id])
 
     const targetShift = shifts.find((s) => s.id === selectedShiftId)
-    const isCorrectable = targetShift && (isRejectedShift(targetShift) || targetShift.closing_status === "PENDING_CORRECTION_APPROVAL")
+    const isCorrectable = targetShift && (
+        isRejectedShift(targetShift)
+        || targetShift.closing_status === "PENDING_CORRECTION_APPROVAL"
+        || targetShift.closing_status === "PENDING_APPROVAL"
+    )
 
     const submitLateExpense = async () => {
         if (!userInfo || !targetShift) return
@@ -186,7 +190,7 @@ export function CorrectionsTab() {
     return (
         <div className="space-y-4">
             <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-800 dark:text-blue-200">
-                Record corrections against a rejected shift. A manager must reject an approved shift first; the corrected shift then follows the normal approval process.
+                Record corrections against a shift awaiting approval or a rejected shift. A manager must reject an already approved shift before it can be corrected.
             </div>
 
             <div className="space-y-2">
@@ -206,7 +210,7 @@ export function CorrectionsTab() {
                     <option value="">Select a shift…</option>
                     {shifts
                         .filter((s) => (isManager || s.manager_id === userInfo?.id)
-                            && (isRejectedShift(s) || s.closing_status === "PENDING_CORRECTION_APPROVAL")
+                            && (isRejectedShift(s) || s.closing_status === "PENDING_CORRECTION_APPROVAL" || s.closing_status === "PENDING_APPROVAL")
                             && s.name.toLowerCase().includes(shiftFilter.toLowerCase()))
                         .map((s) => (
                             <option key={s.id} value={s.id}>
@@ -217,14 +221,14 @@ export function CorrectionsTab() {
             </div>
 
             {!isCorrectable && (
-                <p className="text-sm text-muted-foreground">Select a rejected or correction-review shift. A manager must reject an approved shift before it can be corrected.</p>
+                <p className="text-sm text-muted-foreground">Select a shift awaiting approval, a rejected shift, or a correction-review shift. A manager must reject an approved shift before it can be corrected.</p>
             )}
 
             {isCorrectable && targetShift && (
                 <CorrectionCasePanel targetShift={targetShift} recordedShiftId={activeShift?.id} />
             )}
 
-            {isCorrectable && (
+            {isCorrectable && targetShift && (isRejectedShift(targetShift) || targetShift.closing_status === "PENDING_CORRECTION_APPROVAL") && (
                 <details className="rounded-md border p-4">
                     <summary className="cursor-pointer text-sm font-medium">Individual correction tools</summary>
                     <div className="mt-4 space-y-4">

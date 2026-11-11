@@ -70,6 +70,10 @@ const CorrectReconciliationDialog = dynamic(() => import("@/components/shifts/Co
   ssr: false
 })
 
+const CorrectOpeningFloatDialog = dynamic(() => import("@/components/shifts/CorrectOpeningFloatDialog").then(mod => mod.CorrectOpeningFloatDialog), {
+  ssr: false
+})
+
 export default function DashboardPage() {
   const { user, isLoaded } = useUser()
   const router = useRouter()
@@ -93,6 +97,7 @@ export default function DashboardPage() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [showNoStockTakeWarning, setShowNoStockTakeWarning] = useState(false)
   const [showCorrectReconciliation, setShowCorrectReconciliation] = useState(false)
+  const [showCorrectOpeningFloat, setShowCorrectOpeningFloat] = useState(false)
   const [showInitialize, setShowInitialize] = useState(false)
   const [itemSearchQuery, setItemSearchQuery] = useState("")
 
@@ -442,14 +447,24 @@ export default function DashboardPage() {
                 />
                 {isRejected && currentShift?.id && (
                   <div className="mt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowCorrectReconciliation(true)}
-                      className="text-amber-600 border-amber-300 hover:bg-amber-50"
-                    >
-                      Correct Cash Counts
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowCorrectReconciliation(true)}
+                        className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                      >
+                        Correct Cash Counts
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowCorrectOpeningFloat(true)}
+                        className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                      >
+                        Correct Opening Float
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -595,6 +610,21 @@ export default function DashboardPage() {
             shiftId={currentShift.id}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ["current-shift"] })
+            }}
+          />
+        )}
+
+        {showCorrectOpeningFloat && currentShift?.id && (
+          <CorrectOpeningFloatDialog
+            open={showCorrectOpeningFloat}
+            onOpenChange={setShowCorrectOpeningFloat}
+            shiftId={currentShift.id}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["current-shift"] })
+              queryClient.invalidateQueries({ queryKey: ["expected-financials", currentShift.id] })
+              queryClient.invalidateQueries({ queryKey: ["shift-cash-movements"] })
+              queryClient.invalidateQueries({ queryKey: ["pending-approvals"] })
+              queryClient.invalidateQueries({ queryKey: ["rejected-shifts-v2"] })
             }}
           />
         )}

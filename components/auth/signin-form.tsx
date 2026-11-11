@@ -5,21 +5,125 @@ import Link from "next/link"
 import Image from "next/image"
 import { useSignIn } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react"
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Loader2 } from "lucide-react"
-import { toast } from "sonner"
 
 export function SignInForm() {
     const { isLoaded, signIn, setActive } = useSignIn()
     const router = useRouter()
     const [email, setEmail] = React.useState("")
     const [password, setPassword] = React.useState("")
+    const [resetCode, setResetCode] = React.useState("")
+    const [newPassword, setNewPassword] = React.useState("")
+    const [confirmNewPassword, setConfirmNewPassword] = React.useState("")
+    const [resetStage, setResetStage] = React.useState<"request" | "code" | "password" | null>(null)
     const [showPassword, setShowPassword] = React.useState(false)
     const [isLoading, setIsLoading] = React.useState(false)
     const [error, setError] = React.useState<string | null>(null)
+    const [statusMessage, setStatusMessage] = React.useState<string | null>(null)
+
+    const handleRequestPasswordReset = async (e?: React.FormEvent) => {
+        e?.preventDefault()
+        if (!isLoaded) return
+
+        setIsLoading(true)
+        setError(null)
+        setStatusMessage(null)
+
+        try {
+            const result = await signIn.create({ identifier: email.trim() })
+            const emailCodeFactor = result.supportedFirstFactors?.find(
+                (factor) => factor.strategy === "reset_password_email_code",
+            )
+
+            if (emailCodeFactor?.strategy === "reset_password_email_code") {
+                await signIn.prepareFirstFactor({
+                    strategy: "reset_password_email_code",
+                    emailAddressId: emailCodeFactor.emailAddressId,
+                })
+            }
+
+            setResetCode("")
+            setResetStage("code")
+            setStatusMessage(
+                "If this account can reset its password by email, a verification code has been sent. If you use Google, sign in with Google.",
+            )
+        } catch {
+            setResetCode("")
+            setResetStage("code")
+            setError("We couldn't start the reset right now. If you use Google, try signing in with Google, or try again later.")
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handleVerifyResetCode = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!isLoaded) return
+
+        setIsLoading(true)
+        setError(null)
+        setStatusMessage(null)
+        try {
+            const result = await signIn.attemptFirstFactor({
+                strategy: "reset_password_email_code",
+                code: resetCode,
+            })
+            if (result.status === "needs_new_password") {
+                setResetStage("password")
+            } else if (result.status === "complete" && result.createdSessionId) {
+                await setActive({ session: result.createdSessionId })
+                router.push("/")
+            } else {
+                setError("We couldn't verify that code. Request a new code and try again.")
+            }
+        } catch {
+            setError("We couldn't verify that code. Request a new code and try again.")
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handleSetNewPassword = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!isLoaded) return
+        if (newPassword !== confirmNewPassword) {
+            setError("The passwords do not match.")
+            return
+        }
+
+        setIsLoading(true)
+        setError(null)
+        setStatusMessage(null)
+        try {
+            const result = await signIn.resetPassword({ password: newPassword })
+            if (result.status === "complete" && result.createdSessionId) {
+                await setActive({ session: result.createdSessionId })
+                router.push("/")
+            } else {
+                setError("Password reset needs another verification step. Please sign in or request a new reset code.")
+            }
+        } catch (err: unknown) {
+            const clerkError = err as { errors?: Array<{ code?: string }> }
+            if (clerkError.errors?.some((item) => item.code === "form_password_pwned")) {
+                setError("This password has been compromised. Please choose a different password.")
+            } else {
+                setError("We couldn't reset your password. Check the password requirements and try again.")
+            }
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const returnToSignIn = () => {
+        setResetStage(null)
+        setResetCode("")
+        setNewPassword("")
+        setConfirmNewPassword("")
+        setStatusMessage(null)
+        setError(null)
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -131,6 +235,118 @@ export function SignInForm() {
                 </p>
             </div>
 
+            {resetStage !== null && (
+                <div className="space-y-5">
+                    <div className="text-center space-y-2">
+                        <h2 className="text-xl font-semibold text-foreground">
+                            {resetStage === "request"
+                                ? "Reset your password"
+                                : resetStage === "code"
+                                    ? "Check your email"
+                                    : "Choose a new password"}
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                            {resetStage === "request"
+                                ? "Enter the email address for your account."
+                                : resetStage === "code"
+                                    ? `Enter the verification code sent to ${email}.`
+                                    : "Your email is verified. Enter and confirm your new password."}
+                        </p>
+                    </div>
+
+                    {statusMessage && (
+                        <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                            <p className="text-sm text-center text-foreground">{statusMessage}</p>
+                        </div>
+                    )}
+
+                    {resetStage === "request" && (
+                        <form onSubmit={handleRequestPasswordReset} className="space-y-4">
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10">
+                                    <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
+                                </div>
+                                <Input
+                                    type="email"
+                                    placeholder="Email address"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    disabled={isLoading}
+                                    autoComplete="email"
+                                    className="pl-12 h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 focus:border-primary dark:focus:border-primary rounded-2xl transition-all"
+                                    required
+                                />
+                            </div>
+                            <Button type="submit" disabled={!isLoaded || isLoading || !email.trim()} className="w-full h-14 text-lg font-bold rounded-2xl">
+                                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Send reset code"}
+                            </Button>
+                        </form>
+                    )}
+
+                    {resetStage === "code" && (
+                        <form onSubmit={handleVerifyResetCode} className="space-y-4">
+                            <Input
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="one-time-code"
+                                placeholder="Verification code"
+                                value={resetCode}
+                                onChange={(e) => setResetCode(e.target.value)}
+                                disabled={isLoading}
+                                className="h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 rounded-2xl"
+                                required
+                            />
+                            <Button type="submit" disabled={!isLoaded || isLoading || !resetCode.trim()} className="w-full h-14 text-lg font-bold rounded-2xl">
+                                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Verify code"}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                disabled={isLoading}
+                                onClick={() => handleRequestPasswordReset()}
+                                className="w-full"
+                            >
+                                Send a new code
+                            </Button>
+                        </form>
+                    )}
+
+                    {resetStage === "password" && (
+                        <form onSubmit={handleSetNewPassword} className="space-y-4">
+                            <Input
+                                type="password"
+                                autoComplete="new-password"
+                                placeholder="New password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                disabled={isLoading}
+                                minLength={8}
+                                className="h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 rounded-2xl"
+                                required
+                            />
+                            <Input
+                                type="password"
+                                autoComplete="new-password"
+                                placeholder="Confirm new password"
+                                value={confirmNewPassword}
+                                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                                disabled={isLoading}
+                                minLength={8}
+                                className="h-14 bg-white/40 dark:bg-white/5 backdrop-blur-sm border-gray-200 dark:border-white/10 rounded-2xl"
+                                required
+                            />
+                            <Button type="submit" disabled={!isLoaded || isLoading || !newPassword || !confirmNewPassword} className="w-full h-14 text-lg font-bold rounded-2xl">
+                                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Set new password"}
+                            </Button>
+                        </form>
+                    )}
+
+                    <Button type="button" variant="ghost" disabled={isLoading} onClick={returnToSignIn} className="w-full">
+                        Back to sign in
+                    </Button>
+                </div>
+            )}
+
             {/* Error Display */}
             {error && (
                 <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
@@ -140,6 +356,8 @@ export function SignInForm() {
                 </div>
             )}
 
+            {resetStage === null && (
+                <>
             {/* Email Input */}
             <div className="relative group">
                 <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10">
@@ -181,6 +399,21 @@ export function SignInForm() {
                     ) : (
                         <Eye className="h-5 w-5" />
                     )}
+                </button>
+            </div>
+
+            <div className="text-right">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setError(null)
+                        setStatusMessage(null)
+                        setResetStage("request")
+                    }}
+                    disabled={isLoading}
+                    className="text-sm font-semibold text-primary hover:underline disabled:opacity-50"
+                >
+                    Forgot password?
                 </button>
             </div>
 
@@ -251,6 +484,8 @@ export function SignInForm() {
                 </svg>
                 Continue with Google
             </Button>
+                </>
+            )}
         </div>
     )
 }

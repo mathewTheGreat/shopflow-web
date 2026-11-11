@@ -31,6 +31,8 @@ type CorrectionAction =
     | "LATE_SALE"
     | "LATE_STOCK_TRANSACTION"
     | "LATE_CASH_MOVEMENT"
+    | "LATE_OPENING_FLOAT"
+    | "ATTRIBUTE_BANK_DEPOSIT"
     | "LATE_CUSTOMER_TRANSACTION"
     | "REVERSE_STOCK_TRANSACTION"
     | "REVERSE_CASH_MOVEMENT"
@@ -69,6 +71,8 @@ const actionOptions: Record<CorrectionIntent, Array<{ value: CorrectionAction; l
         { value: "LATE_SALE", label: "Record a missing sale" },
         { value: "LATE_EXPENSE", label: "Record a missing expense" },
         { value: "LATE_CASH_MOVEMENT", label: "Record a missing cash movement" },
+        { value: "LATE_OPENING_FLOAT", label: "Declare missing opening float" },
+        { value: "ATTRIBUTE_BANK_DEPOSIT", label: "Attribute existing bank deposit to this shift" },
         { value: "LATE_STOCK_TRANSACTION", label: "Record a missing stock movement" },
         { value: "LATE_CUSTOMER_TRANSACTION", label: "Record a missing customer payment" },
     ],
@@ -101,6 +105,9 @@ function getEffectScope(
     latePurchaseEntry = false,
     adjustLatePurchaseStock = false,
 ) {
+    if (action === "LATE_OPENING_FLOAT" || action === "ATTRIBUTE_BANK_DEPOSIT") {
+        return "REPORT_ONLY" as const
+    }
     if (action === "AMEND_PURCHASE_RECEIPT") {
         return adjustPurchaseStock ? "REPORT_AND_OPERATIONAL" as const : "REPORT_ONLY" as const
     }
@@ -154,6 +161,13 @@ export function CorrectionCasePanel({
     const [adjustmentTarget, setAdjustmentTarget] = useState<"stock" | "cash">("stock")
     const [cashAccountId, setCashAccountId] = useState("")
     const [cashAccounts, setCashAccounts] = useState<AccountWithBalance[]>([])
+    const [unattributedDeposits, setUnattributedDeposits] = useState<Array<{
+        transferGroupId: string
+        effectiveAt: string
+        sourceAccount: "DRAWER" | "MPESA"
+        amount: number
+        notes: string | null
+    }>>([])
     const [cases, setCases] = useState<CorrectionCase[]>([])
     const [caseId, setCaseId] = useState("")
     const [caseIdempotencyKey, setCaseIdempotencyKey] = useState(uuidv4())
@@ -162,6 +176,10 @@ export function CorrectionCasePanel({
 
     const activeCase = useMemo(() => cases.find((record) => record.id === caseId), [cases, caseId])
     const actions = actionOptions[intent]
+    const activeCaseActions = activeCase
+        ? actions.filter((action) => activeCase.effect_scope === "REPORT_ONLY"
+            || !["LATE_OPENING_FLOAT", "ATTRIBUTE_BANK_DEPOSIT"].includes(action.value))
+        : actions
     const purchaseContextQuery = usePurchaseCorrectionContext(
         actionType === "AMEND_PURCHASE_RECEIPT" ? targetId.trim() || null : null,
         selectedItemId || undefined,
@@ -170,6 +188,7 @@ export function CorrectionCasePanel({
     useEffect(() => {
         setCaseId("")
         setCases([])
+        setUnattributedDeposits([])
         setIntent("DUPLICATE_EVENT")
         setActionType("VOID_SALE")
         setCaseIdempotencyKey(uuidv4())
@@ -200,6 +219,12 @@ export function CorrectionCasePanel({
                 }
             })
             .catch((error: Error) => toast.error(error.message || "Could not load correction cases"))
+        shiftService.getUnattributedBankDeposits(activeShop.id, targetShift.id)
+            .then(setUnattributedDeposits)
+            .catch((error: Error) => {
+                toast.error(error.message || "Could not load unattributed bank deposits")
+                setUnattributedDeposits([])
+            })
     }, [activeShop?.id, targetShift.id])
 
     useEffect(() => {
@@ -411,6 +436,19 @@ export function CorrectionCasePanel({
                 return
             }
             actionData = { movement: { type: movementType, amount: parsedAmount, payment_method: paymentMethod } }
+        } else if (actionType === "LATE_OPENING_FLOAT") {
+            const parsedAmount = Number(amount)
+            if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+                toast.error("Enter a valid positive opening float amount")
+                return
+            }
+            actionData = { movement: { type: "FLOAT_IN", amount: parsedAmount, payment_method: paymentMethod } }
+        } else if (actionType === "ATTRIBUTE_BANK_DEPOSIT") {
+            if (!targetId.trim()) {
+                toast.error("Select an unattributed bank deposit")
+                return
+            }
+            actionData = { transferGroupId: targetId.trim() }
         } else if (actionType === "LATE_CUSTOMER_TRANSACTION") {
             const parsedAmount = Number(amount)
             if (!selectedCustomerId || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -571,7 +609,7 @@ export function CorrectionCasePanel({
                                     }}
                                     className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                 >
-                                    {actions.map((action) => <option key={action.value} value={action.value}>{action.label}</option>)}
+                                    {activeCaseActions.map((action) => <option key={action.value} value={action.value}>{action.label}</option>)}
                                 </select>
                             </div>
                         </div>
@@ -943,6 +981,42 @@ export function CorrectionCasePanel({
                                             <Label htmlFor="case-movement-amount">Amount</Label>
                                             <Input id="case-movement-amount" type="number" min="0" value={amount} onChange={(event) => setAmount(event.target.value)} />
                                         </div>
+                                    </div>
+                                )}
+                                {actionType === "LATE_OPENING_FLOAT" && (
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <div className="space-y-1">
+                                            <Label htmlFor="case-opening-float-method">Opening float account</Label>
+                                            <select id="case-opening-float-method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as typeof paymentMethod)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                                <option value="CASH">Cash</option><option value="MPESA">M-Pesa</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="case-opening-float-amount">Verified opening amount</Label>
+                                            <Input id="case-opening-float-amount" type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground sm:col-span-2">
+                                            This declares cash or M-Pesa already present at shift start. It changes the shift report, not the shop register balance.
+                                        </p>
+                                    </div>
+                                )}
+                                {actionType === "ATTRIBUTE_BANK_DEPOSIT" && (
+                                    <div className="space-y-1">
+                                        <Label htmlFor="correction-deposit-group">Existing unattributed deposit</Label>
+                                        <select id="correction-deposit-group" value={targetId} onChange={(event) => setTargetId(event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                            <option value="">Select a deposit within this shift</option>
+                                            {unattributedDeposits.map((deposit) => (
+                                                <option key={deposit.transferGroupId} value={deposit.transferGroupId}>
+                                                    {new Date(deposit.effectiveAt).toLocaleString()} · {deposit.sourceAccount} · KES {deposit.amount.toFixed(2)}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {unattributedDeposits.length === 0 && (
+                                            <p className="text-xs text-muted-foreground">No eligible unattributed deposits were found during this shift.</p>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">
+                                            The existing balanced transfer is linked to this shift; it will not be posted a second time.
+                                        </p>
                                     </div>
                                 )}
                                 {actionType === "LATE_CUSTOMER_TRANSACTION" && (

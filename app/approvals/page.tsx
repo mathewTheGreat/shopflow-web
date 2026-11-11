@@ -117,7 +117,7 @@ function ManagerApprovalView({
     const [correctionLoadError, setCorrectionLoadError] = useState("")
 
     useEffect(() => {
-        if (!expanded || shift.closing_status !== "PENDING_CORRECTION_APPROVAL") return
+        if (!expanded || !["PENDING_CORRECTION_APPROVAL", "PENDING_APPROVAL"].includes(shift.closing_status || "")) return
         let cancelled = false
         setLoadingCorrections(true)
         setCorrectionLoadError("")
@@ -136,6 +136,10 @@ function ManagerApprovalView({
         return () => { cancelled = true }
     }, [expanded, shift.closing_status, shift.id, shift.shop_id])
 
+    const showCorrectionDetails = shift.closing_status === "PENDING_CORRECTION_APPROVAL"
+        || correctionCases.length > 0
+        || !!correctionLoadError
+
     return (
         <Card className="bg-card border shadow-sm">
             <CardContent className="p-4">
@@ -148,7 +152,7 @@ function ManagerApprovalView({
                         <p className="text-xs text-muted-foreground">
                             Duration: {formatDuration(shift.start_time, shift.end_time)}
                         </p>
-                        {shift.closing_status === "PENDING_CORRECTION_APPROVAL" && (
+                        {showCorrectionDetails && (
                             <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                                 Correction review — expand details before deciding.
                             </p>
@@ -186,7 +190,7 @@ function ManagerApprovalView({
                     <div className="mt-3 pt-3 border-t text-sm space-y-1 text-muted-foreground">
                         <p><strong>Shift:</strong> {shift.name}</p>
                         <p><strong>Cashier:</strong> {shift.manager_name || "Unknown staff"}</p>
-                        {shift.closing_status === "PENDING_CORRECTION_APPROVAL" && (
+                        {showCorrectionDetails && (
                             <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
                                 <p className="font-semibold">Correction review</p>
                                 {loadingCorrections && <p className="mt-1">Loading case details…</p>}
@@ -217,6 +221,10 @@ function ManagerApprovalView({
                                                     category: "Category",
                                                     movement_type: "Movement",
                                                     payment_method: "Payment method",
+                                                    opening_float_declaration: "Opening float declaration",
+                                                    transfer_group_id: "Deposit transfer group",
+                                                    source_account: "Source register",
+                                                    effective_at: "Deposit time",
                                                     transaction_type: "Customer transaction type",
                                                     quantity: "Quantity",
                                                     item_count: "Items",

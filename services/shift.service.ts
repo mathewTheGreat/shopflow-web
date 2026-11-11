@@ -62,6 +62,14 @@ export const shiftService = {
     createLateCashMovement: (originalShiftId: string, userId: string, cashMovementData: any, recordedShiftId?: string) =>
         apiClient.post<any>(`/api/shifts/${originalShiftId}/late-entries/cash-movements`, { userId, recordedShiftId, cashMovementData }),
 
+    createLateOpeningFloat: (originalShiftId: string, payload: {
+        cashAmount: number
+        mpesaAmount: number
+        reason: string
+        recordedShiftId?: string
+    }) =>
+        apiClient.post<ShiftCashMovement[]>(`/api/shifts/${originalShiftId}/late-entries/opening-float`, payload),
+
     createLateReconciliation: (originalShiftId: string, userId: string, reconciliationData: any, recordedShiftId?: string) =>
         apiClient.post<any>(`/api/shifts/${originalShiftId}/late-entries/reconciliation`, { userId, recordedShiftId, reconciliationData }),
 
@@ -82,6 +90,15 @@ export const shiftService = {
         const query = params.toString()
         return apiClient.get<any[]>(`/api/shift-corrections/shop/${shopId}${query ? `?${query}` : ""}`)
     },
+
+    getUnattributedBankDeposits: (shopId: string, shiftId: string) =>
+        apiClient.get<Array<{
+            transferGroupId: string
+            effectiveAt: string
+            sourceAccount: "DRAWER" | "MPESA"
+            amount: number
+            notes: string | null
+        }>>(`/api/shift-corrections/shop/${shopId}/unattributed-deposits?shiftId=${encodeURIComponent(shiftId)}`),
 
     executeCorrectionAction: (caseId: string, data: {
         actionType: string

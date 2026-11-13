@@ -22,7 +22,7 @@ interface CustomerPaymentsManagerProps {
 
 export function CustomerPaymentsManager({ onBack }: CustomerPaymentsManagerProps) {
     const activeShop = useAppStore((state) => state.activeShop)
-    const isManager = activeShop?.role === "Manager"
+    const isManager = ["manager", "admin"].includes(activeShop?.role?.toLowerCase() || "")
     const [searchQuery, setSearchQuery] = useState("")
     const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false)
     const [transactionType, setTransactionType] = useState<"CREDIT" | "DEBIT">("CREDIT")

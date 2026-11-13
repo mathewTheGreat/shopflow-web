@@ -7,8 +7,13 @@ export const shiftService = {
     getCurrentShift: (userId: string, shopId: string) =>
         apiClient.get<Shift | null>(`/api/shifts/current-v2?userId=${userId}&shopId=${shopId}`),
 
-    // Step 1 & 2: Create and Float
+    // Create the shift and its declared opening balances as one server operation.
     createShift: (data: Partial<Shift>) => apiClient.post<Shift>("/api/shifts", data),
+    openShiftWithOpeningFloat: (data: {
+        shift: Pick<Shift, "id" | "name" | "shop_id" | "start_time" | "end_time">
+        cashAmount: number
+        mpesaAmount: number
+    }) => apiClient.post<Shift>("/api/shifts/open-with-float", data),
 
     recordCashMovement: (data: Partial<ShiftCashMovement>) => {
         try {

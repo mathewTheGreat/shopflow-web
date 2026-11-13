@@ -8,6 +8,14 @@ import {
 import { buildListQuery, ListParams, PagedResult } from "@/types/list";
 import { CustomerNetPositionReport } from "@/types/customer-report";
 
+export interface CustomerPaymentReportRow extends CustomerPaymentTransaction {
+    original_shift_id?: string | null
+    recorded_shift_id?: string | null
+    cashierName: string | null
+    cashierEmail: string | null
+    shiftName: string | null
+}
+
 export const customerPaymentService = {
     // 1. Record Debit Transaction (Charge Customer)
     recordWithdrawal: async (data: CreateDebitDTO) => {
@@ -37,6 +45,28 @@ export const customerPaymentService = {
     // 5. Get Recent Transactions by Shop
     getShopTransactions: async (shopId: string, params?: ListParams) => {
         return apiClient.get<PagedResult<CustomerPaymentTransaction>>(`/api/customer-payments/transactions/shop/${shopId}${buildListQuery(params)}`);
+    },
+
+    getPaymentReport: async (params: {
+        shopId: string
+        startDate: string
+        endDate: string
+        cashierId?: string
+        shiftId?: string
+        type?: string
+        paymentMethod?: string
+    }) => {
+        const query = new URLSearchParams({
+            startDate: params.startDate,
+            endDate: params.endDate,
+        })
+        if (params.cashierId) query.set("cashierId", params.cashierId)
+        if (params.shiftId) query.set("shiftId", params.shiftId)
+        if (params.type) query.set("type", params.type)
+        if (params.paymentMethod) query.set("paymentMethod", params.paymentMethod)
+        return apiClient.get<CustomerPaymentReportRow[]>(
+            `/api/customer-payments/transactions/shop/${params.shopId}/report?${query.toString()}`
+        )
     },
 
     // 6. Get Net Position Report

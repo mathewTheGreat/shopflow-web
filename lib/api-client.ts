@@ -3,26 +3,86 @@ type FetchOptions = RequestInit & {
 }
 
 let apiTokenGetter: (() => Promise<string | null>) | undefined
+let requestSequence = 0
 
 export function setApiTokenGetter(getter: () => Promise<string | null>) {
     apiTokenGetter = getter
 }
 
+function authFlowRoute(url: string): string | null {
+    const path = new URL(url, "http://localhost").pathname
+    if (/\/api\/items\/?$/.test(path)) return "/api/items"
+    if (/\/api\/users\/clerk\/[^/]+\/?$/.test(path)) return "/api/users/clerk/:clerkId"
+    if (/\/api\/shop-staff\/user\/[^/]+\/?$/.test(path)) return "/api/shop-staff/user/:userId"
+    return null
+}
+
 async function fetcher<T>(url: string, options?: FetchOptions): Promise<T> {
-    const token = await apiTokenGetter?.()
+    const method = options?.method || "GET"
+    const route = authFlowRoute(url)
+    const traceId = route ? `auth-${Date.now()}-${++requestSequence}` : undefined
+    let token: string | null | undefined
+    try {
+        token = await apiTokenGetter?.()
+    } catch (error) {
+        if (route) {
+            console.error("[AuthFlow] Failed to obtain Clerk token", {
+                traceId,
+                route,
+                method,
+                message: error instanceof Error ? error.message : String(error)
+            })
+        }
+        throw error
+    }
+
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "ngrok-skip-browser-warning": "true",
         ...(options?.headers as Record<string, string> | undefined),
     }
+    if (traceId) headers["X-Auth-Flow-Id"] = traceId
     if (token && !headers.Authorization && !headers.authorization) {
         headers.Authorization = `Bearer ${token}`
     }
 
-    const response = await fetch(url, {
-        ...options,
-        headers,
-    })
+    if (route) {
+        console.info("[AuthFlow] API request", {
+            traceId,
+            route,
+            method,
+            tokenGetterReady: Boolean(apiTokenGetter),
+            tokenPresent: Boolean(token)
+        })
+    }
+
+    let response: Response
+    try {
+        response = await fetch(url, {
+            ...options,
+            headers,
+        })
+    } catch (error) {
+        if (route) {
+            console.error("[AuthFlow] API request failed before response", {
+                traceId,
+                route,
+                method,
+                message: error instanceof Error ? error.message : String(error)
+            })
+        }
+        throw error
+    }
+
+    if (route) {
+        console.info("[AuthFlow] API response", {
+            traceId,
+            route,
+            method,
+            status: response.status,
+            ok: response.ok
+        })
+    }
 
     if (!response.ok) {
         // Try to parse error message from JSON, fallback to status text

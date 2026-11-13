@@ -8,7 +8,9 @@ import { shopService } from "@/services/shop.service"
 import { shiftService } from "@/services/shift.service"
 import { roleService } from "@/services/role.service"
 
-export function useInitializeApp() {
+type ApiError = Error & { status?: number }
+
+export function useInitializeApp(apiTokenGetterReady: boolean) {
     const { user: clerkUser, isLoaded: isClerkLoaded } = useUser()
     const { setUserInfo, setActiveShop, setActiveShift } = useAppStore()
     const [isInitialized, setIsInitialized] = useState(false)
@@ -16,27 +18,34 @@ export function useInitializeApp() {
 
     useEffect(() => {
         const initialize = async () => {
+            if (!apiTokenGetterReady) {
+                console.info("[AuthFlow] Waiting for Clerk token getter")
+                return
+            }
             if (!isClerkLoaded || !clerkUser) {
                 if (isClerkLoaded && !clerkUser) {
+                    console.info("[AuthFlow] No signed-in Clerk user")
                     setIsInitialized(true) // Not logged in, but initialized
                 }
                 return
             }
 
             try {
-                // 1. Get Local User
+                console.info("[AuthFlow] Resolving ShopFlow user")
                 const dbUser = await userService.getUserByClerkId(clerkUser.id)
+                console.info("[AuthFlow] ShopFlow user resolved")
                 setUserInfo({
                     id: dbUser.id,
                     name: dbUser.name,
                     email: dbUser.email
                 })
-                // 2. Get Shop Staff / Shop
+
                 try {
                     const staffRecord = await userService.getShopStaffByUser(dbUser.id)
-                    if (staffRecord && staffRecord[0].shop_id) {
-                        const shopId = staffRecord[0].shop_id
-                        const roleId = staffRecord[0].role_id
+                    const assignment = staffRecord?.[0]
+                    if (assignment?.shop_id) {
+                        const shopId = assignment.shop_id
+                        const roleId = assignment.role_id
 
                         const [shopData, roleData] = await Promise.all([
                             shopService.getShop(shopId),
@@ -48,34 +57,56 @@ export function useInitializeApp() {
                             name: shopData.name,
                             role: roleData?.name || 'None'
                         })
+                        console.info("[AuthFlow] Shop assignment resolved", {
+                            assignmentFound: true,
+                            shopResolved: true,
+                            roleResolved: Boolean(roleData)
+                        })
+                    } else {
+                        console.info("[AuthFlow] User has no shop assignment", {
+                            assignmentCount: staffRecord?.length ?? 0
+                        })
+                        setActiveShop(null)
                     }
-                } catch (staffErr) {
-                    console.warn("No shop assigned to user yet")
+                } catch (staffError) {
+                    const status = (staffError as ApiError)?.status
+                    console.error("[AuthFlow] Shop assignment lookup failed", {
+                        status: status ?? null,
+                        message: staffError instanceof Error ? staffError.message : String(staffError)
+                    })
                     setActiveShop(null)
                 }
 
-                // 3. Get Current Shift
                 try {
                     const activeShop = useAppStore.getState().activeShop
                     if (dbUser.id && activeShop?.id) {
                         const currentShift = await shiftService.getCurrentShift(dbUser.id, activeShop.id)
                         setActiveShift(currentShift)
+                        console.info("[AuthFlow] Current shift lookup completed", {
+                            shiftFound: Boolean(currentShift)
+                        })
                     }
-                } catch (shiftErr) {
-                    console.warn("No active shift found")
+                } catch (shiftError) {
+                    console.error("[AuthFlow] Current shift lookup failed", {
+                        status: (shiftError as ApiError)?.status ?? null,
+                        message: shiftError instanceof Error ? shiftError.message : String(shiftError)
+                    })
                     setActiveShift(null)
                 }
 
                 setIsInitialized(true)
-            } catch (err: any) {
-                console.error("Initialization error:", err)
+            } catch (err) {
+                console.error("[AuthFlow] App initialization failed", {
+                    status: (err as ApiError)?.status ?? null,
+                    message: err instanceof Error ? err.message : String(err)
+                })
                 setError(err instanceof Error ? err : new Error(String(err)))
                 setIsInitialized(true) // Still mark as initialized to stop loading state
             }
         }
 
         initialize()
-    }, [isClerkLoaded, clerkUser, setUserInfo, setActiveShop, setActiveShift])
+    }, [apiTokenGetterReady, isClerkLoaded, clerkUser, setUserInfo, setActiveShop, setActiveShift])
 
     return { isInitialized, error }
 }

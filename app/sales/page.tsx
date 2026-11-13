@@ -55,8 +55,10 @@ import { expenseService } from "@/services/expense.service"
 import { useQueryClient } from "@tanstack/react-query"
 import { CustomerManager } from "@/components/customers/CustomerManager"
 import { CustomerPaymentsManager } from "@/components/payments/CustomerPaymentsManager"
+import { CustomerPaymentsReportDialog } from "@/components/payments/CustomerPaymentsReportDialog"
 import { ShiftPerformanceDialog } from "@/components/reports/ShiftPerformanceDialog"
 import { SalesReportDialog } from "@/components/reports/SalesReportDialog"
+import { ExpenseReportDialog } from "@/components/reports/ExpenseReportDialog"
 import { CustomerNetPositionDialog } from "@/components/reports/CustomerNetPositionDialog"
 import { Loader2, ChevronLeft } from "lucide-react"
 import { useAllItemPrices } from "@/hooks/use-item-prices"
@@ -93,6 +95,8 @@ export default function SalesPage() {
   const [showExpenseDialog, setShowExpenseDialog] = useState(false)
   const [showShiftReportDialog, setShowShiftReportDialog] = useState(false)
   const [showSalesReportDialog, setShowSalesReportDialog] = useState(false)
+  const [showExpenseReportDialog, setShowExpenseReportDialog] = useState(false)
+  const [showCustomerPaymentsReportDialog, setShowCustomerPaymentsReportDialog] = useState(false)
   const [showNetPositionDialog, setShowNetPositionDialog] = useState(false)
   const [showFinancialBreakdown, setShowFinancialBreakdown] = useState(false)
   const [showDailyReportDialog, setShowDailyReportDialog] = useState(false)
@@ -927,6 +931,36 @@ export default function SalesPage() {
 
                         <Card
                           className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setShowExpenseReportDialog(true)}
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <Receipt className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Expense Report</h3>
+                              <p className="text-sm text-muted-foreground">Review posted expenses by date, cashier, shift, category, and payment method.</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => setShowCustomerPaymentsReportDialog(true)}
+                        >
+                          <CardContent className="p-6 flex items-start gap-4">
+                            <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                              <CreditCard className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">Customer Payments Report</h3>
+                              <p className="text-sm text-muted-foreground">Review customer account payments, charges, and reversals by date, cashier, and shift.</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card
+                          className="border hover:border-primary/50 transition-colors cursor-pointer group"
                           onClick={() => setShowNetPositionDialog(true)}
                         >
                           <CardContent className="p-6 flex items-start gap-4">
@@ -1067,6 +1101,16 @@ export default function SalesPage() {
               <SalesReportDialog
                 open={showSalesReportDialog}
                 onOpenChange={setShowSalesReportDialog}
+              />
+
+              <ExpenseReportDialog
+                open={showExpenseReportDialog}
+                onOpenChange={setShowExpenseReportDialog}
+              />
+
+              <CustomerPaymentsReportDialog
+                open={showCustomerPaymentsReportDialog}
+                onOpenChange={setShowCustomerPaymentsReportDialog}
               />
 
               <CustomerNetPositionDialog

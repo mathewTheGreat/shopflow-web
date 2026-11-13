@@ -7,14 +7,21 @@ import { setApiTokenGetter } from "@/lib/api-client"
 import { Loader2 } from "lucide-react"
 
 export function AppInitializer({ children }: { children: React.ReactNode }) {
-    const { getToken } = useAuth()
-    const { isInitialized } = useInitializeApp()
+    const { getToken, isLoaded: isAuthLoaded } = useAuth()
+    const [apiTokenGetterReady, setApiTokenGetterReady] = useState(false)
+    const { isInitialized } = useInitializeApp(apiTokenGetterReady)
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => {
         setMounted(true)
+    }, [])
+
+    useEffect(() => {
+        if (!isAuthLoaded) return
         setApiTokenGetter(getToken)
-    }, [getToken])
+        setApiTokenGetterReady(true)
+        console.info("[AuthFlow] Clerk token getter is ready")
+    }, [getToken, isAuthLoaded])
 
     if (!mounted || !isInitialized) {
         return (

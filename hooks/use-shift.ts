@@ -70,42 +70,18 @@ export function useShift() {
         mutationFn: async (data: { cashAmount: number; mpesaAmount: number }) => {
             if (!activeShop || !userInfo) throw new Error("Shop or User not identified")
 
-            const createdShift = await shiftService.createShift({
-                name: `Shift ${new Date().toLocaleTimeString()}`,
-                shop_id: activeShop.id,
-                manager_id: userInfo.id,
-                start_time: new Date().toISOString(),
-                end_time: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
-                is_closed: false,
+            const startTime = new Date()
+            return shiftService.openShiftWithOpeningFloat({
+                shift: {
+                    id: crypto.randomUUID(),
+                    name: `Shift ${startTime.toLocaleTimeString()}`,
+                    shop_id: activeShop.id,
+                    start_time: startTime.toISOString(),
+                    end_time: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+                },
+                cashAmount: data.cashAmount,
+                mpesaAmount: data.mpesaAmount,
             })
-
-            if (!createdShift?.id) {
-                throw new Error("Failed to open shift")
-            }
-
-            if (data.cashAmount > 0) {
-                await shiftService.recordCashMovement({
-                    shift_id: createdShift.id,
-                    type: 'FLOAT_IN',
-                    amount: data.cashAmount,
-                    payment_method: 'CASH',
-                    reason: 'Initial Shift Opening Float - CASH',
-                    created_by: userInfo.id
-                })
-            }
-
-            if (data.mpesaAmount > 0) {
-                await shiftService.recordCashMovement({
-                    shift_id: createdShift.id,
-                    type: 'FLOAT_IN',
-                    amount: data.mpesaAmount,
-                    payment_method: 'MPESA',
-                    reason: 'Initial Shift Opening Float - MPESA',
-                    created_by: userInfo.id
-                })
-            }
-
-            return createdShift
         },
         onSuccess: (createdShift) => {
             queryClient.invalidateQueries({ queryKey: ["current-shift"] })

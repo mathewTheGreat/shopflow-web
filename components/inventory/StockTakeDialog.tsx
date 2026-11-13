@@ -7,13 +7,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { X, Loader2, ClipboardList, Check, AlertCircle } from "lucide-react"
 import { useItems } from "@/hooks/use-items"
-import { useStockLevelsByShop } from "@/hooks/use-stock-levels"
 import { useCreateBulkStockTakes } from "@/hooks/use-stock-takes"
 import { useAppStore } from "@/store/use-app-store"
 import { Card, CardContent } from "../ui/card"
 import { v4 as uuidv4 } from "uuid"
 import { Checkbox } from "@/components/ui/checkbox"
-import { takeVariance, formatQty } from "@/lib/utils"
 
 interface StockTakeDialogProps {
     open: boolean
@@ -37,8 +35,6 @@ export function StockTakeDialog({ open, onOpenChange, onSuccess }: StockTakeDial
 
     // Data Fetching
     const { items, isLoading: itemsLoading } = useItems()
-    const { data: stockLevels = [], isLoading: levelsLoading } = useStockLevelsByShop(activeShop?.id || "")
-
     // Mutations
     const { mutateAsync: createBulkStockTakes } = useCreateBulkStockTakes()
 
@@ -55,15 +51,6 @@ export function StockTakeDialog({ open, onOpenChange, onSuccess }: StockTakeDial
             setFormData(initialForm)
         }
     }, [open, items])
-
-    // Lookup map for stock levels
-    const stockLevelMap = useMemo(() => {
-        const map: Record<string, number> = {}
-        stockLevels.forEach(level => {
-            map[level.item_id] = level.quantity
-        })
-        return map
-    }, [stockLevels])
 
     const handleCountChange = (itemId: string, value: string) => {
         setFormData(prev => ({
@@ -96,35 +83,23 @@ export function StockTakeDialog({ open, onOpenChange, onSuccess }: StockTakeDial
         }
 
         setIsSubmitting(true)
-        const timestamp = new Date().toISOString()
-
         try {
             const stockTakes = []
 
             for (const item of items) {
                 const countData = formData[item.id]
-                const expectedQty = stockLevelMap[item.id] || 0
                 const countedQty = parseFloat(countData.counted_qty)
-                const variance = takeVariance(countedQty, expectedQty)
 
-                // Stock Take Record only: the server applies the projection
-                // adjustment itself when auto-adjust is on.
                 stockTakes.push({
                     id: uuidv4(),
                     item_id: item.id,
                     shop_id: activeShop.id,
                     shift_id: activeShift.id,
-                    expected_qty: expectedQty,
                     counted_qty: countedQty,
-                    variance: variance,
                     notes: countData.notes || undefined,
-                    is_adjusted: autoAdjust && variance !== 0,
-                    created_at: timestamp
                 })
             }
 
-            // The server owns projection updates when auto-adjust is on; when
-            // off the count is recorded only. Never write levels directly here.
             await createBulkStockTakes({ takes: stockTakes, autoAdjust })
 
             onOpenChange(false)
@@ -137,7 +112,7 @@ export function StockTakeDialog({ open, onOpenChange, onSuccess }: StockTakeDial
         }
     }
 
-    const isLoading = itemsLoading || levelsLoading
+    const isLoading = itemsLoading
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -193,9 +168,7 @@ export function StockTakeDialog({ open, onOpenChange, onSuccess }: StockTakeDial
                                 </div>
                             ) : (
                                 items.map((item) => {
-                                    const expectedQty = stockLevelMap[item.id] || 0
                                     const count = formData[item.id]
-                                    const variance = count?.counted_qty !== "" ? takeVariance(parseFloat(count?.counted_qty), expectedQty) : null
 
                                     return (
                                         <Card key={item.id} className="overflow-hidden border-border/50">
@@ -205,18 +178,6 @@ export function StockTakeDialog({ open, onOpenChange, onSuccess }: StockTakeDial
                                                         <h3 className="text-lg font-bold">{item.name}</h3>
                                                         <p className="text-sm text-muted-foreground">Unit: {item.unit_of_measure}</p>
                                                     </div>
-                                                    {variance !== null && (
-                                                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${variance === 0 ? "bg-gray-100 text-gray-600" :
-                                                            variance > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                                                            }`}>
-                                                            {variance > 0 ? "+" : ""}{formatQty(variance)} {item.unit_of_measure} Variance
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="bg-muted/50 p-4 rounded-lg flex items-center justify-between">
-                                                    <span className="text-sm font-medium">Current System Quantity:</span>
-                                                    <span className="text-lg font-bold">{formatQty(expectedQty)}</span>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

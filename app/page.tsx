@@ -80,7 +80,7 @@ export default function DashboardPage() {
   const queryClient = useQueryClient()
 
   const { activeShop, userInfo } = useAppStore()
-  const { currentShift, isLoading: isLoadingShift, openShift, closeShift, isOpening, isClosing, expectedFinancials } = useShift()
+  const { currentShift, isLoading: isLoadingShift, openShift, closeShift, isOpening, isClosing } = useShift()
   const { sales, expenses, isLoading: isLoadingStats, isManager, currency } = useDashboardStats()
   const { position: moneyPosition, isLoading: isLoadingPosition, refetch: refetchPosition } = useMoneyPosition(activeShop?.id)
   const { initialized, isLoading: initLoading, refetch: refetchInit } = useRegisterInitialization(activeShop?.id)
@@ -589,8 +589,6 @@ export default function DashboardPage() {
             setMpesaAmount={setMpesaAmount}
             onSubmit={handleCloseShiftSubmit}
             isLoading={isClosing}
-            expectedCash={expectedFinancials?.totalExpectedCash ?? 0}
-            expectedMpesa={expectedFinancials?.totalExpectedMpesa ?? 0}
           />
         )}
 

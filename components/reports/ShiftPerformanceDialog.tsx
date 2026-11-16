@@ -56,6 +56,7 @@ type StockReportItem = {
   prepaid_qty: number
   sales_by_category?: {
     regular_qty: number
+    regular_amount?: number
     credit_qty: number
     prepaid_qty: number
   }
@@ -372,9 +373,7 @@ function formatShiftReportHTML(
 
   for (const item of saleItems) {
     const itemName = itemMap[item.item_id]?.name || item.item_id;
-    const regularSalesQty = getSalesByCategory(item).regular_qty;
-    const itemPrice = itemMap[item.item_id]?.sale_price || 0;
-    const cashSaleAmount = regularSalesQty * itemPrice;
+    const cashSaleAmount = getSalesByCategory(item).regular_amount ?? 0;
 
     cashSalesSummary[itemName] = cashSaleAmount;
     totalCashSales += cashSaleAmount;

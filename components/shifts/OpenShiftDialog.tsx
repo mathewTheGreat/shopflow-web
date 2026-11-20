@@ -39,8 +39,9 @@ export function OpenShiftDialog({
                 <DialogHeader>
                     <DialogTitle className="text-xl">Open Shift</DialogTitle>
                     <DialogDescription>
-                        Enter the cash and M-Pesa already in the register at shift start. These
-                        become this shift's opening balances; they are not added to the register again.
+                        Enter the full cash and M-Pesa balances already in the register at shift start,
+                        including funds carried over from previous shifts. These opening balances are
+                        recorded for reconciliation and are not added to the register again.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -55,7 +56,7 @@ export function OpenShiftDialog({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="open-mpesa">Opening M-Pesa (KES)</Label>
+                        <Label htmlFor="open-mpesa">Opening M-Pesa Wallet Balance (KES)</Label>
                         <Input
                             id="open-mpesa"
                             type="number"

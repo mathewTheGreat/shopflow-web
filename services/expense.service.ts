@@ -46,6 +46,9 @@ export const expenseService = {
         return apiClient.get<PagedResult<Expense>>(`/api/expenses/shop/${shopId}${buildListQuery(params)}`)
     },
 
+    getExpensesByShift: (shiftId: string) =>
+        apiClient.get<Expense[]>(`/api/expenses/shift/${shiftId}`),
+
     getExpenseReport: (params: {
         shopId: string
         startDate: string

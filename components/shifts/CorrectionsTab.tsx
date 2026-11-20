@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { SearchablePicker } from "@/components/ui/searchable-picker"
 import { toast } from "sonner"
 import { v4 as uuidv4 } from "uuid"
 
@@ -20,7 +21,7 @@ function formatShiftLabel(shift: Shift) {
     return `${shift.name} — ${start} (${status})`
 }
 
-export function CorrectionsTab() {
+export function CorrectionsTab({ initialShiftId }: { initialShiftId?: string }) {
     const { activeShop, activeShift, userInfo } = useAppStore()
     const isManager = activeShop?.role === "Manager" || activeShop?.role === "Admin"
     const queryClient = useQueryClient()
@@ -28,7 +29,6 @@ export function CorrectionsTab() {
     const [shifts, setShifts] = useState<Shift[]>([])
     const [loading, setLoading] = useState(false)
     const [selectedShiftId, setSelectedShiftId] = useState("")
-    const [shiftFilter, setShiftFilter] = useState("")
     const [busy, setBusy] = useState(false)
 
     const [expenseAmount, setExpenseAmount] = useState("")
@@ -57,7 +57,19 @@ export function CorrectionsTab() {
             .finally(() => setLoading(false))
     }, [activeShop?.id])
 
+    useEffect(() => {
+        if (initialShiftId && shifts.some((shift) => shift.id === initialShiftId)) {
+            setSelectedShiftId(initialShiftId)
+        }
+    }, [initialShiftId, shifts])
+
     const targetShift = shifts.find((s) => s.id === selectedShiftId)
+    const correctableShifts = shifts.filter((shift) =>
+        (isManager || shift.manager_id === userInfo?.id)
+        && (isRejectedShift(shift)
+            || shift.closing_status === "PENDING_CORRECTION_APPROVAL"
+            || shift.closing_status === "PENDING_APPROVAL")
+    )
     const isCorrectable = targetShift && (
         isRejectedShift(targetShift)
         || targetShift.closing_status === "PENDING_CORRECTION_APPROVAL"
@@ -195,29 +207,21 @@ export function CorrectionsTab() {
 
             <div className="space-y-2">
                 <Label htmlFor="correction-shift">Target Shift</Label>
-                <Input
-                    placeholder="Filter shifts by name..."
-                    value={shiftFilter}
-                    onChange={(e) => setShiftFilter(e.target.value)}
-                    className="h-10"
-                />
-                <select
+                <SearchablePicker
                     id="correction-shift"
                     value={selectedShiftId}
-                    onChange={(e) => setSelectedShiftId(e.target.value)}
-                    className="w-full h-11 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                    <option value="">Select a shift…</option>
-                    {shifts
-                        .filter((s) => (isManager || s.manager_id === userInfo?.id)
-                            && (isRejectedShift(s) || s.closing_status === "PENDING_CORRECTION_APPROVAL" || s.closing_status === "PENDING_APPROVAL")
-                            && s.name.toLowerCase().includes(shiftFilter.toLowerCase()))
-                        .map((s) => (
-                            <option key={s.id} value={s.id}>
-                                {formatShiftLabel(s)}
-                            </option>
-                        ))}
-                </select>
+                    onValueChange={setSelectedShiftId}
+                    placeholder="Choose a shift to correct"
+                    searchPlaceholder="Search shift name, date, or status..."
+                    emptyMessage="No correctable shifts match that search."
+                    columns={{ primary: "Shift", secondary: "Manager" }}
+                    options={correctableShifts.map((shift) => ({
+                        value: shift.id,
+                        label: formatShiftLabel(shift),
+                        secondaryLabel: shift.manager_name || "Manager name unavailable",
+                        keywords: `${shift.manager_name || ""} ${shift.id}`,
+                    }))}
+                />
             </div>
 
             {!isCorrectable && (

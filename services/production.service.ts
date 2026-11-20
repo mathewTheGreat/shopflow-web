@@ -36,6 +36,7 @@ export const productionService = {
         if (params.sort_by) queryParams.set("sort_by", params.sort_by)
         if (params.sort_order) queryParams.set("sort_order", params.sort_order)
         if (params.search) queryParams.set("search", params.search)
+        if (params.shift_id) queryParams.set("shift_id", params.shift_id)
 
         const queryString = queryParams.toString()
         return apiClient.get<ProductionBatchesResponse>(`/api/production/shop/${shopId}${queryString ? `?${queryString}` : ""}`)

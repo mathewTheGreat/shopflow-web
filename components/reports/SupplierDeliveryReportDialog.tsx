@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import * as XLSX from "xlsx"
 import {
     Dialog,
@@ -23,6 +23,8 @@ import { useSuppliers } from "@/hooks/use-supplier"
 import { useItems } from "@/hooks/use-items"
 import { useAppStore } from "@/store/use-app-store"
 import { supplierService } from "@/services/supplier.service"
+import { shiftService } from "@/services/shift.service"
+import { useQuery } from "@tanstack/react-query"
 import { Loader2, FileSpreadsheet, FileText, Printer } from "lucide-react"
 import { toast } from "sonner"
 
@@ -40,18 +42,44 @@ export function SupplierDeliveryReportDialog({ open, onOpenChange }: SupplierDel
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
     const [selectedSupplierId, setSelectedSupplierId] = useState<string>("all")
     const [selectedItemId, setSelectedItemId] = useState<string>("all")
+    const [selectedShiftId, setSelectedShiftId] = useState<string>("all")
     const [isGenerating, setIsGenerating] = useState(false)
 
     // Data Hooks
     const { suppliers = [] } = useSuppliers()
     const { items } = useItems()
+    const { data: shifts = [], isLoading: shiftsLoading, isError: shiftsError } = useQuery({
+        queryKey: ["supplier-delivery-report-shifts", activeShop?.id, startDate, endDate],
+        queryFn: () => shiftService.getShiftsByShopAndDate(activeShop!.id, startDate, endDate),
+        enabled: Boolean(activeShop?.id && startDate && endDate && open),
+    })
+
+    useEffect(() => {
+        setSelectedShiftId("all")
+    }, [activeShop?.id, startDate, endDate])
 
     const handleGenerateReport = async (action: 'preview' | 'excel' | 'pdf') => {
+        if (!activeShop?.id) {
+            toast.error("Select an active shop before generating the report")
+            return
+        }
         setIsGenerating(true)
         try {
             const supplierIdArg = selectedSupplierId === "all" ? undefined : selectedSupplierId
             const itemIdArg = selectedItemId === "all" ? undefined : selectedItemId
-            const reportData = await supplierService.getSupplierDeliveries(supplierIdArg, startDate, endDate, itemIdArg)
+            const shiftIdArg = selectedShiftId === "all" ? undefined : selectedShiftId
+            const selectedShift = shifts.find((shift) => shift.id === selectedShiftId)
+            const shiftFilter = selectedShift
+                ? `${selectedShift.name} — ${selectedShift.manager_name || "Unknown cashier"}`
+                : "All shifts"
+            const reportData = await supplierService.getSupplierDeliveries(
+                supplierIdArg,
+                startDate,
+                endDate,
+                itemIdArg,
+                activeShop.id,
+                shiftIdArg,
+            )
 
             const supplierName = selectedSupplierId === "all"
                 ? "All Suppliers"
@@ -70,6 +98,7 @@ export function SupplierDeliveryReportDialog({ open, onOpenChange }: SupplierDel
                     new Date(endDate),
                     supplierName,
                     itemName,
+                    shiftFilter,
                     `Supplier_Deliveries_${startDate}_${endDate}.xlsx`
                 )
                 toast.success("Excel report exported")
@@ -82,7 +111,8 @@ export function SupplierDeliveryReportDialog({ open, onOpenChange }: SupplierDel
                     new Date(startDate),
                     new Date(endDate),
                     supplierName,
-                    itemName
+                    itemName,
+                    shiftFilter
                 )
 
                 const printWindow = window.open('', '_blank')
@@ -127,6 +157,33 @@ export function SupplierDeliveryReportDialog({ open, onOpenChange }: SupplierDel
                                 onChange={(e) => setEndDate(e.target.value)}
                             />
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Shift / cashier</Label>
+                        <Select
+                            value={selectedShiftId}
+                            onValueChange={setSelectedShiftId}
+                            disabled={shiftsLoading || shiftsError || !activeShop?.id}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder={shiftsLoading ? "Loading shifts..." : "Select shift"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All shifts in date range</SelectItem>
+                                {shifts.map((shift) => (
+                                    <SelectItem key={shift.id} value={shift.id}>
+                                        {shift.manager_name || "Unknown cashier"} — {shift.name} ({new Date(shift.start_time).toLocaleTimeString()})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {shiftsError && (
+                            <p className="text-xs text-destructive">Could not load shifts. Try again before generating a shift-specific report.</p>
+                        )}
+                        {!shiftsLoading && !shiftsError && shifts.length === 0 && (
+                            <p className="text-xs text-muted-foreground">No shifts found for this date range.</p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -209,7 +266,8 @@ const formatSupplierDeliveriesHTML = (
     startDate: Date,
     endDate: Date,
     supplierFilter: string,
-    itemFilter: string
+    itemFilter: string,
+    shiftFilter: string
 ): string => {
     const formatTime = (timeString: string) => {
         const date = new Date(timeString);
@@ -271,6 +329,7 @@ const formatSupplierDeliveriesHTML = (
           <div><strong>Generated By:</strong> ${managerName}</div>
           <div><strong>Supplier:</strong> ${supplierFilter}</div>
           <div><strong>Item:</strong> ${itemFilter}</div>
+          <div><strong>Shift / cashier:</strong> ${shiftFilter}</div>
         </div>
         <div class="summary">
           <div class="summary-grid">
@@ -327,6 +386,7 @@ const exportSupplierDeliveriesToExcelWeb = async (
     endDate: Date,
     supplierFilter: string,
     itemFilter: string,
+    shiftFilter: string,
     fileName: string
 ): Promise<void> => {
     // Create workbook and worksheet
@@ -340,6 +400,7 @@ const exportSupplierDeliveriesToExcelWeb = async (
         ['Period:', `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`],
         ['Supplier Filter:', supplierFilter],
         ['Item Filter:', itemFilter],
+        ['Shift / Cashier Filter:', shiftFilter],
         ['Generated:', new Date().toLocaleString()],
         ['Total Deliveries:', deliveries.length],
         ['Total Items Received:', deliveries.reduce((sum, delivery) => sum + (delivery.quantity || 0), 0)],

@@ -65,11 +65,13 @@ export interface ShiftFinancialsBreakdownDetailed {
     cashPayIn: number;
     cashPayOut: number;
     cashBankDeposit: number;
+    cashCarryoverBankDeposit: number;
     mpesaOpeningFloat: number;
     mpesaAdditionalFloat: number;
     mpesaPayIn: number;
     mpesaPayOut: number;
     mpesaBankDeposit: number;
+    mpesaCarryoverBankDeposit: number;
     totalExpectedCash: number;
     totalExpectedMpesa: number;
 }

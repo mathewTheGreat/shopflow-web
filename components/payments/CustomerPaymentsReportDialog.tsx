@@ -52,6 +52,13 @@ function sumByType(rows: CustomerPaymentReportRow[]): Record<string, number> {
     }, {})
 }
 
+function sumByPaymentMethod(rows: CustomerPaymentReportRow[]): Record<string, number> {
+    return rows.reduce<Record<string, number>>((totals, row) => {
+        totals[row.payment_method] = (totals[row.payment_method] || 0) + Number(row.cash_inflow_impact || 0)
+        return totals
+    }, {})
+}
+
 export function CustomerPaymentsReportDialog({ open, onOpenChange }: CustomerPaymentsReportDialogProps) {
     const userInfo = useAppStore((state) => state.userInfo)
     const activeShop = useAppStore((state) => state.activeShop)
@@ -67,6 +74,7 @@ export function CustomerPaymentsReportDialog({ open, onOpenChange }: CustomerPay
     const [shiftId, setShiftId] = useState("all")
     const [type, setType] = useState("all")
     const [paymentMethod, setPaymentMethod] = useState("all")
+    const [flow, setFlow] = useState<"INFLOWS" | "ALL">("INFLOWS")
     const [isGenerating, setIsGenerating] = useState(false)
 
     useEffect(() => {
@@ -113,9 +121,12 @@ export function CustomerPaymentsReportDialog({ open, onOpenChange }: CustomerPay
                 shiftId: shiftId === "all" ? undefined : shiftId,
                 type: type === "all" ? undefined : type,
                 paymentMethod: paymentMethod === "all" ? undefined : paymentMethod,
+                flow,
             })
             const byType = sumByType(rows)
             const signedTotal = rows.reduce((total, row) => total + transactionImpact(row), 0)
+            const cashInflowTotal = rows.reduce((total, row) => total + Number(row.cash_inflow_impact || 0), 0)
+            const inflowsByMethod = sumByPaymentMethod(rows)
             const cashierName = cashierId === "all"
                 ? (isManager ? "All Cashiers" : userInfo?.name || "My Transactions")
                 : cashiers.find((cashier) => cashier.id === cashierId)?.name
@@ -134,7 +145,10 @@ export function CustomerPaymentsReportDialog({ open, onOpenChange }: CustomerPay
                 shiftName,
                 typeName: type === "all" ? "All Transaction Types" : type,
                 paymentName: paymentMethod === "all" ? "All Payment Methods" : paymentMethod,
+                flowName: flow === "INFLOWS" ? "Customer cash inflows" : "All customer-account activity",
                 signedTotal,
+                cashInflowTotal,
+                inflowsByMethod,
                 byType,
             }
 
@@ -165,7 +179,7 @@ export function CustomerPaymentsReportDialog({ open, onOpenChange }: CustomerPay
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader><DialogTitle>Customer Payments Report</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Customer Payments &amp; Inflows Report</DialogTitle></DialogHeader>
 
                 <div className="grid gap-4 py-4">
                     <div className="space-y-2">
@@ -188,6 +202,17 @@ export function CustomerPaymentsReportDialog({ open, onOpenChange }: CustomerPay
                                 setShiftId("all")
                             }} />
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Report view</Label>
+                        <Select value={flow} onValueChange={(value) => setFlow(value as "INFLOWS" | "ALL")}>
+                            <SelectTrigger><SelectValue placeholder="Select report view" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="INFLOWS">Customer inflows only (matches shift financials)</SelectItem>
+                                <SelectItem value="ALL">All customer-account activity</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -255,7 +280,7 @@ export function CustomerPaymentsReportDialog({ open, onOpenChange }: CustomerPay
                         </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        Includes original and reversal entries. Reversals offset the original transaction in the net account impact.
+                        Customer inflows include payments/refunds/adjustments posted to cash or M-Pesa, less reversals. Credit-sale charges do not count as cash received. Selecting a shift includes entries attributed to that shift even if they were recorded later.
                     </p>
                 </div>
 
@@ -287,7 +312,10 @@ interface PaymentsReportMetadata {
     shiftName: string
     typeName: string
     paymentName: string
+    flowName: string
     signedTotal: number
+    cashInflowTotal: number
+    inflowsByMethod: Record<string, number>
     byType: Record<string, number>
 }
 
@@ -300,55 +328,99 @@ function formatPaymentsReportHtml(rows: CustomerPaymentReportRow[], metadata: Pa
             <td>${escapeHtml(row.payment_method)}</td>
             <td>${escapeHtml(row.cashierName || row.cashierEmail || "User")}</td>
             <td>${escapeHtml(row.shiftName || row.shift_id || "-")}</td>
+            <td>${escapeHtml(row.recorded_by_name || row.cashierName || "User")}</td>
             <td>${escapeHtml(row.notes || "-")}</td>
             <td class="amount">${escapeHtml(formatAmount(Number(row.amount)))}</td>
             <td class="amount">${escapeHtml(formatAmount(transactionImpact(row)))}</td>
+            <td class="amount">${escapeHtml(formatAmount(Number(row.cash_inflow_impact || 0)))}</td>
         </tr>`).join("")
     const typeTotals = Object.entries(metadata.byType)
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([label, amount]) => `<tr><td>${escapeHtml(label)}</td><td class="amount">${escapeHtml(formatAmount(amount))}</td></tr>`)
         .join("")
 
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Customer Payments Report</title>
+    const methodTotals = Object.entries(metadata.inflowsByMethod)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([label, amount]) => `<tr><td>${escapeHtml(label)}</td><td class="amount">${escapeHtml(formatAmount(amount))}</td></tr>`)
+        .join("")
+
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Customer Payments &amp; Inflows Report</title>
 <style>
-@page{size:A4 landscape;margin:12mm}body{font:12px Arial,sans-serif;color:#111;margin:0}
-h1{margin:0 0 6px;font-size:22px}.muted{color:#555}.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:18px 0}
-.summary{display:flex;gap:24px;padding:12px;background:#f3f4f6;margin:16px 0;font-weight:bold}
-table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ccc;padding:7px;text-align:left}th{background:#eee}.amount{text-align:right;white-space:nowrap}
-@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+@page{size:A4 landscape;margin:0.5cm}
+*{box-sizing:border-box}
+body{font:9pt Arial,sans-serif;color:#222;margin:0}
+.report-container{max-width:29.7cm;margin:0 auto}
+.report-header{text-align:center;border-bottom:2px solid #2c5aa0;padding-bottom:0.15cm;margin-bottom:0.3cm}
+.report-title{font-size:16pt;font-weight:bold;color:#2c5aa0;margin:0 0 0.05cm}
+.report-subtitle{font-size:9pt;color:#666;margin:0.02cm 0}
+.report-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px 14px;background:#f8f9fa;padding:0.25cm;border-radius:4px;margin-bottom:0.3cm;font-size:8pt;border:1px solid #eee}
+.report-meta strong{color:#555}
+.summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0.3cm 0}
+.summary-item{background:#f0f4fa;border:1px solid #dce5f2;border-radius:4px;padding:0.2cm;text-align:center}
+.summary-value{font-size:11pt;font-weight:bold;color:#2c5aa0;margin:0.08cm 0}
+.summary-label{font-size:8pt;color:#666}
+.report-note{color:#666;font-size:8pt;margin:0.2cm 0}
+.section-title{font-weight:bold;font-size:11pt;margin:0.4cm 0 0.2cm;padding-bottom:0.1cm;border-bottom:1px solid #e0e0e0;color:#2c5aa0}
+table{width:100%;border-collapse:collapse;margin-bottom:0.3cm;font-size:8pt}
+th,td{border:1px solid #eee;padding:5px 7px;text-align:left;vertical-align:top}
+th{background:#f0f4fa;color:#2c5aa0;font-weight:bold}
+tbody tr:nth-child(even){background:#f8f9fa}
+.amount{text-align:right;white-space:nowrap}
+.empty{text-align:center;color:#666;padding:14px}
+.footer{text-align:center;margin-top:0.5cm;padding-top:0.2cm;border-top:1px solid #eee;color:#888;font-size:7.5pt;font-style:italic}
+@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}.report-container{max-width:none}}
 </style></head><body>
-<h1>Customer Payments Report</h1><div class="muted">${escapeHtml(metadata.shopName)}</div>
-<div class="meta">
- <div><b>Period:</b> ${escapeHtml(metadata.startDate)} to ${escapeHtml(metadata.endDate)}</div>
- <div><b>Cashier:</b> ${escapeHtml(metadata.cashierName)}</div>
- <div><b>Shift:</b> ${escapeHtml(metadata.shiftName)}</div>
- <div><b>Transaction type:</b> ${escapeHtml(metadata.typeName)}</div>
- <div><b>Payment method:</b> ${escapeHtml(metadata.paymentName)}</div>
- <div><b>Generated by:</b> ${escapeHtml(metadata.generatedBy)}</div>
-</div>
-<div class="summary"><span>Transactions: ${rows.length}</span><span>Net customer-account impact: ${escapeHtml(formatAmount(metadata.signedTotal))}</span></div>
-<p class="muted">Positive net impact increases the customer account balance; negative impact reduces it. Original and reversal rows are shown.</p>
-<h2>Totals by Transaction Type</h2>
-<table><thead><tr><th>Type</th><th class="amount">Gross Amount</th></tr></thead><tbody>${typeTotals || '<tr><td colspan="2">No transactions</td></tr>'}</tbody></table>
-<h2>Transaction Details</h2>
-<table><thead><tr><th>Date</th><th>Customer</th><th>Type</th><th>Method</th><th>Cashier</th><th>Shift</th><th>Notes</th><th class="amount">Amount</th><th class="amount">Account Impact</th></tr></thead>
-<tbody>${details || '<tr><td colspan="9">No transactions found for the selected filters.</td></tr>'}</tbody></table>
-</body></html>`
+<main class="report-container">
+<header class="report-header">
+ <h1 class="report-title">Customer Payments &amp; Inflows Report</h1>
+ <div class="report-subtitle">${escapeHtml(metadata.shopName)} Branch</div>
+ <div class="report-subtitle">${escapeHtml(metadata.startDate)} — ${escapeHtml(metadata.endDate)}</div>
+</header>
+<section class="report-meta">
+ <div><strong>Generated:</strong> ${escapeHtml(new Date().toLocaleString("en-KE"))}</div>
+ <div><strong>Generated By:</strong> ${escapeHtml(metadata.generatedBy)}</div>
+ <div><strong>Cashier:</strong> ${escapeHtml(metadata.cashierName)}</div>
+ <div><strong>Shift:</strong> ${escapeHtml(metadata.shiftName)}</div>
+ <div><strong>Transaction type:</strong> ${escapeHtml(metadata.typeName)}</div>
+ <div><strong>Payment method:</strong> ${escapeHtml(metadata.paymentName)}</div>
+ <div><strong>Report view:</strong> ${escapeHtml(metadata.flowName)}</div>
+</section>
+<section class="summary-grid">
+ <div class="summary-item"><div class="summary-value">${rows.length}</div><div class="summary-label">Transactions</div></div>
+ <div class="summary-item"><div class="summary-value">${escapeHtml(formatAmount(metadata.signedTotal))}</div><div class="summary-label">Net Customer-Account Impact</div></div>
+ <div class="summary-item"><div class="summary-value">${escapeHtml(formatAmount(metadata.cashInflowTotal))}</div><div class="summary-label">Net Customer Inflows</div></div>
+</section>
+<p class="report-note">Cash inflows match the Customer Inflows bucket in shift financial breakdown. Reversal entries reduce the original inflow; account charges that did not move money show zero cash impact.</p>
+<h2 class="section-title">Net Customer Inflows by Payment Method</h2>
+<table><thead><tr><th>Payment Method</th><th class="amount">Net Inflow</th></tr></thead><tbody>${methodTotals || '<tr><td colspan="2" class="empty">No customer inflows</td></tr>'}</tbody></table>
+<h2 class="section-title">Totals by Transaction Type</h2>
+<table><thead><tr><th>Type</th><th class="amount">Gross Amount</th></tr></thead><tbody>${typeTotals || '<tr><td colspan="2" class="empty">No transactions</td></tr>'}</tbody></table>
+<h2 class="section-title">Transaction Details</h2>
+<table><thead><tr><th>Date/Time</th><th>Customer</th><th>Type</th><th>Method</th><th>Shift Cashier</th><th>Responsible Shift</th><th>Recorded By</th><th>Notes</th><th class="amount">Amount</th><th class="amount">Account Impact</th><th class="amount">Cash Inflow</th></tr></thead>
+<tbody>${details || '<tr><td colspan="11" class="empty">No transactions found for the selected filters.</td></tr>'}</tbody></table>
+<footer class="footer">Generated on ${escapeHtml(new Date().toLocaleString("en-KE"))}</footer>
+</main></body></html>`
 }
 
 function exportPaymentsToExcel(rows: CustomerPaymentReportRow[], metadata: PaymentsReportMetadata) {
     const workbook = XLSX.utils.book_new()
     const summary = [
-        ["Customer Payments Report"],
+        ["Customer Payments & Inflows Report"],
         ["Shop", metadata.shopName],
         ["Period", `${metadata.startDate} to ${metadata.endDate}`],
         ["Cashier", metadata.cashierName],
         ["Shift", metadata.shiftName],
         ["Transaction type", metadata.typeName],
         ["Payment method", metadata.paymentName],
+        ["Report view", metadata.flowName],
         ["Generated by", metadata.generatedBy],
         ["Transactions", rows.length],
         ["Net customer-account impact (KES)", metadata.signedTotal],
+        ["Net customer inflows (KES)", metadata.cashInflowTotal],
+        [],
+        ["Net customer inflows by payment method"],
+        ["Payment method", "Net inflow (KES)"],
+        ...Object.entries(metadata.inflowsByMethod).sort(([left], [right]) => left.localeCompare(right)),
         [],
         ["Totals by transaction type"],
         ["Type", "Gross amount (KES)"],
@@ -356,7 +428,7 @@ function exportPaymentsToExcel(rows: CustomerPaymentReportRow[], metadata: Payme
     ]
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summary), "Summary")
     const details = [
-        ["Transaction ID", "Date", "Customer", "Type", "Reversal Of", "Payment Method", "Cashier", "Shift", "Notes", "Amount (KES)", "Account Impact (KES)"],
+        ["Transaction ID", "Date", "Customer", "Type", "Reversal Of", "Payment Method", "Shift Cashier", "Responsible Shift", "Recorded By", "Notes", "Amount (KES)", "Account Impact (KES)", "Cash Inflow (KES)"],
         ...rows.map((row) => [
             row.id,
             row.created_at || "",
@@ -366,9 +438,11 @@ function exportPaymentsToExcel(rows: CustomerPaymentReportRow[], metadata: Payme
             row.payment_method,
             row.cashierName || row.cashierEmail || "User",
             row.shiftName || row.shift_id || "",
+            row.recorded_by_name || "",
             row.notes || "",
             Number(row.amount),
             transactionImpact(row),
+            Number(row.cash_inflow_impact || 0),
         ]),
     ]
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(details), "Transactions")

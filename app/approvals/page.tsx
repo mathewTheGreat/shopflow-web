@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useUser } from "@clerk/nextjs"
-import { Loader2, ChevronRight, Check, X, AlertTriangle } from "lucide-react"
+import { Loader2, ChevronRight, Check, X, AlertTriangle, FilePenLine } from "lucide-react"
 import { useAppStore } from "@/store/use-app-store"
 import { useApprovals } from "@/hooks/use-approvals"
 import { Button } from "@/components/ui/button"
@@ -93,12 +93,14 @@ function ManagerApprovalView({
     shift,
     onApprove,
     onReject,
+    onCorrect,
     isApproving,
     isRejecting,
 }: {
     shift: Shift
     onApprove: () => void
     onReject: (reason: string) => void
+    onCorrect: () => void
     isApproving: boolean
     isRejecting: boolean
 }) {
@@ -159,6 +161,14 @@ function ManagerApprovalView({
                         )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={onCorrect}
+                        >
+                            <FilePenLine className="h-4 w-4 mr-1" />
+                            Correct shift
+                        </Button>
                         <Button
                             size="sm"
                             variant="default"
@@ -295,7 +305,17 @@ function ManagerApprovalView({
     )
 }
 
-function RejectedShiftCard({ shift, onApprove, isApproving }: { shift: Shift; onApprove?: () => void; isApproving?: boolean }) {
+function RejectedShiftCard({
+    shift,
+    onApprove,
+    onCorrect,
+    isApproving,
+}: {
+    shift: Shift
+    onApprove?: () => void
+    onCorrect?: () => void
+    isApproving?: boolean
+}) {
     return (
         <Card className="bg-card border shadow-sm">
             <CardContent className="p-4 space-y-4">
@@ -316,9 +336,20 @@ function RejectedShiftCard({ shift, onApprove, isApproving }: { shift: Shift; on
 
                 <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3">
                     <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
-                        Corrections are recorded from the cashier's dashboard. Once all corrections are complete, click approve below.
+                        The cashier or a manager can record corrections. Review and approve the shift separately after corrections are complete.
                     </p>
                 </div>
+
+                {onCorrect && (
+                    <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={onCorrect}
+                    >
+                        <FilePenLine className="h-4 w-4 mr-2" />
+                        Correct this shift
+                    </Button>
+                )}
 
                 {onApprove && (
                     <Button
@@ -354,6 +385,7 @@ export default function ApprovalsPage() {
     } = useApprovals()
 
     const [selectedTab, setSelectedTab] = useState<"pending" | "rejected" | "corrections">("pending")
+    const [correctionShiftId, setCorrectionShiftId] = useState<string>()
     const [shiftSearch, setShiftSearch] = useState("")
     const matchesShiftSearch = (shift: any) =>
         !shiftSearch || shift.name?.toLowerCase().includes(shiftSearch.toLowerCase())
@@ -446,6 +478,10 @@ export default function ApprovalsPage() {
                                             shift={shift}
                                             onApprove={() => approveV2(shift.id)}
                                             onReject={(reason) => rejectV2({ shiftId: shift.id, reason })}
+                                            onCorrect={() => {
+                                                setCorrectionShiftId(shift.id)
+                                                setSelectedTab("corrections")
+                                            }}
                                             isApproving={isApprovingV2}
                                             isRejecting={isRejectingV2}
                                         />
@@ -465,7 +501,16 @@ export default function ApprovalsPage() {
                                     <p className="text-sm text-muted-foreground text-center py-12">No shifts found</p>
                                 ) : (
                                     rejectedShifts.map((shift) => (
-                                        <RejectedShiftCard key={shift.id} shift={shift} onApprove={isManager ? () => approveRejectedShiftV2(shift.id) : undefined} isApproving={isApprovingRejectedShiftV2} />
+                                        <RejectedShiftCard
+                                            key={shift.id}
+                                            shift={shift}
+                                            onApprove={isManager ? () => approveRejectedShiftV2(shift.id) : undefined}
+                                            onCorrect={isManager ? () => {
+                                                setCorrectionShiftId(shift.id)
+                                                setSelectedTab("corrections")
+                                            } : undefined}
+                                            isApproving={isApprovingRejectedShiftV2}
+                                        />
                                     ))
                                 )}
                             </div>
@@ -491,7 +536,16 @@ export default function ApprovalsPage() {
                                     <p className="text-sm text-muted-foreground text-center py-12">No rejected shifts</p>
                                 ) : (
                                     visibleRejected.map((shift) => (
-                                        <RejectedShiftCard key={shift.id} shift={shift} onApprove={isManager ? () => approveRejectedShiftV2(shift.id) : undefined} isApproving={isApprovingRejectedShiftV2} />
+                                        <RejectedShiftCard
+                                            key={shift.id}
+                                            shift={shift}
+                                            onApprove={isManager ? () => approveRejectedShiftV2(shift.id) : undefined}
+                                            onCorrect={isManager ? () => {
+                                                setCorrectionShiftId(shift.id)
+                                                setSelectedTab("corrections")
+                                            } : undefined}
+                                            isApproving={isApprovingRejectedShiftV2}
+                                        />
                                     ))
                                 )}
                             </div>
@@ -500,7 +554,7 @@ export default function ApprovalsPage() {
                         {selectedTab === "corrections" && (
                             <div className="space-y-3">
                                 <h2 className="text-lg font-bold">Shift Corrections</h2>
-                                <CorrectionsTab />
+                                <CorrectionsTab initialShiftId={correctionShiftId} />
                             </div>
                         )}
                     </div>

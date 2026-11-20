@@ -9,6 +9,9 @@ export const stockTransactionService = {
     getTransactionsByShop: (shopId: string, params?: ListParams) =>
         apiClient.get<PagedResult<StockTransaction & { item_name?: string | null; created_by_name?: string | null }>>(`/api/stock/transactions/shop/${shopId}${buildListQuery(params)}`),
 
+    getTransactionsByShift: (shiftId: string) =>
+        apiClient.get<Array<StockTransaction & { item_name?: string | null }>>(`/api/stock/transactions/shift/${shiftId}`),
+
     getTransactionsByItem: (itemId: string) =>
         apiClient.get<StockTransaction[]>(`/api/stock/transactions/item/${itemId}`),
 

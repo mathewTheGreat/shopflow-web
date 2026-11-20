@@ -13,6 +13,7 @@ export interface ProductionBatchesQueryParams {
     sort_by?: ProductionSortBy
     sort_order?: ProductionSortOrder
     search?: string
+    shift_id?: string
 }
 
 export interface ProductionBatchesResponse {
@@ -83,6 +84,7 @@ export interface ProductionBatch {
     start_shift_id: string
     finalized_shift_id?: string
     original_shift_id?: string
+    responsible_shift_id?: string | null
     finalized_by?: string
     process_type: ProductionProcessType
     status: ProductionBatchStatus

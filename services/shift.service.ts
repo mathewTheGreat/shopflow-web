@@ -105,6 +105,17 @@ export const shiftService = {
             notes: string | null
         }>>(`/api/shift-corrections/shop/${shopId}/unattributed-deposits?shiftId=${encodeURIComponent(shiftId)}`),
 
+    getReversibleBankDeposits: (shopId: string, shiftId: string) =>
+        apiClient.get<Array<{
+            transferGroupId: string
+            sourceEntryId: string
+            effectiveAt: string
+            sourceAccount: "DRAWER" | "MPESA" | "SAFE" | "BANK"
+            amountMinor: number
+            destinationAccount: "DRAWER" | "MPESA" | "SAFE" | "BANK"
+            notes: string | null
+        }>>(`/api/shift-corrections/shop/${shopId}/reversible-deposits?shiftId=${encodeURIComponent(shiftId)}`),
+
     executeCorrectionAction: (caseId: string, data: {
         actionType: string
         idempotencyKey: string

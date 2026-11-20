@@ -14,6 +14,9 @@ export interface CustomerPaymentReportRow extends CustomerPaymentTransaction {
     cashierName: string | null
     cashierEmail: string | null
     shiftName: string | null
+    recordedShiftName: string | null
+    recorded_by_name: string | null
+    cash_inflow_impact: number
 }
 
 export const customerPaymentService = {
@@ -47,6 +50,9 @@ export const customerPaymentService = {
         return apiClient.get<PagedResult<CustomerPaymentTransaction>>(`/api/customer-payments/transactions/shop/${shopId}${buildListQuery(params)}`);
     },
 
+    getTransactionsByShift: async (shiftId: string) =>
+        apiClient.get<CustomerPaymentTransaction[]>(`/api/customer-payments/transactions/shift/${shiftId}`),
+
     getPaymentReport: async (params: {
         shopId: string
         startDate: string
@@ -55,6 +61,7 @@ export const customerPaymentService = {
         shiftId?: string
         type?: string
         paymentMethod?: string
+        flow?: "INFLOWS" | "ALL"
     }) => {
         const query = new URLSearchParams({
             startDate: params.startDate,
@@ -64,6 +71,7 @@ export const customerPaymentService = {
         if (params.shiftId) query.set("shiftId", params.shiftId)
         if (params.type) query.set("type", params.type)
         if (params.paymentMethod) query.set("paymentMethod", params.paymentMethod)
+        if (params.flow) query.set("flow", params.flow)
         return apiClient.get<CustomerPaymentReportRow[]>(
             `/api/customer-payments/transactions/shop/${params.shopId}/report?${query.toString()}`
         )

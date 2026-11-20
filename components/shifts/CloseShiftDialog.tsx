@@ -39,7 +39,8 @@ export function CloseShiftDialog({
                 <DialogHeader>
                     <DialogTitle className="text-xl">Close Shift</DialogTitle>
                     <DialogDescription>
-                        Enter the final balances for cash and M-Pesa to close your shift.
+                        Enter the full cash and M-Pesa balances at shift end. Include any funds carried
+                        into the shift; bank deposits made during this shift are included in its reconciliation.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -54,7 +55,7 @@ export function CloseShiftDialog({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="mpesa">Final M-Pesa Balance (KES)</Label>
+                        <Label htmlFor="mpesa">Final M-Pesa Wallet Balance (KES)</Label>
                         <Input
                             id="mpesa"
                             type="number"
